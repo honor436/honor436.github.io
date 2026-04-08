@@ -458,64 +458,60 @@ function buildTtsEntry(sequence, filePath, timestamp, script, status, requestId)
 
 /**
  * Extract all log data from an array of File objects.
+ * Files are processed in parallel (up to CONCURRENCY at a time) for faster I/O.
  *
  * @param {File[]} files
  * @param {Function|null} progressCallback
  *   (filePath, fileIndex, fileCount, overallBytes, totalBytes, fileBytes, fileTotal)
- * @param {'all'|'gps'|'route_tts'} mode  'gps' = GPS+MM only (fast),
- *   'route_tts' = Route+TTS only, 'all' = everything
+ * @param {'all'|'gps'|'route_tts'} mode
  * @returns {Promise<{ locationLogs, mmLogs, routeRequests, ttsLogs }>}
  */
 export async function extractLogs(files, progressCallback = null, mode = 'all') {
   const doGps   = mode === 'all' || mode === 'gps';
   const doRoute = mode === 'all' || mode === 'route_tts';
   const doTts   = mode === 'all' || mode === 'route_tts';
-  const locationLogs = [];  // { lon, lat, bearing, timestamp, et, sourceType, sequence }
-  const mmLogs = [];        // { lon, lat, bearing, timestamp, sourceType, sequence, details }
-  const routeRequests = [];
-  const ttsLogs = [];
-
-  let sequence = 0, mmSequence = 0, routeSequence = 0, ttsSequence = 0;
 
   const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name));
   const totalBytes = sortedFiles.reduce((s, f) => s + f.size, 0);
-  let processedBytesBeforeFile = 0;
+  const fileCount = sortedFiles.length;
 
   const markerStrings = mode === 'gps' ? GPS_INTERESTING_STRINGS
     : mode === 'route_tts' ? ROUTE_TTS_INTERESTING_STRINGS
     : ALL_INTERESTING_STRINGS;
   const interestingMarkers = encodeMarkers(markerStrings);
 
-  for (let fileIndex = 0; fileIndex < sortedFiles.length; fileIndex++) {
-    const file = sortedFiles[fileIndex];
-    const fileSize = file.size;
+  // Track per-file progress for concurrent reporting
+  const fileBytesDone = new Array(fileCount).fill(0);
+  let lastUiTick = 0;
+  function reportProgress(fileIndex, fileBytes, fileTotal) {
+    fileBytesDone[fileIndex] = fileBytes;
+    const now = Date.now();
+    if (!progressCallback || (now - lastUiTick < 80 && fileBytes < fileTotal)) return;
+    lastUiTick = now;
+    const overallBytes = Math.min(fileBytesDone.reduce((s, b) => s + b, 0), totalBytes);
+    progressCallback(
+      sortedFiles[fileIndex].name, fileIndex + 1, fileCount,
+      overallBytes, totalBytes, fileBytes, fileTotal
+    );
+  }
 
-    const onFileProgress = (fileProcessed, fileTotal) => {
-      if (progressCallback) {
-        progressCallback(
-          file.name, fileIndex + 1, sortedFiles.length,
-          processedBytesBeforeFile + fileProcessed, totalBytes,
-          fileProcessed, fileTotal
-        );
-      }
-    };
+  // ---- Per-file processor ------------------------------------------------- //
+  async function processFile(file, fileIndex) {
+    const locationLogs = [], mmLogs = [], routeRequests = [], ttsLogs = [];
+    let sequence = 0, mmSequence = 0, routeSequence = 0, ttsSequence = 0;
 
     let currentMmResult = null;
     let recentLocation = null;
     const ttsStatusByRequestId = {};
-    // #RpLog state: key = `${sgId}:${rpId}` → entry
     const rplogMap = new Map();
-    // most-recent rpId per session group that started accumulating REQ
     const rplogSessionLastRpId = new Map();
 
-    // Finalize a pending #RpLog entry into a routeRequest
     function finalizeRpLogEntry(entry) {
       if (entry.finalized) return;
       entry.finalized = true;
       const payload = extractPartialRoutePayload(entry.reqBuffer);
-      const rr = buildRouteRequest(routeSequence, file.name,
-        entry.timestamp || timestamp, entry.endpoint || '', entry.reqBuffer, payload);
-      routeSequence++;
+      const rr = buildRouteRequest(routeSequence++, file.name,
+        entry.timestamp, entry.endpoint || '', entry.reqBuffer, payload);
       rr.rpId      = entry.rpId;
       rr.rpOption  = entry.rpOption;
       rr.rpLabel   = `RP-${entry.rpId}-${entry.rpOption}`;
@@ -533,7 +529,11 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
       routeRequests.push(rr);
     }
 
-    for await (const record of iterateDltRecords(file, onFileProgress, interestingMarkers)) {
+    for await (const record of iterateDltRecords(
+      file,
+      (fb, ft) => reportProgress(fileIndex, fb, ft),
+      interestingMarkers
+    )) {
       const { text: line, timestamp } = record;
 
       const hasLocation = line.includes('#onLocationChanged') && line.includes('Location[');
@@ -719,16 +719,37 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
       }
     }
 
-    // Finalize any #RpLog entries that never received a RES line
-    for (const entry of rplogMap.values()) {
-      finalizeRpLogEntry(entry);
-    }
+      // Finalize any #RpLog entries that never received a RES line
+      for (const entry of rplogMap.values()) {
+        finalizeRpLogEntry(entry);
+      }
+      reportProgress(fileIndex, file.size, file.size);
 
-    processedBytesBeforeFile += fileSize;
+      return { locationLogs, mmLogs, routeRequests, ttsLogs };
+  } // end processFile
+
+  // ---- Run files in parallel batches -------------------------------------- //
+  const CONCURRENCY = 4;
+  const allResults = [];
+  for (let i = 0; i < fileCount; i += CONCURRENCY) {
+    const batch = [];
+    for (let j = i; j < Math.min(i + CONCURRENCY, fileCount); j++) {
+      batch.push(processFile(sortedFiles[j], j));
+    }
+    allResults.push(...await Promise.all(batch));
+  }
+
+  // ---- Merge results (preserve file-sort order, reassign sequences) ------- //
+  const locationLogs = [], mmLogs = [], routeRequests = [], ttsLogs = [];
+  let seq = 0, mmSeq = 0, routeSeq = 0, ttsSeq = 0;
+  for (const r of allResults) {
+    for (const p of r.locationLogs)    { p.sequence = seq++;      locationLogs.push(p); }
+    for (const p of r.mmLogs)          { p.sequence = mmSeq++;    mmLogs.push(p); }
+    for (const rr of r.routeRequests)  { rr.sequence = routeSeq++; routeRequests.push(rr); }
+    for (const t of r.ttsLogs)         { t.sequence = ttsSeq++;   ttsLogs.push(t); }
   }
 
   // ---- Coordinate conversion ---- //
-
   const calibSamples = [];
   for (const rr of routeRequests) {
     if (rr.departLat != null && rr.departX != null && rr.departY != null)
@@ -741,7 +762,6 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
   function convertCoord(x, y) {
     return skCoordToWgs84(x, y) || (affineTransform ? applyAffineTransform(affineTransform, +x, +y) : null);
   }
-
   function fillCoords(rr) {
     if (rr.departLat == null && rr.departX != null) {
       const c = convertCoord(rr.departX, rr.departY);
@@ -758,15 +778,9 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
       }
     }
   }
-
   routeRequests.forEach(fillCoords);
 
-  return {
-    locationLogs,
-    mmLogs,
-    routeRequests,
-    ttsLogs,
-  };
+  return { locationLogs, mmLogs, routeRequests, ttsLogs };
 }
 
 // ---- Export helpers for display ----------------------------------------- //

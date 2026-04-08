@@ -6,7 +6,7 @@
 'use strict';
 
 const DLT_MARKER = new Uint8Array([0x44, 0x4C, 0x54, 0x01]); // 'DLT\x01'
-const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
+const CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB — fewer async slice/arrayBuffer calls
 const _utf8 = new TextDecoder('utf-8', { fatal: false });
 
 const WALLCLOCK_RE = /(\d{4})[/\-](\d{2})[/\-](\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?/;

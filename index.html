@@ -108,6 +108,17 @@
       border-radius: 99px;
       transition: width 0.15s ease;
     }
+    #folder-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-all;
+      padding: 4px 8px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 6px;
+    }
+    #folder-name:empty { display: none; }
     #progress-label { font-size: 12px; font-weight: 600; color: var(--text); word-break: break-all; }
     #progress-detail { font-size: 11px; color: var(--muted); word-break: break-all; min-height: 14px; }
 
@@ -235,6 +246,7 @@
 
   <!-- Progress -->
   <div id="progress-section" hidden>
+    <div id="folder-name"></div>
     <div class="progress-track">
       <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
     </div>

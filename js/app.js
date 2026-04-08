@@ -17,6 +17,7 @@ const dropZone       = document.getElementById('drop-zone');
 const browseBtn      = document.getElementById('browse-btn');
 const browserWarn    = document.getElementById('browser-warn');
 const progressSection= document.getElementById('progress-section');
+const folderName     = document.getElementById('folder-name');
 const progressBar    = document.getElementById('progress-bar');
 const progressLabel  = document.getElementById('progress-label');
 const progressDetail = document.getElementById('progress-detail');
@@ -63,7 +64,7 @@ browseBtn.addEventListener('click', async () => {
     return; // 사용자가 취소했거나 오류
   }
 
-  startProgress();
+  startProgress(dirHandle.name);
   setProgress(0, '디렉토리 스캔 중...', '하위 디렉토리를 탐색하고 있습니다.');
 
   const { files, names } = await scanDirectory(dirHandle, onScanProgress);
@@ -87,7 +88,12 @@ dropZone.addEventListener('drop', async e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
 
-  startProgress();
+  const rootName = [...e.dataTransfer.items]
+    .map(i => i.webkitGetAsEntry?.())
+    .filter(Boolean)
+    .map(e => e.name)
+    .join(', ') || '드롭된 폴더';
+  startProgress(rootName);
   setProgress(0, '디렉토리 스캔 중...', '드롭된 항목에서 DLT 파일을 탐색합니다.');
 
   const { files, names } = await getFilesFromDataTransfer(e.dataTransfer);
@@ -189,11 +195,12 @@ async function collectFromEntry(entry, files, names, prefix) {
 
 // ---- Progress helpers ---------------------------------------------------- //
 
-function startProgress() {
+function startProgress(name = '') {
   progressSection.hidden = false;
   statsSection.hidden = true;
   layerPanel.hidden = true;
   progressFiles.innerHTML = '';
+  folderName.textContent = name ? `📁 ${name}` : '';
 }
 
 function setProgress(pct, label, detail = '') {

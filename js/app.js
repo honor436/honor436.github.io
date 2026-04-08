@@ -74,6 +74,10 @@ function updateCountDisplay() {
 
 updateCountDisplay(); // show on page load
 
+// Global uncaught error handler
+window.addEventListener('unhandledrejection', e => showError(e.reason));
+window.addEventListener('error', e => showError(e.error || e.message));
+
 // ---- Initial map load with current location ------------------------------ //
 
 initMap('map', [37.5665, 126.9780]); // default: Seoul
@@ -155,6 +159,24 @@ coordClearBtn.addEventListener('click', () => {
 function setCoordResult(msg, type) {
   coordResult.textContent = msg;
   coordResult.style.color = type === 'error' ? '#f87171' : '#4ade80';
+}
+
+// ---- Error popup --------------------------------------------------------- //
+
+const errorOverlay = document.getElementById('error-overlay');
+const errorMessage = document.getElementById('error-message');
+document.getElementById('error-close').addEventListener('click', () => {
+  errorOverlay.classList.remove('visible');
+});
+errorOverlay.addEventListener('click', e => {
+  if (e.target === errorOverlay) errorOverlay.classList.remove('visible');
+});
+
+function showError(err) {
+  const msg = err?.stack || err?.message || String(err);
+  errorMessage.textContent = msg;
+  errorOverlay.classList.add('visible');
+  console.error(err);
 }
 
 // ---- Browse button: File System Access API ------------------------------- //
@@ -387,8 +409,8 @@ async function analyzeGps(dltFiles, displayNames) {
       analyzeExtraBtn.textContent = `경로 요청(${result.routeRequests.length}) / TTS(${result.ttsLogs.length}) 결과 보기`;
     }
   } catch (err) {
-    console.error(err);
-    setProgress(0, '오류 발생', err.message);
+    setProgress(0, '오류 발생', err.message || String(err));
+    showError(err);
   }
 }
 

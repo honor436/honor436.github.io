@@ -51,7 +51,7 @@ const coordResult      = document.getElementById('coord-result');
 
 let savedFiles        = null;   // File[] from Phase 1
 let savedDisplayNames = null;   // string[] display names
-let phase1Result      = null;   // { locationLogs, mmLogs }
+let phase1Result      = null;   // { locationLogs, mmLogs, routeRequests, ttsLogs }
 
 // ---- Browser compatibility check ----------------------------------------- //
 
@@ -217,53 +217,12 @@ dropZone.addEventListener('drop', async e => {
 
 // ---- "경로/TTS 추가 분석" button ----------------------------------------- //
 
-analyzeExtraBtn.addEventListener('click', async () => {
-  if (!savedFiles || !savedDisplayNames) return;
+analyzeExtraBtn.addEventListener('click', () => {
+  if (!phase1Result) return;
 
-  analyzeExtraBtn.disabled = true;
-  analyzeExtraBtn.textContent = '경로/TTS 분석 중...';
-  progressSection.hidden = false;
-
-  let lastUIUpdate = 0;
-  function onProgress(filePath, fileIndex, fileCount, overallBytes, totalBytes, fileBytes, fileTotal) {
-    const now = Date.now();
-    if (now - lastUIUpdate < 80) return;
-    lastUIUpdate = now;
-
-    const currentIdx = fileIndex - 1;
-    const overallPct = totalBytes > 0 ? (overallBytes / totalBytes) * 100 : 0;
-    const filePct    = fileTotal  > 0 ? (fileBytes    / fileTotal)  * 100 : 0;
-
-    setProgress(
-      overallPct,
-      `경로/TTS 분석 중 — ${overallPct.toFixed(1)}%`,
-      `[${fileIndex}/${fileCount}] ${savedDisplayNames[currentIdx] ?? filePath}  (${filePct.toFixed(1)}%)`
-    );
-    renderFileList(savedDisplayNames, currentIdx, fileIndex - 1);
-  }
-
-  try {
-    const extra = await extractLogs(savedFiles, onProgress, 'route_tts');
-
-    setProgress(100, '경로/TTS 분석 완료', `총 ${savedFiles.length}개 파일 처리 완료`);
-    renderFileList(savedDisplayNames, -1, savedFiles.length);
-
-    // Merge with Phase 1 GPS results
-    const merged = {
-      locationLogs: phase1Result.locationLogs,
-      mmLogs:       phase1Result.mmLogs,
-      routeRequests: extra.routeRequests,
-      ttsLogs:       extra.ttsLogs,
-    };
-
-    displayResults(merged);
-    analyzeExtraBtn.hidden = true;
-  } catch (err) {
-    console.error(err);
-    setProgress(0, '오류 발생', err.message);
-    analyzeExtraBtn.disabled = false;
-    analyzeExtraBtn.textContent = '경로 요청 / TTS 추가 분석';
-  }
+  // Route/TTS data was already collected in Phase 1 — just render it
+  displayResults(phase1Result);
+  analyzeExtraBtn.hidden = true;
 });
 
 // ---- Directory scan: File System Access API ------------------------------ //
@@ -403,17 +362,17 @@ async function analyzeGps(dltFiles, displayNames) {
 
     setProgress(
       overallPct,
-      `[2단계] GPS 분석 중 — ${overallPct.toFixed(1)}%`,
+      `분석 중 — ${overallPct.toFixed(1)}%`,
       `[${fileIndex}/${fileCount}] ${displayNames[currentIdx] ?? filePath}  (${filePct.toFixed(1)}%)`
     );
     renderFileList(displayNames, currentIdx, fileIndex - 1);
   }
 
   try {
-    const result = await extractLogs(dltFiles, onProgress, 'gps');
+    const result = await extractLogs(dltFiles, onProgress, 'all');
     phase1Result = result;
 
-    setProgress(100, 'GPS 분석 완료', `총 ${dltFiles.length}개 파일 처리 완료`);
+    setProgress(100, '분석 완료', `총 ${dltFiles.length}개 파일 처리 완료`);
     renderFileList(displayNames, -1, dltFiles.length);
 
     localStorage.setItem('gpsAnalysisCount', String(getAnalysisCount() + 1));
@@ -421,10 +380,12 @@ async function analyzeGps(dltFiles, displayNames) {
 
     displayResults(result);
 
-    // Show "경로/TTS 추가 분석" button
-    analyzeExtraBtn.hidden   = false;
-    analyzeExtraBtn.disabled = false;
-    analyzeExtraBtn.textContent = '경로 요청 / TTS 추가 분석';
+    // Show "경로/TTS 결과 보기" button only when there is route/TTS data
+    if (result.routeRequests.length > 0 || result.ttsLogs.length > 0) {
+      analyzeExtraBtn.hidden   = false;
+      analyzeExtraBtn.disabled = false;
+      analyzeExtraBtn.textContent = `경로 요청(${result.routeRequests.length}) / TTS(${result.ttsLogs.length}) 결과 보기`;
+    }
   } catch (err) {
     console.error(err);
     setProgress(0, '오류 발생', err.message);

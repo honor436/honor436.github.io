@@ -11,7 +11,7 @@
 'use strict';
 
 import { extractLogs, formatTimestamp } from './extractor.js';
-import { initMap, renderLogs, toggleLayer, addCoordMarker, clearCoordMarkers, getMap } from './map-viewer.js';
+import { initMap, renderLogs, toggleLayer, addCoordMarker, clearCoordMarkers, getMap, setMapCenter } from './map-viewer.js';
 import { skCoordToWgs84 } from './coordinate.js';
 
 // ---- DOM refs ------------------------------------------------------------ //
@@ -56,6 +56,16 @@ let phase1Result      = null;   // { locationLogs, mmLogs }
 const hasDirectoryPicker = typeof window.showDirectoryPicker === 'function';
 if (!hasDirectoryPicker) {
   browserWarn.style.display = 'block';
+}
+
+// ---- Initial map load with current location ------------------------------ //
+
+initMap('map', [37.5665, 126.9780]); // default: Seoul
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    pos => setMapCenter(pos.coords.latitude, pos.coords.longitude, 15),
+    () => {}  // silent fail — keep default center
+  );
 }
 
 // ---- Layer toggle wiring ------------------------------------------------- //

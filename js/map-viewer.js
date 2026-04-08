@@ -6,6 +6,7 @@
 'use strict';
 
 import { formatTimestamp, preparePayloadForDisplayExport } from './extractor.js';
+import { wgs84ToSkCoord } from './coordinate.js';
 
 let map = null;
 let layers = {};
@@ -151,10 +152,34 @@ export function initMap(containerId, center = [37.5665, 126.9780]) {
 
   map.on('click', clearRouteAnchors);
 
+  // Long tap / right-click → coordinate popup
+  map.on('contextmenu', e => {
+    L.DomEvent.preventDefault(e.originalEvent);
+    const { lat, lng } = e.latlng;
+    const sk = wgs84ToSkCoord(lat, lng);
+    L.popup({ maxWidth: 260 })
+      .setLatLng(e.latlng)
+      .setContent(`
+        <div style="font-size:12px;line-height:1.8">
+          <b>좌표 정보</b><br>
+          <b>WGS84</b><br>
+          위도: ${lat.toFixed(6)}<br>
+          경도: ${lng.toFixed(6)}<br>
+          <b>SK</b><br>
+          X: ${sk[0]}<br>
+          Y: ${sk[1]}
+        </div>`)
+      .openOn(map);
+  });
+
   return map;
 }
 
 export function getLayerGroup(name) { return layers[name] || null; }
+
+export function setMapCenter(lat, lon, zoom = 15) {
+  if (map) map.setView([lat, lon], zoom);
+}
 
 // ---- Coordinate marker --------------------------------------------------- //
 

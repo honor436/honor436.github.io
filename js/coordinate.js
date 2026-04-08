@@ -73,6 +73,17 @@ export function skCoordToWgs84(skX, skY) {
   return besselToWgs84(bLon, bLat); // returns [lat, lon]
 }
 
+/**
+ * WGS84 [lat, lon] → SK integer coordinates [skX, skY]
+ * Inverse of skCoordToWgs84.
+ */
+export function wgs84ToSkCoord(lat, lon) {
+  let [x, y, z] = geodToEcef(lat, lon, 0, WGS84_A, WGS84_B);
+  x -= B2W_DX; y -= B2W_DY; z -= B2W_DZ;
+  const [bLat, bLon] = ecefToGeod(x, y, z, BESSEL_A, BESSEL_B);
+  return [Math.round(bLon * 36000), Math.round(bLat * 36000)];
+}
+
 // ---- Affine/quadratic regression fallback -------------------------------- //
 
 function affineFeatures(x, y) { return [x, y, 1.0]; }

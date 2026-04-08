@@ -311,6 +311,21 @@
     }
     details summary { cursor: pointer; font-weight: 600; margin-top: 6px; }
 
+    /* ---- Company logo ---- */
+    #company-logo {
+      margin-top: auto;
+      padding: 12px 0 4px;
+      text-align: center;
+    }
+    #company-logo img {
+      max-width: 160px;
+      height: auto;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.92);
+      padding: 8px 14px;
+      opacity: 0.85;
+    }
+
     @media (max-width: 800px) {
       body { flex-direction: column; overflow: auto; }
       #sidebar { width: 100%; max-width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
@@ -349,9 +364,15 @@
 
   <!-- Stats -->
   <div id="stats-section" hidden>
-    <div class="stat-card wide">
-      <div class="stat-label">총 위치 포인트</div>
-      <div class="stat-value" id="stat-points">—</div>
+    <div class="stat-card wide" style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="stat-label">총 위치 포인트</div>
+        <div class="stat-value" id="stat-points">—</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="stat-label">분석 횟수</div>
+        <div class="stat-value" id="stat-analysis-count" style="font-size:20px;color:var(--accent)">—</div>
+      </div>
     </div>
     <div class="stat-card">
       <div class="stat-label" style="color:#2563eb">GPS</div>
@@ -406,6 +427,11 @@
       <button id="coord-clear-btn">삭제</button>
     </div>
     <div id="coord-result"></div>
+  </div>
+
+  <!-- Company logo -->
+  <div id="company-logo">
+    <img src="images/skms-logo.png" alt="SK m&amp;service" draggable="false">
   </div>
 
   <!-- Layer toggle -->

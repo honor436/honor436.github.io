@@ -26,8 +26,9 @@ const progressLabel   = document.getElementById('progress-label');
 const progressDetail  = document.getElementById('progress-detail');
 const progressFiles   = document.getElementById('progress-files');
 const statsSection    = document.getElementById('stats-section');
-const statPoints      = document.getElementById('stat-points');
-const statGps         = document.getElementById('stat-gps');
+const statPoints         = document.getElementById('stat-points');
+const statAnalysisCount  = document.getElementById('stat-analysis-count');
+const statGps            = document.getElementById('stat-gps');
 const statDrGps       = document.getElementById('stat-drgps');
 const statMmGps       = document.getElementById('stat-mmgps');
 const statMmMatch     = document.getElementById('stat-mmmatch');
@@ -400,6 +401,9 @@ async function analyzeGps(dltFiles, displayNames) {
     setProgress(100, 'GPS 분석 완료', `총 ${dltFiles.length}개 파일 처리 완료`);
     renderFileList(displayNames, -1, dltFiles.length);
 
+    const count = (parseInt(localStorage.getItem('gpsAnalysisCount') || '0', 10)) + 1;
+    localStorage.setItem('gpsAnalysisCount', String(count));
+
     displayResults(result);
 
     // Show "경로/TTS 추가 분석" button
@@ -421,6 +425,7 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   const mmMatchCount = mmLogs.filter(p => p.sourceType === 'mm_match').length;
 
   statPoints.textContent  = locationLogs.length;
+  statAnalysisCount.textContent = localStorage.getItem('gpsAnalysisCount') || '1';
   statGps.textContent     = gpsCount;
   statDrGps.textContent   = drGpsCount;
   statMmGps.textContent   = mmGpsCount;

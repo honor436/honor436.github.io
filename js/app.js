@@ -3,7 +3,9 @@
  * Uses File System Access API (showDirectoryPicker) to read a local directory
  * without any file upload — files are read directly from the local filesystem.
  *
- * Fallback: drag & drop a folder (FileSystemEntry API)
+ * Two-phase analysis:
+ *   Phase 1 (auto) : GPS + Map Matching → fast, shows map immediately
+ *   Phase 2 (manual): Route requests + TTS → user clicks button when ready
  */
 
 'use strict';
@@ -13,25 +15,32 @@ import { initMap, renderLogs, toggleLayer } from './map-viewer.js';
 
 // ---- DOM refs ------------------------------------------------------------ //
 
-const dropZone       = document.getElementById('drop-zone');
-const browseBtn      = document.getElementById('browse-btn');
-const browserWarn    = document.getElementById('browser-warn');
-const progressSection= document.getElementById('progress-section');
-const folderName     = document.getElementById('folder-name');
-const progressBar    = document.getElementById('progress-bar');
-const progressLabel  = document.getElementById('progress-label');
-const progressDetail = document.getElementById('progress-detail');
-const progressFiles  = document.getElementById('progress-files');
-const statsSection   = document.getElementById('stats-section');
-const statPoints     = document.getElementById('stat-points');
-const statGps        = document.getElementById('stat-gps');
-const statDrGps      = document.getElementById('stat-drgps');
-const statMmGps      = document.getElementById('stat-mmgps');
-const statMmMatch    = document.getElementById('stat-mmmatch');
-const statRoute      = document.getElementById('stat-route');
-const statTts        = document.getElementById('stat-tts');
-const statTimeRange  = document.getElementById('stat-timerange');
-const layerPanel     = document.getElementById('layer-panel');
+const dropZone        = document.getElementById('drop-zone');
+const browseBtn       = document.getElementById('browse-btn');
+const browserWarn     = document.getElementById('browser-warn');
+const progressSection = document.getElementById('progress-section');
+const folderName      = document.getElementById('folder-name');
+const progressBar     = document.getElementById('progress-bar');
+const progressLabel   = document.getElementById('progress-label');
+const progressDetail  = document.getElementById('progress-detail');
+const progressFiles   = document.getElementById('progress-files');
+const statsSection    = document.getElementById('stats-section');
+const statPoints      = document.getElementById('stat-points');
+const statGps         = document.getElementById('stat-gps');
+const statDrGps       = document.getElementById('stat-drgps');
+const statMmGps       = document.getElementById('stat-mmgps');
+const statMmMatch     = document.getElementById('stat-mmmatch');
+const statRoute       = document.getElementById('stat-route');
+const statTts         = document.getElementById('stat-tts');
+const statTimeRange   = document.getElementById('stat-timerange');
+const layerPanel      = document.getElementById('layer-panel');
+const analyzeExtraBtn = document.getElementById('analyze-extra-btn');
+
+// ---- State for two-phase analysis ---------------------------------------- //
+
+let savedFiles        = null;   // File[] from Phase 1
+let savedDisplayNames = null;   // string[] display names
+let phase1Result      = null;   // { locationLogs, mmLogs }
 
 // ---- Browser compatibility check ----------------------------------------- //
 
@@ -61,7 +70,7 @@ browseBtn.addEventListener('click', async () => {
     dirHandle = await window.showDirectoryPicker({ mode: 'read' });
   } catch (e) {
     if (e.name !== 'AbortError') console.error(e);
-    return; // 사용자가 취소했거나 오류
+    return;
   }
 
   startProgress(dirHandle.name);
@@ -74,7 +83,7 @@ browseBtn.addEventListener('click', async () => {
     return;
   }
 
-  await analyzeFiles(files, names);
+  await analyzeGps(files, names);
 });
 
 // ---- Drag & drop (folder drop via FileSystemEntry API) ------------------- //
@@ -103,17 +112,62 @@ dropZone.addEventListener('drop', async e => {
     return;
   }
 
-  await analyzeFiles(files, names);
+  await analyzeGps(files, names);
+});
+
+// ---- "경로/TTS 추가 분석" button ----------------------------------------- //
+
+analyzeExtraBtn.addEventListener('click', async () => {
+  if (!savedFiles || !savedDisplayNames) return;
+
+  analyzeExtraBtn.disabled = true;
+  analyzeExtraBtn.textContent = '경로/TTS 분석 중...';
+  progressSection.hidden = false;
+
+  let lastUIUpdate = 0;
+  function onProgress(filePath, fileIndex, fileCount, overallBytes, totalBytes, fileBytes, fileTotal) {
+    const now = Date.now();
+    if (now - lastUIUpdate < 80) return;
+    lastUIUpdate = now;
+
+    const currentIdx = fileIndex - 1;
+    const overallPct = totalBytes > 0 ? (overallBytes / totalBytes) * 100 : 0;
+    const filePct    = fileTotal  > 0 ? (fileBytes    / fileTotal)  * 100 : 0;
+
+    setProgress(
+      overallPct,
+      `경로/TTS 분석 중 — ${overallPct.toFixed(1)}%`,
+      `[${fileIndex}/${fileCount}] ${savedDisplayNames[currentIdx] ?? filePath}  (${filePct.toFixed(1)}%)`
+    );
+    renderFileList(savedDisplayNames, currentIdx, fileIndex - 1);
+  }
+
+  try {
+    const extra = await extractLogs(savedFiles, onProgress, 'route_tts');
+
+    setProgress(100, '경로/TTS 분석 완료', `총 ${savedFiles.length}개 파일 처리 완료`);
+    renderFileList(savedDisplayNames, -1, savedFiles.length);
+
+    // Merge with Phase 1 GPS results
+    const merged = {
+      locationLogs: phase1Result.locationLogs,
+      mmLogs:       phase1Result.mmLogs,
+      routeRequests: extra.routeRequests,
+      ttsLogs:       extra.ttsLogs,
+    };
+
+    displayResults(merged);
+    analyzeExtraBtn.hidden = true;
+  } catch (err) {
+    console.error(err);
+    setProgress(0, '오류 발생', err.message);
+    analyzeExtraBtn.disabled = false;
+    analyzeExtraBtn.textContent = '경로 요청 / TTS 추가 분석';
+  }
 });
 
 // ---- Directory scan: File System Access API ------------------------------ //
 
-/**
- * Recursively scan a FileSystemDirectoryHandle for .dlt files.
- * @param {FileSystemDirectoryHandle} dirHandle
- * @param {Function} onFound  callback(count, latestName) called each time a file is found
- * @returns {{ files: File[], names: string[] }}
- */
 async function scanDirectory(dirHandle, onFound = null) {
   const files = [];
   const names = [];
@@ -162,7 +216,6 @@ async function getFilesFromDataTransfer(dataTransfer) {
     }
   }
 
-  // Fallback: plain file list
   for (const f of dataTransfer.files) {
     if (f.name.toLowerCase().endsWith('.dlt')) {
       files.push(f);
@@ -199,6 +252,7 @@ function startProgress(name = '') {
   progressSection.hidden = false;
   statsSection.hidden = true;
   layerPanel.hidden = true;
+  analyzeExtraBtn.hidden = true;
   progressFiles.innerHTML = '';
   folderName.textContent = name ? `📁 ${name}` : '';
 }
@@ -210,20 +264,14 @@ function setProgress(pct, label, detail = '') {
   progressDetail.textContent = detail;
 }
 
-/**
- * Render the file list panel.
- * @param {string[]} names
- * @param {number}   currentIdx  index of file currently being parsed
- * @param {number}   doneCount   number of finished files
- */
 function renderFileList(names, currentIdx, doneCount) {
   progressFiles.innerHTML = '';
   names.forEach((name, i) => {
     const row = document.createElement('div');
     let cls, icon;
-    if (i < doneCount)        { cls = 'done';    icon = '✓'; }
-    else if (i === currentIdx) { cls = 'active';  icon = '▶'; }
-    else                       { cls = 'pending'; icon = '·'; }
+    if (i < doneCount)         { cls = 'done';    icon = '✓'; }
+    else if (i === currentIdx) { cls = 'active';   icon = '▶'; }
+    else                       { cls = 'pending';  icon = '·'; }
     row.className = `pf-row ${cls}`;
     row.innerHTML = `<span class="pf-icon">${icon}</span><span class="pf-name" title="${name}">${name}</span>`;
     progressFiles.appendChild(row);
@@ -233,41 +281,47 @@ function renderFileList(names, currentIdx, doneCount) {
   });
 }
 
-// ---- Analysis ------------------------------------------------------------ //
+// ---- Phase 1: GPS + Map Matching (fast) ---------------------------------- //
 
-async function analyzeFiles(dltFiles, displayNames) {
-  // Step 1 완료 — 스캔 결과 표시
-  setProgress(0, `[1단계] 스캔 완료`, `DLT 파일 ${dltFiles.length}개 발견 — 분석을 시작합니다.`);
+async function analyzeGps(dltFiles, displayNames) {
+  savedFiles        = dltFiles;
+  savedDisplayNames = displayNames;
+  phase1Result      = null;
+
+  setProgress(0, '[1단계] 스캔 완료', `DLT 파일 ${dltFiles.length}개 발견 — GPS 분석을 시작합니다.`);
   renderFileList(displayNames, 0, 0);
 
-  // Step 2 — 파일별 분석
   let lastUIUpdate = 0;
-
   function onProgress(filePath, fileIndex, fileCount, overallBytes, totalBytes, fileBytes, fileTotal) {
     const now = Date.now();
     if (now - lastUIUpdate < 80) return;
     lastUIUpdate = now;
 
-    const currentIdx  = fileIndex - 1;
-    const overallPct  = totalBytes > 0 ? (overallBytes / totalBytes) * 100 : 0;
-    const filePct     = fileTotal  > 0 ? (fileBytes    / fileTotal)  * 100 : 0;
+    const currentIdx = fileIndex - 1;
+    const overallPct = totalBytes > 0 ? (overallBytes / totalBytes) * 100 : 0;
+    const filePct    = fileTotal  > 0 ? (fileBytes    / fileTotal)  * 100 : 0;
 
     setProgress(
       overallPct,
-      `[2단계] 파일 분석 중 — ${overallPct.toFixed(1)}%`,
+      `[2단계] GPS 분석 중 — ${overallPct.toFixed(1)}%`,
       `[${fileIndex}/${fileCount}] ${displayNames[currentIdx] ?? filePath}  (${filePct.toFixed(1)}%)`
     );
     renderFileList(displayNames, currentIdx, fileIndex - 1);
   }
 
   try {
-    const result = await extractLogs(dltFiles, onProgress);
+    const result = await extractLogs(dltFiles, onProgress, 'gps');
+    phase1Result = result;
 
-    // Step 3 — 완료
-    setProgress(100, `[3단계] 분석 완료`, `총 ${dltFiles.length}개 파일 처리 완료`);
+    setProgress(100, 'GPS 분석 완료', `총 ${dltFiles.length}개 파일 처리 완료`);
     renderFileList(displayNames, -1, dltFiles.length);
 
     displayResults(result);
+
+    // Show "경로/TTS 추가 분석" button
+    analyzeExtraBtn.hidden   = false;
+    analyzeExtraBtn.disabled = false;
+    analyzeExtraBtn.textContent = '경로 요청 / TTS 추가 분석';
   } catch (err) {
     console.error(err);
     setProgress(0, '오류 발생', err.message);
@@ -282,13 +336,13 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   const mmGpsCount   = mmLogs.filter(p => p.sourceType === 'mm_gps').length;
   const mmMatchCount = mmLogs.filter(p => p.sourceType === 'mm_match').length;
 
-  statPoints.textContent   = locationLogs.length;
-  statGps.textContent      = gpsCount;
-  statDrGps.textContent    = drGpsCount;
-  statMmGps.textContent    = mmGpsCount;
-  statMmMatch.textContent  = mmMatchCount;
-  statRoute.textContent    = routeRequests.length;
-  statTts.textContent      = ttsLogs.length;
+  statPoints.textContent  = locationLogs.length;
+  statGps.textContent     = gpsCount;
+  statDrGps.textContent   = drGpsCount;
+  statMmGps.textContent   = mmGpsCount;
+  statMmMatch.textContent = mmMatchCount;
+  statRoute.textContent   = routeRequests.length;
+  statTts.textContent     = ttsLogs.length;
 
   const allTimestamps = [
     ...locationLogs.map(p => p.timestamp),

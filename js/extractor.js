@@ -41,7 +41,21 @@ const TTS_STATUS_RE = /TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTT
 const TTS_SCRIPT_RE = /TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTTS script : ([^\x00\r\n]+)/;
 const OKHTTP_MSG_RE = /okhttp\.OkHttpClient\[\d+\]:(.*)/;
 
-const INTERESTING_STRINGS = [
+const GPS_INTERESTING_STRINGS = [
+  '#onLocationChanged',
+  '[MM_RESULT]',
+];
+
+const ROUTE_TTS_INTERESTING_STRINGS = [
+  '#onLocationChanged',   // needed for recentLocation (route anchor)
+  'RouteRequestData(',
+  '#RpLog[',
+  'okhttp.OkHttpClient',
+  'okhttpclient[',
+  'requestTTS',
+];
+
+const ALL_INTERESTING_STRINGS = [
   '#onLocationChanged',
   '[MM_RESULT]',
   'RouteRequestData(',
@@ -460,9 +474,14 @@ function buildTtsEntry(sequence, filePath, timestamp, script, status, requestId)
  * @param {File[]} files
  * @param {Function|null} progressCallback
  *   (filePath, fileIndex, fileCount, overallBytes, totalBytes, fileBytes, fileTotal)
+ * @param {'all'|'gps'|'route_tts'} mode  'gps' = GPS+MM only (fast),
+ *   'route_tts' = Route+TTS only, 'all' = everything
  * @returns {Promise<{ locationLogs, mmLogs, routeRequests, ttsLogs }>}
  */
-export async function extractLogs(files, progressCallback = null) {
+export async function extractLogs(files, progressCallback = null, mode = 'all') {
+  const doGps   = mode === 'all' || mode === 'gps';
+  const doRoute = mode === 'all' || mode === 'route_tts';
+  const doTts   = mode === 'all' || mode === 'route_tts';
   const locationLogs = [];  // { lon, lat, bearing, timestamp, et, sourceType, sequence }
   const mmLogs = [];        // { lon, lat, bearing, timestamp, sourceType, sequence, details }
   const routeRequests = [];
@@ -474,7 +493,10 @@ export async function extractLogs(files, progressCallback = null) {
   const totalBytes = sortedFiles.reduce((s, f) => s + f.size, 0);
   let processedBytesBeforeFile = 0;
 
-  const interestingMarkers = encodeMarkers(INTERESTING_STRINGS);
+  const markerStrings = mode === 'gps' ? GPS_INTERESTING_STRINGS
+    : mode === 'route_tts' ? ROUTE_TTS_INTERESTING_STRINGS
+    : ALL_INTERESTING_STRINGS;
+  const interestingMarkers = encodeMarkers(markerStrings);
 
   for (let fileIndex = 0; fileIndex < sortedFiles.length; fileIndex++) {
     const file = sortedFiles[fileIndex];
@@ -503,13 +525,13 @@ export async function extractLogs(files, progressCallback = null) {
       const { text: line, timestamp } = record;
 
       const hasLocation = line.includes('#onLocationChanged') && line.includes('Location[');
-      const hasMm = line.includes('[MM_RESULT]') || currentMmResult != null;
-      const hasRoute = (
+      const hasMm = doGps && (line.includes('[MM_RESULT]') || currentMmResult != null);
+      const hasRoute = doRoute && (
         line.includes('RouteRequestData(') || line.includes('#RpLog[') ||
         line.includes('okhttp.OkHttpClient') || line.includes('okhttpclient[') ||
         pendingRoutePost != null || pendingRouteReqLog != null || pendingRouteResp != null
       );
-      const hasTts = line.includes('requestTTS');
+      const hasTts = doTts && line.includes('requestTTS');
 
       // ---- Location ---- //
       if (hasLocation) {
@@ -521,9 +543,11 @@ export async function extractLogs(files, progressCallback = null) {
           const bearing = parseFloat(m[4]);
           const etM = ET_RE.exec(line);
           const et = etM ? etM[0] : '';
-          locationLogs.push({ lon, lat, bearing, timestamp, et, sourceType, sequence });
+          if (doGps) {
+            locationLogs.push({ lon, lat, bearing, timestamp, et, sourceType, sequence });
+            sequence++;
+          }
           recentLocation = { lon, lat, bearing, timestamp, sourceType };
-          sequence++;
         }
       }
 

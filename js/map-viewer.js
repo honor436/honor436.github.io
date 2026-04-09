@@ -231,7 +231,7 @@ function handleRulerClick(e) {
       className: 'ruler-tooltip' }).addTo(rulerLayer);
     if (rulerOnStateChange) rulerOnStateChange('start');
   } else {
-    // Second click — end marker + line + distance popup
+    // Second click — end marker + line + distance label
     const dist = rulerStart.distanceTo(latlng);
     L.circleMarker(latlng, {
       radius: 6, color: '#f59e0b', fillColor: '#fff', fillOpacity: 1, weight: 2,
@@ -244,11 +244,12 @@ function handleRulerClick(e) {
       (rulerStart.lat + latlng.lat) / 2,
       (rulerStart.lng + latlng.lng) / 2,
     );
-    L.popup({ closeButton: true, autoClose: false, closeOnClick: false, className: 'ruler-popup' })
-      .setLatLng(mid)
-      .setContent(`<div style="text-align:center;font-size:13px;font-weight:700">
-        📏 ${formatDistance(dist)}</div>`)
-      .openOn(map);
+    // Small permanent label positioned to the right of midpoint
+    L.marker(mid, { opacity: 0, interactive: false })
+      .bindTooltip(`📏 ${formatDistance(dist)}`, {
+        permanent: true, direction: 'right', offset: [8, 0],
+        className: 'ruler-dist-label',
+      }).addTo(rulerLayer);
     rulerStart = null;
     if (rulerOnStateChange) rulerOnStateChange('ready');
   }
@@ -263,7 +264,6 @@ export function setRulerMode(active, onStateChange) {
 
 export function clearRuler() {
   if (rulerLayer) rulerLayer.clearLayers();
-  if (map) map.closePopup();
   rulerStart = null;
   if (rulerActive && rulerOnStateChange) rulerOnStateChange('ready');
 }

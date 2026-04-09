@@ -1,13 +1,13 @@
 /**
  * Web Worker for SHP parsing + coordinate transformation.
- * Runs off the main thread to avoid page freeze.
+ * Processes features in chunks to avoid browser watchdog kills.
  */
 'use strict';
 
 importScripts('https://unpkg.com/shpjs@4.0.4/dist/shp.js');
 
 // ---- GCS_Tokyo (Bessel 1841) → WGS84 ------------------------------------ //
-// EPSG:1838 — Korea South (dx=-147, dy=506, dz=687.5)
+// EPSG:1838 — Korea South
 
 const BESSEL_a  = 6377397.155;
 const BESSEL_e2 = (() => { const f = 1/299.1528128;  return 2*f - f*f; })();
@@ -32,26 +32,20 @@ function besselToWgs84(lon, lat) {
   return [λ2 * 180 / Math.PI, φ2 * 180 / Math.PI];
 }
 
-function transformGeom(geom) {
-  if (!geom) return geom;
-  const tr = ([lng, lat]) => besselToWgs84(lng, lat);
-  switch (geom.type) {
-    case 'Point':           return { ...geom, coordinates: tr(geom.coordinates) };
-    case 'LineString':      return { ...geom, coordinates: geom.coordinates.map(tr) };
-    case 'MultiLineString': return { ...geom, coordinates: geom.coordinates.map(r => r.map(tr)) };
-    case 'MultiPoint':      return { ...geom, coordinates: geom.coordinates.map(tr) };
-    default:                return geom;
-  }
-}
-
-// ---- Bbox --------------------------------------------------------------- //
-
-function featureBbox(geom) {
+/**
+ * Transform coordinates in-place (no new objects) and return bbox.
+ * Single pass: transform + bbox together.
+ */
+function transformInPlace(geom) {
   let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
-  const visit = ([lng, lat]) => {
+
+  const visit = (c) => {
+    const [lng, lat] = besselToWgs84(c[0], c[1]);
+    c[0] = lng; c[1] = lat;
     if (lng < w) w = lng; if (lat < s) s = lat;
     if (lng > e) e = lng; if (lat > n) n = lat;
   };
+
   if (!geom) return [0, 0, 0, 0];
   switch (geom.type) {
     case 'Point':           visit(geom.coordinates); break;
@@ -59,38 +53,54 @@ function featureBbox(geom) {
     case 'MultiLineString': geom.coordinates.forEach(r => r.forEach(visit)); break;
     case 'MultiPoint':      geom.coordinates.forEach(visit); break;
   }
-  return [w, s, e, n];
+  return [w === Infinity ? 0 : w, s === Infinity ? 0 : s, e, n];
 }
 
 // ---- Message handler ---------------------------------------------------- //
 
-self.onmessage = function ({ data: { shpBuf, dbfBuf } }) {
+const CHUNK_SIZE = 5000;
+
+self.onmessage = async function ({ data: { shpBuf, dbfBuf } }) {
   try {
     postMessage({ type: 'progress', pct: 25, msg: '[2/4] 지오메트리 파싱 중...' });
     const geometries = shp.parseShp(shpBuf);
+    const total = geometries.length;
 
     let attributes = [];
     if (dbfBuf) {
-      postMessage({ type: 'progress', pct: 45, msg: '[3/4] DBF 속성 읽는 중...' });
+      postMessage({ type: 'progress', pct: 40, msg: '[3/4] DBF 속성 읽는 중...' });
       attributes = shp.parseDbf(dbfBuf);
-    } else {
-      postMessage({ type: 'progress', pct: 50, msg: '[3/4] DBF 없음' });
     }
 
-    postMessage({ type: 'progress', pct: 65, msg: '[4/4] 좌표 변환 중...' });
+    postMessage({ type: 'progress', pct: 55, msg: `[4/4] 좌표 변환 중... (0 / ${total.toLocaleString()})` });
 
-    const total = geometries.length;
-    const data  = new Array(total);
-    for (let i = 0; i < total; i++) {
-      const geom = transformGeom(geometries[i]);
-      data[i] = {
-        feature: { type: 'Feature', geometry: geom, properties: attributes[i] || {} },
-        bbox: featureBbox(geom),
-      };
+    // Process in chunks + yield to avoid browser watchdog
+    for (let start = 0; start < total; start += CHUNK_SIZE) {
+      const end   = Math.min(start + CHUNK_SIZE, total);
+      const chunk = [];
+
+      for (let i = start; i < end; i++) {
+        const geom = geometries[i];
+        const bbox = transformInPlace(geom);
+        chunk.push({
+          feature: { type: 'Feature', geometry: geom, properties: attributes[i] || {} },
+          bbox,
+        });
+      }
+
+      const pct = 55 + Math.round((end / total) * 40);
+      postMessage({
+        type: 'chunk',
+        data: chunk,
+        pct,
+        msg: `[4/4] 좌표 변환 중... (${end.toLocaleString()} / ${total.toLocaleString()})`,
+      });
+
+      // Yield — lets the browser process events and prevents watchdog kill
+      await new Promise(r => setTimeout(r, 0));
     }
 
-    postMessage({ type: 'progress', pct: 90, msg: '결과 전송 중...' });
-    postMessage({ type: 'done', data });
+    postMessage({ type: 'done', total });
   } catch (err) {
     postMessage({ type: 'error', msg: err.message || String(err) });
   }

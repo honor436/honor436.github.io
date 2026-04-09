@@ -54,15 +54,20 @@ function bboxIntersects([fw, fs, fe, fn], bounds) {
 
 function parseInWorker(shpBuf, dbfBuf, onProgress) {
   return new Promise((resolve, reject) => {
-    const workerUrl = new URL('./shp-worker.js', import.meta.url);
-    const worker    = new Worker(workerUrl);
+    const workerUrl  = new URL('./shp-worker.js', import.meta.url);
+    const worker     = new Worker(workerUrl);
+    const accumulated = [];
 
     worker.onmessage = ({ data }) => {
       if (data.type === 'progress') {
         if (onProgress) onProgress(data.pct, data.msg);
+      } else if (data.type === 'chunk') {
+        // Accumulate features as they arrive from the worker
+        for (let i = 0; i < data.data.length; i++) accumulated.push(data.data[i]);
+        if (onProgress) onProgress(data.pct, data.msg);
       } else if (data.type === 'done') {
         worker.terminate();
-        resolve(data.data);   // array of { feature, bbox }
+        resolve(accumulated);
       } else if (data.type === 'error') {
         worker.terminate();
         reject(new Error(data.msg));

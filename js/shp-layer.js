@@ -7,6 +7,7 @@
  *  - Worker keeps ALL raw geometries + Float64Array bbox index.
  *  - Main thread sends viewport bounds → worker returns only visible features.
  *  - Coordinate transform (Bessel→WGS84) happens in worker, only for visible features.
+ *  - DBF attributes are NOT loaded at startup — fetched on-demand per click via 'attrs'.
  *  - No bulk transfer of millions of features to main thread.
  */
 
@@ -30,6 +31,10 @@ let linkQueryId = 0;
 let nodeQueryId = 0;
 let linkEnabled = true;
 let nodeEnabled = true;
+
+// Pending callbacks for on-demand attrs requests
+let pendingLinkAttrsCallback = null;
+let pendingNodeAttrsCallback = null;
 
 // ---- Link selection mode ------------------------------------------------- //
 
@@ -110,7 +115,7 @@ function ensureMapMoveListener(map) {
 function buildPopupHtml(props) {
   if (!props) return '<em style="color:#94a3b8">속성 없음</em>';
   const entries = Object.entries(props)
-    .filter(([k, v]) => k !== '_shpIndex' && v !== null && v !== undefined && v !== '');
+    .filter(([, v]) => v !== null && v !== undefined && v !== '');
   if (!entries.length) return '<em style="color:#94a3b8">속성 없음</em>';
   const rows = entries.map(([k, v]) =>
     `<tr>
@@ -132,9 +137,11 @@ export function clearShpLayers() {
   if (nodeLayer)  { try { nodeLayer.remove();      } catch {} nodeLayer  = null; }
   const map = getMap();
   if (activePopup && map) { try { map.closePopup(); } catch {} }
-  activePopup   = null;
-  selectedIndex = -1;
-  selectedLayer = null;
+  activePopup              = null;
+  selectedIndex            = -1;
+  selectedLayer            = null;
+  pendingLinkAttrsCallback = null;
+  pendingNodeAttrsCallback = null;
 }
 
 /**
@@ -181,7 +188,7 @@ export function toggleShpNode(visible) {
 async function renderShpGroup(name, group, onProgress) {
   const prog = (pct, msg) => { if (onProgress) onProgress(pct, msg); };
 
-  prog(5, '[1/3] 파일 읽는 중...');
+  prog(5, '파일 읽는 중...');
   const shpBuf = await group.shp.arrayBuffer();
   const dbfBuf = group.dbf ? await group.dbf.arrayBuffer() : null;
 
@@ -241,13 +248,19 @@ async function renderShpGroup(name, group, onProgress) {
             e.target.setStyle({ color: '#ef4444', weight: 3, opacity: 1 });
             selectedLayer = e.target;
             selectedIndex = idx;
-            onLinkSelect(feature.properties);
+            // Request attrs on-demand
+            pendingLinkAttrsCallback = props => onLinkSelect(props);
+            linkWorker.postMessage({ type: 'attrs', index: idx });
           } else if (!linkSelectMode) {
             if (activePopup) { try { map.closePopup(); } catch {} }
-            activePopup = L.popup({ maxWidth: 320, closeButton: true, autoClose: false, closeOnClick: false })
-              .setLatLng(e.latlng)
-              .setContent(buildPopupHtml(feature.properties));
-            map.openPopup(activePopup);
+            const latlng = e.latlng;
+            pendingLinkAttrsCallback = props => {
+              activePopup = L.popup({ maxWidth: 320, closeButton: true, autoClose: false, closeOnClick: false })
+                .setLatLng(latlng)
+                .setContent(buildPopupHtml(props));
+              map.openPopup(activePopup);
+            };
+            linkWorker.postMessage({ type: 'attrs', index: idx });
           }
         });
         layer.on('mouseover', e => {
@@ -259,11 +272,18 @@ async function renderShpGroup(name, group, onProgress) {
       },
     }).addTo(map);
 
-    // Switch worker message handler to query responses
+    // Handle both 'features' (viewport query) and 'attrs' (on-demand click) responses
     worker.onmessage = ({ data }) => {
-      if (data.type !== 'features' || data.queryId !== linkQueryId || !linkLayer) return;
-      linkLayer.clearLayers();
-      data.data.forEach(d => linkLayer.addData(d.wgs84Feature));
+      if (data.type === 'features') {
+        if (data.queryId !== linkQueryId || !linkLayer) return;
+        linkLayer.clearLayers();
+        data.data.forEach(d => linkLayer.addData(d.wgs84Feature));
+      } else if (data.type === 'attrs') {
+        if (pendingLinkAttrsCallback) {
+          pendingLinkAttrsCallback(data.props);
+          pendingLinkAttrsCallback = null;
+        }
+      }
     };
 
   } else {
@@ -276,21 +296,33 @@ async function renderShpGroup(name, group, onProgress) {
         radius: 3, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.8, weight: 1,
       }),
       onEachFeature(feature, layer) {
+        const idx = feature._shpIndex;
         layer.on('click', e => {
           L.DomEvent.stopPropagation(e);
           if (activePopup) { try { map.closePopup(); } catch {} }
-          activePopup = L.popup({ maxWidth: 320, closeButton: true, autoClose: false, closeOnClick: false })
-            .setLatLng(e.latlng)
-            .setContent(buildPopupHtml(feature.properties));
-          map.openPopup(activePopup);
+          const latlng = e.latlng;
+          pendingNodeAttrsCallback = props => {
+            activePopup = L.popup({ maxWidth: 320, closeButton: true, autoClose: false, closeOnClick: false })
+              .setLatLng(latlng)
+              .setContent(buildPopupHtml(props));
+            map.openPopup(activePopup);
+          };
+          nodeWorker.postMessage({ type: 'attrs', index: idx });
         });
       },
     }).addTo(map);
 
     worker.onmessage = ({ data }) => {
-      if (data.type !== 'features' || data.queryId !== nodeQueryId || !nodeLayer) return;
-      nodeLayer.clearLayers();
-      data.data.forEach(d => nodeLayer.addData(d.wgs84Feature));
+      if (data.type === 'features') {
+        if (data.queryId !== nodeQueryId || !nodeLayer) return;
+        nodeLayer.clearLayers();
+        data.data.forEach(d => nodeLayer.addData(d.wgs84Feature));
+      } else if (data.type === 'attrs') {
+        if (pendingNodeAttrsCallback) {
+          pendingNodeAttrsCallback(data.props);
+          pendingNodeAttrsCallback = null;
+        }
+      }
     };
   }
 

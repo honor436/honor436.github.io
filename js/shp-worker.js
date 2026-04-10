@@ -4,23 +4,32 @@
  * Protocol (main → worker):
  *   { type: 'load', shpBuf, dbfBuf }
  *   { type: 'query', bounds: [w,s,e,n], queryId }
+ *   { type: 'attrs', index }
  *
  * Protocol (worker → main):
  *   { type: 'progress', pct, msg }
  *   { type: 'ready', count, geomType }
  *   { type: 'features', data: [{index, wgs84Feature}], queryId }
+ *   { type: 'attrs', index, props }
  *   { type: 'error', msg }
  *
- * All raw geometries stay in worker memory — never bulk-transferred to main.
+ * DBF attributes are NOT parsed at load time.
+ * Only the header (field defs + record size) is parsed once.
+ * Individual records are read on-demand via 'attrs' messages.
  */
 'use strict';
 
 importScripts('https://unpkg.com/shpjs@4.0.4/dist/shp.js');
 
-// ---- Worker-local state (5M features stay here) ------------------------- //
+// ---- Worker-local state -------------------------------------------------- //
 let _geometries = null;
-let _attributes = null;
 let _bboxes     = null;   // Float64Array [w,s,e,n, ...] — compact spatial index
+
+// DBF on-demand state
+let _dbfRaw     = null;   // raw ArrayBuffer — never fully parsed
+let _dbfFields  = null;   // [{name, type, length}]
+let _dbfHdrSize = 0;
+let _dbfRecSize = 0;
 
 // ---- GCS_Tokyo (Bessel 1841) → WGS84 — EPSG:1838 Korea South ----------- //
 const BESSEL_a  = 6377397.155;
@@ -75,25 +84,65 @@ function rawBbox(geom) {
   return [w === Infinity ? 0 : w, s === Infinity ? 0 : s, e, n];
 }
 
+// ---- DBF on-demand reader ------------------------------------------------ //
+
+function parseDbfHeader(buf) {
+  const u8  = new Uint8Array(buf);
+  const dv  = new DataView(buf);
+  const hdrSize = dv.getUint16(8, true);
+  const recSize = dv.getUint16(10, true);
+  const fields  = [];
+  for (let off = 32; off < hdrSize - 1; off += 32) {
+    let name = '';
+    for (let i = 0; i < 11 && u8[off + i]; i++) name += String.fromCharCode(u8[off + i]);
+    if (!name) break;
+    const type   = String.fromCharCode(u8[off + 11]);
+    const length = u8[off + 16];
+    fields.push({ name, type, length });
+  }
+  return { fields, hdrSize, recSize };
+}
+
+function readDbfRecord(index) {
+  if (!_dbfRaw || !_dbfFields) return {};
+  const decoder = new TextDecoder('euc-kr');
+  let off = _dbfHdrSize + index * _dbfRecSize + 1;  // +1: skip deletion flag
+  const props = {};
+  for (const f of _dbfFields) {
+    const slice = new Uint8Array(_dbfRaw, off, f.length);
+    let val = decoder.decode(slice).trim();
+    if (f.type === 'N' || f.type === 'F') {
+      const n = parseFloat(val);
+      if (!isNaN(n)) val = n;
+    }
+    if (val !== '' && val !== null && val !== undefined) props[f.name] = val;
+    off += f.length;
+  }
+  return props;
+}
+
 // ---- Message handler ----------------------------------------------------- //
 
 self.onmessage = async function ({ data }) {
 
-  // ---- LOAD: parse files + build spatial index -------------------------- //
+  // ---- LOAD: parse SHP + build spatial index (DBF header only) ---------- //
   if (data.type === 'load') {
     try {
-      postMessage({ type: 'progress', pct: 20, msg: '[2/3] 지오메트리 파싱 중...' });
+      postMessage({ type: 'progress', pct: 20, msg: '[1/2] 지오메트리 파싱 중...' });
       _geometries = shp.parseShp(data.shpBuf);
       const total = _geometries.length;
 
-      _attributes = [];
+      // Parse DBF header only — store raw buffer for on-demand record reads
       if (data.dbfBuf) {
-        postMessage({ type: 'progress', pct: 40, msg: '[3/3] DBF 속성 읽는 중...' });
-        _attributes = shp.parseDbf(data.dbfBuf);
+        const h = parseDbfHeader(data.dbfBuf);
+        _dbfRaw     = data.dbfBuf;
+        _dbfFields  = h.fields;
+        _dbfHdrSize = h.hdrSize;
+        _dbfRecSize = h.recSize;
       }
 
-      postMessage({ type: 'progress', pct: 55,
-        msg: `공간 인덱스 생성 중... (0 / ${total.toLocaleString()})` });
+      postMessage({ type: 'progress', pct: 40,
+        msg: `[2/2] 공간 인덱스 생성 중... (0 / ${total.toLocaleString()})` });
 
       // Build compact Float64Array bbox index — 100K chunks with yield
       _bboxes = new Float64Array(total * 4);
@@ -104,9 +153,9 @@ self.onmessage = async function ({ data }) {
           const [w, s, e, n] = rawBbox(_geometries[j]);
           _bboxes[j*4] = w; _bboxes[j*4+1] = s; _bboxes[j*4+2] = e; _bboxes[j*4+3] = n;
         }
-        const pct = 55 + Math.round((end / total) * 40);
+        const pct = 40 + Math.round((end / total) * 55);
         postMessage({ type: 'progress', pct,
-          msg: `공간 인덱스 생성 중... (${end.toLocaleString()} / ${total.toLocaleString()})` });
+          msg: `[2/2] 공간 인덱스 생성 중... (${end.toLocaleString()} / ${total.toLocaleString()})` });
         await new Promise(r => setTimeout(r, 0));  // yield — keep browser responsive
       }
 
@@ -116,7 +165,7 @@ self.onmessage = async function ({ data }) {
       postMessage({ type: 'error', msg: err.message || String(err) });
     }
 
-  // ---- QUERY: return only visible features (with WGS84 transform) ------- //
+  // ---- QUERY: return only visible features (properties fetched on demand) //
   } else if (data.type === 'query') {
     if (!_bboxes) return;
     const [qw, qs, qe, qn] = data.bounds;
@@ -130,12 +179,16 @@ self.onmessage = async function ({ data }) {
           wgs84Feature: {
             type: 'Feature',
             geometry: transformGeom(_geometries[idx]),
-            properties: _attributes[idx] || {},
-            _shpIndex: idx,   // for selection tracking in main thread
+            properties: {},   // fetched on demand via 'attrs'
+            _shpIndex: idx,
           },
         });
       }
     }
     postMessage({ type: 'features', data: result, queryId: data.queryId });
+
+  // ---- ATTRS: read single DBF record by index ----------------------------- //
+  } else if (data.type === 'attrs') {
+    postMessage({ type: 'attrs', index: data.index, props: readDbfRecord(data.index) });
   }
 };

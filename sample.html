@@ -6,7 +6,6 @@
   <title>CJ더마켓 - TDS Sample</title>
   <style>
     :root {
-      /* TDS Color System (Light Mode) */
       --grey50: #f9fafb;
       --grey100: #f2f4f6;
       --grey200: #e5e8eb;
@@ -17,19 +16,13 @@
       --grey700: #4e5968;
       --grey800: #333d4b;
       --grey900: #191f28;
-      --blue50: #e8f3ff;
-      --blue100: #c9e2ff;
       --blue500: #3182f6;
-      --blue600: #2272eb;
       --red500: #f04452;
+      --green500: #22c55e;
       --bg: #FFFFFF;
-      --surface: var(--grey50);
-      --border: var(--grey200);
       --text: var(--grey900);
-      --text-secondary: var(--grey700);
       --muted: var(--grey500);
       --accent: var(--blue500);
-      /* TDS Radius */
       --radius-sm: 8px;
       --radius-md: 12px;
       --radius-lg: 16px;
@@ -38,403 +31,338 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Toss Product Sans', 'SF Pro KR', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Roboto, 'Noto Sans KR', 'Helvetica Neue', sans-serif;
+      font-family: 'Toss Product Sans', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Roboto, 'Noto Sans KR', sans-serif;
       background: var(--grey100);
       color: var(--text);
       font-size: 15px;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ---- App Container ---- */
-    .app-container {
+    .app {
       max-width: 430px;
       margin: 0 auto;
       min-height: 100vh;
       background: var(--bg);
-      box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 0 40px rgba(0,0,0,0.06);
       padding-bottom: 80px;
       position: relative;
     }
 
-    /* ---- Top Navigation (iOS 18 style) ---- */
-    .top-nav {
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: saturate(180%) blur(20px);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
+    /* ---- Header ---- */
+    .header {
+      padding: 14px 16px 0;
+      background: var(--bg);
       position: sticky;
       top: 0;
       z-index: 100;
-      border-bottom: 0.5px solid rgba(0, 0, 0, 0.12);
     }
 
-    .nav-logo {
-      font-size: 17px;
-      font-weight: 600;
+    .header-logo {
+      font-size: 20px;
+      font-weight: 800;
       color: var(--text);
-      line-height: 22px;
-      letter-spacing: -0.4px;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
     }
 
-    .nav-logo span {
-      color: var(--accent);
+    .header-logo span {
+      color: #2b9e3f;
     }
 
-    .nav-left {
+    /* ---- Top Tabs ---- */
+    .top-tabs {
       display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .nav-actions {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    .nav-icon {
-      width: 28px;
-      height: 28px;
-      color: var(--accent);
-      cursor: pointer;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: background 0.15s;
-    }
-
-    .nav-icon svg {
-      width: 22px;
-      height: 22px;
-    }
-
-    .nav-icon:active {
-      background: rgba(0, 0, 0, 0.06);
-    }
-
-    .cart-badge {
-      position: absolute;
-      top: -2px;
-      right: -4px;
-      background: var(--red500);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 600;
-      min-width: 16px;
-      height: 16px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      padding: 0 4px;
-      border: 1.5px solid #fff;
-    }
-
-    /* ---- Carousel ---- */
-    .carousel-section {
-      position: relative;
-      overflow: hidden;
-      background: var(--grey100);
-    }
-
-    .carousel-viewport {
-      overflow: hidden;
-      touch-action: pan-y;
-    }
-
-    .carousel-track {
-      display: flex;
-      transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-
-    .carousel-slide {
-      min-width: 100%;
-      flex-shrink: 0;
-      aspect-ratio: 16 / 9;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 28px 24px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .carousel-slide::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 60%);
-      z-index: 1;
-    }
-
-    .slide-tag {
-      position: relative;
-      z-index: 2;
-      display: inline-block;
-      width: fit-content;
-      background: rgba(255,255,255,0.2);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-bottom: 8px;
-      letter-spacing: 0.2px;
-    }
-
-    .slide-title {
-      position: relative;
-      z-index: 2;
-      color: #fff;
-      font-size: 22px;
-      font-weight: 700;
-      line-height: 31px;
-      letter-spacing: -0.4px;
-    }
-
-    .slide-desc {
-      position: relative;
-      z-index: 2;
-      color: rgba(255,255,255,0.85);
-      font-size: 14px;
-      line-height: 21px;
-      margin-top: 4px;
-    }
-
-    .slide-1 { background: linear-gradient(135deg, #3182f6 0%, #1b64da 50%, #194aa6 100%); }
-    .slide-2 { background: linear-gradient(135deg, #f04452 0%, #d22030 50%, #a51926 100%); }
-    .slide-3 { background: linear-gradient(135deg, #22c55e 0%, #15803d 50%, #027648 100%); }
-    .slide-4 { background: linear-gradient(135deg, #f59e0b 0%, #e45600 50%, #c2410c 100%); }
-    .slide-5 { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #65237b 100%); }
-
-    .carousel-indicators {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-      padding: 14px 0;
-      background: var(--bg);
-    }
-
-    .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 3px;
-      background: var(--grey300);
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-
-    .dot.active {
-      width: 20px;
-      background: var(--grey800);
-    }
-
-    /* ---- Quick Menu ---- */
-    .quick-menu-section {
-      padding: 20px 16px 24px;
-    }
-
-    .quick-menu-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 18px 0;
-    }
-
-    .quick-menu-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .quick-menu-item:active .quick-menu-icon {
-      transform: scale(0.92);
-      background: var(--grey200);
-    }
-
-    .quick-menu-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: var(--grey50);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      transition: all 0.15s ease;
-      border: 1px solid var(--grey200);
-    }
-
-    .quick-menu-label {
-      font-size: 12px;
-      line-height: 18px;
-      color: var(--text-secondary);
-      text-align: center;
-      font-weight: 400;
-      letter-spacing: -0.2px;
-    }
-
-    /* ---- Section Divider ---- */
-    .section-divider {
-      height: 8px;
-      background: var(--grey100);
-    }
-
-    /* ---- Tab Section ---- */
-    .tab-section {
-      background: var(--bg);
-    }
-
-    .tab-bar {
-      display: flex;
-      border-bottom: 1px solid var(--grey200);
+      gap: 0;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+      border-bottom: 1px solid var(--grey200);
+      background: var(--bg);
     }
+    .top-tabs::-webkit-scrollbar { display: none; }
 
-    .tab-bar::-webkit-scrollbar { display: none; }
-
-    .tab-item {
+    .top-tab {
       flex-shrink: 0;
-      padding: 14px 16px;
-      font-size: 15px;
-      font-weight: 400;
+      padding: 10px 14px 12px;
+      font-size: 14px;
+      font-weight: 500;
       color: var(--grey500);
       cursor: pointer;
       position: relative;
       white-space: nowrap;
-      transition: color 0.2s;
       -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s;
     }
 
-    .tab-item.active {
+    .top-tab.active {
       color: var(--grey900);
-      font-weight: 600;
+      font-weight: 700;
     }
 
-    .tab-item.active::after {
+    .top-tab.active::after {
       content: '';
       position: absolute;
       bottom: 0;
-      left: 16px;
-      right: 16px;
-      height: 2px;
+      left: 14px;
+      right: 14px;
+      height: 2.5px;
       background: var(--grey900);
-      border-radius: 1px;
+      border-radius: 2px;
     }
 
-    /* ---- Product Grid (Bonus section) ---- */
-    .product-section {
-      padding: 20px 16px;
+    /* ---- Banner Carousel ---- */
+    .banner-section {
+      padding: 16px 0 20px;
     }
 
-    .product-section-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 29px;
-      margin-bottom: 4px;
-      letter-spacing: -0.3px;
-    }
-
-    .product-section-desc {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 19.5px;
-      margin-bottom: 16px;
-    }
-
-    .product-scroll {
+    .banner-scroll {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
-      padding-bottom: 4px;
+      padding: 0 16px;
+      scroll-snap-type: x mandatory;
     }
+    .banner-scroll::-webkit-scrollbar { display: none; }
 
-    .product-scroll::-webkit-scrollbar { display: none; }
-
-    .product-card {
+    .banner-card {
       flex-shrink: 0;
-      width: 140px;
+      width: 280px;
+      height: 320px;
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
       cursor: pointer;
+      scroll-snap-align: start;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .product-card:active {
-      opacity: 0.7;
+    .banner-card:active {
+      opacity: 0.9;
     }
 
-    .product-thumb {
+    .banner-bg {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 20px;
+      position: relative;
+    }
+
+    .banner-card-1 .banner-bg {
+      background: linear-gradient(160deg, #f0f4e8 0%, #e8eddf 40%, #dde4d3 100%);
+    }
+    .banner-card-2 .banner-bg {
+      background: linear-gradient(160deg, #1a2a1a 0%, #0d1f0d 100%);
+    }
+    .banner-card-3 .banner-bg {
+      background: linear-gradient(160deg, #fff5f0 0%, #ffe8dd 100%);
+    }
+    .banner-card-4 .banner-bg {
+      background: linear-gradient(160deg, #eef0ff 0%, #dde2ff 100%);
+    }
+
+    /* 배너 내 이미지 장식 */
+    .banner-deco {
+      position: absolute;
+      top: 16px;
+      right: 16px;
       width: 140px;
-      height: 140px;
-      border-radius: var(--radius-md);
-      background: var(--grey100);
-      margin-bottom: 10px;
+      height: 160px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 48px;
-      overflow: hidden;
+      font-size: 80px;
+      opacity: 0.9;
     }
 
-    .product-brand {
+    .banner-badge {
+      position: absolute;
+      top: auto;
+      bottom: 100px;
+      right: 16px;
+      background: #2b9e3f;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 6px 10px;
+      border-radius: 10px;
+      line-height: 1.3;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .banner-badge small {
+      font-size: 10px;
+      font-weight: 600;
+      display: block;
+    }
+
+    .banner-subtitle {
       font-size: 12px;
-      color: var(--muted);
-      line-height: 18px;
-      margin-bottom: 2px;
+      color: var(--grey600);
+      font-weight: 500;
+      margin-bottom: 4px;
+      position: relative;
+      z-index: 2;
     }
 
-    .product-name {
-      font-size: 14px;
-      color: var(--text);
-      line-height: 21px;
-      font-weight: 400;
-      margin-bottom: 6px;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+    .banner-card-2 .banner-subtitle { color: rgba(255,255,255,0.6); }
+
+    .banner-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--grey900);
+      line-height: 1.35;
+      letter-spacing: -0.5px;
+      position: relative;
+      z-index: 2;
     }
 
-    .product-price {
+    .banner-card-2 .banner-title { color: #fff; }
+
+    .banner-desc {
+      font-size: 12px;
+      color: var(--grey500);
+      margin-top: 4px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .banner-card-2 .banner-desc { color: rgba(255,255,255,0.5); }
+
+    /* ---- Quick Menu (가로 스크롤, 둥근 사각형 아이콘) ---- */
+    .quick-section {
+      padding: 0 0 20px;
+    }
+
+    .quick-scroll {
       display: flex;
-      align-items: baseline;
-      gap: 4px;
+      gap: 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 0 16px;
+    }
+    .quick-scroll::-webkit-scrollbar { display: none; }
+
+    .quick-item {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      width: 56px;
     }
 
-    .price-discount {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--red500);
+    .quick-item:active .quick-icon {
+      transform: scale(0.92);
     }
 
-    .price-value {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
+    .quick-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      transition: transform 0.15s;
+      overflow: hidden;
+      position: relative;
     }
 
-    .price-original {
-      font-size: 12px;
-      color: var(--grey400);
-      text-decoration: line-through;
+    .quick-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 각 퀵메뉴 색상 */
+    .qi-shooting { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
+    .qi-fresh { background: linear-gradient(135deg, #e8f5e9, #a5d6a7); }
+    .qi-emart { background: #ffe500; color: #222; }
+    .qi-smart { background: linear-gradient(135deg, #e3f2fd, #90caf9); }
+    .qi-best { background: linear-gradient(135deg, #f3e5f5, #ce93d8); }
+    .qi-new { background: linear-gradient(135deg, #fff3e0, #ffb74d); }
+    .qi-event { background: linear-gradient(135deg, #fce4ec, #f48fb1); }
+    .qi-gift { background: linear-gradient(135deg, #e8eaf6, #9fa8da); }
+
+    .quick-icon-text {
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .quick-label {
+      font-size: 11px;
+      color: var(--grey700);
+      font-weight: 500;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* ---- Category Pills ---- */
+    .category-section {
+      padding: 0 16px 20px;
+    }
+
+    .category-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .category-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--grey200);
+      background: var(--bg);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--grey800);
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .category-pill:active {
+      background: var(--grey100);
+    }
+
+    .category-pill.active {
+      background: var(--grey900);
+      color: #fff;
+      border-color: var(--grey900);
+    }
+
+    .category-pill .pill-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .category-pill.active .pill-icon {
+      filter: brightness(10);
     }
 
     /* ---- Liquid Glass Tab Bar ---- */
@@ -446,21 +374,12 @@
       width: calc(100% - 32px);
       max-width: 398px;
       height: 56px;
-      /* Liquid Glass layers */
-      background:
-        linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.35) 100%);
+      background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.4) 100%);
       backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
       -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
-      /* Glass edge: inner glow + outer specular */
       border: 0.5px solid rgba(255,255,255,0.55);
-      box-shadow:
-        /* outer soft shadow */
-        0 8px 32px rgba(0, 0, 0, 0.08),
-        0 2px 8px rgba(0, 0, 0, 0.04),
-        /* inner specular highlight (top) */
-        inset 0 1px 0 rgba(255,255,255,0.6),
-        /* inner bottom subtle refraction */
-        inset 0 -0.5px 0 rgba(255,255,255,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04),
+        inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -0.5px 0 rgba(255,255,255,0.2);
       border-radius: 22px;
       display: flex;
       align-items: stretch;
@@ -469,21 +388,17 @@
       overflow: hidden;
     }
 
-    /* Specular shine overlay */
     .bottom-nav::before {
       content: '';
       position: absolute;
-      top: 0;
-      left: 10%;
-      right: 10%;
-      height: 50%;
+      top: 0; left: 10%; right: 10%; height: 50%;
       background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 100%);
       border-radius: 22px 22px 50% 50%;
       pointer-events: none;
       z-index: 1;
     }
 
-    .bottom-nav-item {
+    .bnav-item {
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -495,458 +410,263 @@
       padding: 6px 0;
       position: relative;
       z-index: 2;
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
     }
 
-    .bottom-nav-item:active {
-      transform: scale(0.88);
-    }
+    .bnav-item:active { transform: scale(0.88); }
 
-    /* Active pill (liquid glass highlight) */
-    .bottom-nav-item.active::before {
+    .bnav-item.active::before {
       content: '';
       position: absolute;
-      inset: 6px 8px;
-      background: linear-gradient(135deg, rgba(49,130,246,0.18) 0%, rgba(49,130,246,0.08) 100%);
+      inset: 6px 6px;
+      background: linear-gradient(135deg, rgba(49,130,246,0.18) 0%, rgba(49,130,246,0.06) 100%);
       border: 0.5px solid rgba(49,130,246,0.2);
       border-radius: 14px;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.4),
-        0 1px 4px rgba(49,130,246,0.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 4px rgba(49,130,246,0.1);
     }
 
-    .bottom-nav-icon {
-      width: 24px;
-      height: 24px;
-      color: var(--grey600);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      z-index: 3;
+    .bnav-icon {
+      width: 24px; height: 24px;
+      color: var(--grey500);
+      display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 3;
+    }
+    .bnav-icon svg { width: 22px; height: 22px; }
+    .bnav-icon .i-f { display: none; }
+    .bnav-icon .i-o { display: block; }
+    .bnav-item.active .bnav-icon .i-f { display: block; }
+    .bnav-item.active .bnav-icon .i-o { display: none; }
+    .bnav-item.active .bnav-icon { color: var(--accent); }
+
+    .bnav-label {
+      font-size: 10px; line-height: 12px;
+      color: var(--grey500); font-weight: 500;
+      text-align: center; position: relative; z-index: 3;
+    }
+    .bnav-item.active .bnav-label { color: var(--accent); font-weight: 700; }
+
+    .bnav-badge {
+      position: absolute; top: 2px; right: calc(50% - 18px);
+      min-width: 15px; height: 15px; padding: 0 4px;
+      background: var(--red500); color: #fff;
+      font-size: 9px; font-weight: 700; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid rgba(255,255,255,0.6); z-index: 4;
     }
 
-    .bottom-nav-icon svg {
-      width: 22px;
-      height: 22px;
-    }
-
-    /* inactive: outlined / active: filled */
-    .bottom-nav-icon .icon-filled { display: none; }
-    .bottom-nav-icon .icon-outlined { display: block; }
-    .bottom-nav-item.active .bottom-nav-icon .icon-filled { display: block; }
-    .bottom-nav-item.active .bottom-nav-icon .icon-outlined { display: none; }
-
-    .bottom-nav-label {
-      font-size: 10px;
-      line-height: 12px;
-      color: var(--grey600);
-      font-weight: 500;
-      text-align: center;
-      position: relative;
-      z-index: 3;
-    }
-
-    .bottom-nav-item.active .bottom-nav-icon {
-      color: var(--accent);
-    }
-
-    .bottom-nav-item.active .bottom-nav-label {
-      color: var(--accent);
-      font-weight: 700;
-    }
-
-    .tab-badge {
-      position: absolute;
-      top: 2px;
-      right: -4px;
-      min-width: 15px;
-      height: 15px;
-      padding: 0 4px;
-      background: var(--red500);
-      color: #fff;
-      font-size: 9px;
-      font-weight: 700;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      border: 1.5px solid rgba(255,255,255,0.6);
-      z-index: 4;
-    }
-
-    .tab-dot {
-      position: absolute;
-      top: 1px;
-      right: -1px;
-      width: 6px;
-      height: 6px;
-      background: var(--red500);
-      border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.6);
-      z-index: 4;
+    .bnav-dot {
+      position: absolute; top: 4px; right: calc(50% - 16px);
+      width: 6px; height: 6px;
+      background: var(--red500); border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.6); z-index: 4;
     }
   </style>
 </head>
 <body>
 
-<div class="app-container">
-  <!-- Top Navigation (iOS 18) -->
-  <nav class="top-nav">
-    <div class="nav-left">
-      <!-- iOS hamburger / line.3.horizontal -->
-      <div class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <line x1="4" y1="6.5" x2="20" y2="6.5"/>
-          <line x1="4" y1="12" x2="20" y2="12"/>
-          <line x1="4" y1="17.5" x2="20" y2="17.5"/>
-        </svg>
-      </div>
-      <div class="nav-logo"><span>CJ</span>더마켓</div>
-    </div>
-    <div class="nav-actions">
-      <!-- magnifyingglass -->
-      <div class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="10.5" cy="10.5" r="6.5"/>
-          <line x1="21" y1="21" x2="15.5" y2="15.5"/>
-        </svg>
-      </div>
-      <!-- bell -->
-      <div class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2.5a5.5 5.5 0 0 0-5.5 5.5c0 3.5-1.5 5.5-2.5 6.5h16c-1-1-2.5-3-2.5-6.5A5.5 5.5 0 0 0 12 2.5z"/>
-          <path d="M10.5 19.5a2 2 0 0 0 3 0"/>
-        </svg>
-        <span class="noti-badge"></span>
-      </div>
-      <!-- bag (cart) -->
-      <div class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 7h14l-1.5 12h-11L5 7z"/>
-          <path d="M9 7V5a3 3 0 0 1 6 0v2"/>
-        </svg>
-        <span class="cart-badge">3</span>
-      </div>
-    </div>
-  </nav>
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo"><span>CJ</span>더마켓</div>
+  </header>
 
-  <!-- Main Banner Carousel -->
-  <section class="carousel-section">
-    <div class="carousel-viewport" id="carouselViewport">
-      <div class="carousel-track" id="carouselTrack">
-        <div class="carousel-slide slide-1">
-          <span class="slide-tag">오늘만 특가</span>
-          <div class="slide-title">봄맞이 신선식품<br>최대 40% 할인</div>
-          <div class="slide-desc">산지직송 제철 과일 모음전</div>
-        </div>
-        <div class="carousel-slide slide-2">
-          <span class="slide-tag">단독 혜택</span>
-          <div class="slide-title">비비고 인기상품<br>1+1 대전</div>
-          <div class="slide-desc">만두부터 국물요리까지</div>
-        </div>
-        <div class="carousel-slide slide-3">
-          <span class="slide-tag">건강 기획전</span>
-          <div class="slide-title">건강한 식탁을 위한<br>유기농 채소</div>
-          <div class="slide-desc">첫 구매 시 30% 할인 쿠폰</div>
-        </div>
-        <div class="carousel-slide slide-4">
-          <span class="slide-tag">선물 추천</span>
-          <div class="slide-title">감사의 마음을 담은<br>프리미엄 선물세트</div>
-          <div class="slide-desc">무료배송 + 전용 포장</div>
-        </div>
-        <div class="carousel-slide slide-5">
-          <span class="slide-tag">신규 입점</span>
-          <div class="slide-title">매일 새로운 맛<br>베이커리 컬렉션</div>
-          <div class="slide-desc">오늘 구운 빵을 내일 배송</div>
-        </div>
-      </div>
-    </div>
-    <div class="carousel-indicators" id="carouselIndicators">
-      <div class="dot active" data-index="0"></div>
-      <div class="dot" data-index="1"></div>
-      <div class="dot" data-index="2"></div>
-      <div class="dot" data-index="3"></div>
-      <div class="dot" data-index="4"></div>
-    </div>
-  </section>
+  <!-- Top Tabs -->
+  <div class="top-tabs">
+    <div class="top-tab active">홈</div>
+    <div class="top-tab">실속장보기</div>
+    <div class="top-tab">신상발견</div>
+    <div class="top-tab">베스트</div>
+    <div class="top-tab">이벤트</div>
+    <div class="top-tab">매거진</div>
+    <div class="top-tab">선물하기</div>
+  </div>
 
-  <!-- Quick Menu -->
-  <section class="quick-menu-section">
-    <div class="quick-menu-grid">
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🍱</div>
-        <div class="quick-menu-label">간편식</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">💊</div>
-        <div class="quick-menu-label">건강식품</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🥬</div>
-        <div class="quick-menu-label">신선식품</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🧊</div>
-        <div class="quick-menu-label">냉동식품</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🥘</div>
-        <div class="quick-menu-label">김치/반찬</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🎁</div>
-        <div class="quick-menu-label">선물세트</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🥤</div>
-        <div class="quick-menu-label">음료/간식</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🍞</div>
-        <div class="quick-menu-label">베이커리</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🏃</div>
-        <div class="quick-menu-label">다이어트</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🍳</div>
-        <div class="quick-menu-label">밀키트</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🐟</div>
-        <div class="quick-menu-label">수산물</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">🧴</div>
-        <div class="quick-menu-label">생활용품</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">👶</div>
-        <div class="quick-menu-label">유아식품</div>
-      </div>
-      <div class="quick-menu-item">
-        <div class="quick-menu-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <rect x="1" y="1" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="7.5" y="1" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="14" y="1" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="1" y="7.5" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="7.5" y="7.5" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="14" y="7.5" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="1" y="14" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="7.5" y="14" width="5" height="5" rx="1.5" fill="#4e5968"/>
-            <rect x="14" y="14" width="5" height="5" rx="1.5" fill="#4e5968"/>
-          </svg>
+  <!-- Banner Carousel (카드형 가로 스크롤) -->
+  <section class="banner-section">
+    <div class="banner-scroll">
+      <div class="banner-card banner-card-1">
+        <div class="banner-bg">
+          <div class="banner-deco">📖🍴</div>
+          <div class="banner-badge"><small>더마켓</small>PICK</div>
+          <div class="banner-subtitle">Magazine CJ</div>
+          <div class="banner-title">YUMMY TIME<br>그랜드 오픈</div>
+          <div class="banner-desc">담을 때마다 2% 적립</div>
         </div>
-        <div class="quick-menu-label">전체보기</div>
+      </div>
+      <div class="banner-card banner-card-2">
+        <div class="banner-bg">
+          <div class="banner-deco">🥦✨</div>
+          <div class="banner-title">4월 미리보기<br>잘먹겠습니다</div>
+          <div class="banner-desc">담을 때마다 2% 적립</div>
+        </div>
+      </div>
+      <div class="banner-card banner-card-3">
+        <div class="banner-bg">
+          <div class="banner-deco">🎁🎉</div>
+          <div class="banner-badge"><small>더마켓</small>PICK</div>
+          <div class="banner-title">프리미엄<br>선물세트 특가</div>
+          <div class="banner-desc">최대 40% 할인</div>
+        </div>
+      </div>
+      <div class="banner-card banner-card-4">
+        <div class="banner-bg">
+          <div class="banner-deco">🥟🍲</div>
+          <div class="banner-title">비비고 인기상품<br>1+1 대전</div>
+          <div class="banner-desc">만두부터 국물요리까지</div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Section Divider -->
-  <div class="section-divider"></div>
-
-  <!-- Tab Section -->
-  <section class="tab-section">
-    <div class="tab-bar">
-      <div class="tab-item active">추천</div>
-      <div class="tab-item">신상품</div>
-      <div class="tab-item">베스트</div>
-      <div class="tab-item">특가</div>
-      <div class="tab-item">이벤트</div>
-    </div>
-  </section>
-
-  <!-- Product Section -->
-  <section class="product-section">
-    <div class="product-section-title">오늘의 추천 상품</div>
-    <div class="product-section-desc">회원님을 위해 엄선한 상품이에요</div>
-    <div class="product-scroll">
-      <div class="product-card">
-        <div class="product-thumb">🥟</div>
-        <div class="product-brand">비비고</div>
-        <div class="product-name">왕교자 만두 1.05kg</div>
-        <div class="product-price">
-          <span class="price-discount">25%</span>
-          <span class="price-value">8,900원</span>
+  <!-- Quick Menu (가로 스크롤, 둥근 사각형) -->
+  <section class="quick-section">
+    <div class="quick-scroll">
+      <div class="quick-item">
+        <div class="quick-icon qi-shooting">
+          <span class="quick-icon-text">슈팅<br>배송</span>
         </div>
-        <div class="price-original">11,900원</div>
+        <div class="quick-label">슈팅배송</div>
       </div>
-      <div class="product-card">
-        <div class="product-thumb">🍲</div>
-        <div class="product-brand">비비고</div>
-        <div class="product-name">소고기미역국 500g</div>
-        <div class="product-price">
-          <span class="price-discount">20%</span>
-          <span class="price-value">4,780원</span>
+      <div class="quick-item">
+        <div class="quick-icon qi-fresh">
+          <span class="quick-icon-text">신선<br>밥상</span>
         </div>
-        <div class="price-original">5,980원</div>
+        <div class="quick-label">신선밥상</div>
       </div>
-      <div class="product-card">
-        <div class="product-thumb">🥩</div>
-        <div class="product-brand">더마켓</div>
-        <div class="product-name">한우 등심 1++ 300g</div>
-        <div class="product-price">
-          <span class="price-discount">15%</span>
-          <span class="price-value">32,900원</span>
+      <div class="quick-item">
+        <div class="quick-icon qi-emart">
+          <span class="quick-icon-text" style="color:#222;text-shadow:none;">emart</span>
         </div>
-        <div class="price-original">38,700원</div>
+        <div class="quick-label">이마트</div>
       </div>
-      <div class="product-card">
-        <div class="product-thumb">🫒</div>
-        <div class="product-brand">백설</div>
-        <div class="product-name">포도씨유 900ml</div>
-        <div class="product-price">
-          <span class="price-discount">30%</span>
-          <span class="price-value">6,290원</span>
+      <div class="quick-item">
+        <div class="quick-icon qi-smart">
+          <span class="quick-icon-text" style="color:#1565c0;text-shadow:none;">스마트<br>장보기</span>
         </div>
-        <div class="price-original">8,980원</div>
+        <div class="quick-label">스마트장보기</div>
       </div>
-      <div class="product-card">
-        <div class="product-thumb">🥗</div>
-        <div class="product-brand">더마켓</div>
-        <div class="product-name">유기농 샐러드 키트</div>
-        <div class="product-price">
-          <span class="price-discount">10%</span>
-          <span class="price-value">5,390원</span>
+      <div class="quick-item">
+        <div class="quick-icon qi-best">
+          <span class="quick-icon-text" style="color:#7b1fa2;text-shadow:none;">미트플러스<br><b>BEST</b></span>
         </div>
-        <div class="price-original">5,990원</div>
+        <div class="quick-label">베스트</div>
+      </div>
+      <div class="quick-item">
+        <div class="quick-icon qi-new">
+          <span class="quick-icon-text" style="color:#e65100;text-shadow:none;">NEW<br>✨</span>
+        </div>
+        <div class="quick-label">신상품</div>
+      </div>
+      <div class="quick-item">
+        <div class="quick-icon qi-event">
+          <span class="quick-icon-text" style="color:#c2185b;text-shadow:none;">🎪<br>이벤트</span>
+        </div>
+        <div class="quick-label">이벤트</div>
+      </div>
+      <div class="quick-item">
+        <div class="quick-icon qi-gift">
+          <span class="quick-icon-text" style="color:#283593;text-shadow:none;">🎁<br>선물</span>
+        </div>
+        <div class="quick-label">선물하기</div>
       </div>
     </div>
   </section>
 
-  <!-- Liquid Glass Tab Bar (TDS Icons) -->
+  <!-- Category Pills -->
+  <section class="category-section">
+    <div class="category-row">
+      <div class="category-pill active">
+        <span class="pill-icon">🔖</span> 전체
+      </div>
+      <div class="category-pill">
+        <span class="pill-icon">🥬</span> 채소/두부
+      </div>
+      <div class="category-pill">
+        <span class="pill-icon">🍎</span> 과일
+      </div>
+      <div class="category-pill">
+        <span class="pill-icon">🍖</span> 축산
+      </div>
+    </div>
+    <div class="category-row">
+      <div class="category-pill">
+        <span class="pill-icon">💧</span> 생수/음료
+      </div>
+      <div class="category-pill">
+        <span class="pill-icon">🥛</span> 우유/유제품
+      </div>
+      <div class="category-pill">
+        <span class="pill-icon">💊</span> 건강식품
+      </div>
+    </div>
+  </section>
+
+  <!-- Liquid Glass Tab Bar -->
   <nav class="bottom-nav">
-    <!-- 홈 (TDS: house) -->
-    <div class="bottom-nav-item active" data-tab="home">
-      <div class="bottom-nav-icon">
-        <svg class="icon-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.4L2 11.3h2.8v9.2c0 .6.4 1 1 1h3.7v-5.8c0-.4.3-.7.7-.7h3.6c.4 0 .7.3.7.7v5.8h3.7c.6 0 1-.4 1-1v-9.2H22L12 2.4z"/></svg>
-        <svg class="icon-outlined" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l8-8 8 8"/><path d="M6 10.5v9c0 .5.4.9 1 .9h3.5v-5.5c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v5.5H17c.5 0 1-.4 1-.9v-9"/></svg>
+    <div class="bnav-item active" data-tab="home">
+      <div class="bnav-icon">
+        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.4L2 11.3h2.8v9.2c0 .6.4 1 1 1h3.7v-5.8c0-.4.3-.7.7-.7h3.6c.4 0 .7.3.7.7v5.8h3.7c.6 0 1-.4 1-1v-9.2H22L12 2.4z"/></svg>
+        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l8-8 8 8"/><path d="M6 10.5v9c0 .5.4.9 1 .9h3.5v-5.5c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v5.5H17c.5 0 1-.4 1-.9v-9"/></svg>
       </div>
-      <div class="bottom-nav-label">홈</div>
+      <div class="bnav-label">홈</div>
     </div>
-    <!-- 카테고리 (TDS: grid 2x2) -->
-    <div class="bottom-nav-item" data-tab="category">
-      <div class="bottom-nav-icon">
-        <svg class="icon-filled" viewBox="0 0 24 24"><rect fill="currentColor" x="3" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="3" y="13" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="13" width="8" height="8" rx="2.5"/></svg>
-        <svg class="icon-outlined" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+    <div class="bnav-item" data-tab="category">
+      <div class="bnav-icon">
+        <svg class="i-f" viewBox="0 0 24 24"><rect fill="currentColor" x="3" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="3" y="13" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="13" width="8" height="8" rx="2.5"/></svg>
+        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
       </div>
-      <div class="bottom-nav-label">카테고리</div>
+      <div class="bnav-label">카테고리</div>
     </div>
-    <!-- 혜택 (TDS: gift/benefit) -->
-    <div class="bottom-nav-item" data-tab="benefit">
-      <div class="bottom-nav-icon">
-        <svg class="icon-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M20 7h-1.5A3.5 3.5 0 0012 4.05 3.5 3.5 0 005.5 7H4a2 2 0 00-2 2v2h20V9a2 2 0 00-2-2zM8.5 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm7 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM2 12v8a2 2 0 002 2h16a2 2 0 002-2v-8H2z"/></svg>
-        <svg class="icon-outlined" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13"/><path d="M3 12h18"/><path d="M8.5 8a2.5 2.5 0 010-5C10.5 3 12 5.5 12 8"/><path d="M15.5 8a2.5 2.5 0 000-5C13.5 3 12 5.5 12 8"/></svg>
-        <span class="tab-badge">5</span>
+    <div class="bnav-item" data-tab="benefit">
+      <div class="bnav-icon">
+        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M20 7h-1.5A3.5 3.5 0 0012 4.05 3.5 3.5 0 005.5 7H4a2 2 0 00-2 2v2h20V9a2 2 0 00-2-2zM8.5 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm7 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM2 12v8a2 2 0 002 2h16a2 2 0 002-2v-8H2z"/></svg>
+        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13"/><path d="M3 12h18"/><path d="M8.5 8a2.5 2.5 0 010-5C10.5 3 12 5.5 12 8"/><path d="M15.5 8a2.5 2.5 0 000-5C13.5 3 12 5.5 12 8"/></svg>
       </div>
-      <div class="bottom-nav-label">혜택</div>
+      <div class="bnav-label">혜택</div>
+      <span class="bnav-badge">5</span>
     </div>
-    <!-- 찜 (TDS: heart) -->
-    <div class="bottom-nav-item" data-tab="wish">
-      <div class="bottom-nav-icon">
-        <svg class="icon-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        <svg class="icon-outlined" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.35l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.54L12 20.35z"/></svg>
-        <span class="tab-dot"></span>
+    <div class="bnav-item" data-tab="wish">
+      <div class="bnav-icon">
+        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.35l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.54L12 20.35z"/></svg>
       </div>
-      <div class="bottom-nav-label">찜</div>
+      <div class="bnav-label">찜</div>
+      <span class="bnav-dot"></span>
     </div>
-    <!-- 마이 (TDS: person circle) -->
-    <div class="bottom-nav-item" data-tab="my">
-      <div class="bottom-nav-icon">
-        <svg class="icon-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3.5a3.25 3.25 0 110 6.5 3.25 3.25 0 010-6.5zm0 14.2a7.2 7.2 0 01-5.6-2.7c.04-1.86 3.72-2.88 5.6-2.88 1.86 0 5.56 1.02 5.6 2.88A7.2 7.2 0 0112 19.7z"/></svg>
-        <svg class="icon-outlined" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="9.5" r="3"/><path d="M5.8 19c1-2.4 3.4-4 6.2-4s5.2 1.6 6.2 4"/></svg>
+    <div class="bnav-item" data-tab="my">
+      <div class="bnav-icon">
+        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3.5a3.25 3.25 0 110 6.5 3.25 3.25 0 010-6.5zm0 14.2a7.2 7.2 0 01-5.6-2.7c.04-1.86 3.72-2.88 5.6-2.88 1.86 0 5.56 1.02 5.6 2.88A7.2 7.2 0 0112 19.7z"/></svg>
+        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="9.5" r="3"/><path d="M5.8 19c1-2.4 3.4-4 6.2-4s5.2 1.6 6.2 4"/></svg>
       </div>
-      <div class="bottom-nav-label">마이</div>
+      <div class="bnav-label">마이</div>
     </div>
   </nav>
 </div>
 
 <script>
-  // Carousel
-  const track = document.getElementById('carouselTrack');
-  const viewport = document.getElementById('carouselViewport');
-  const dots = document.querySelectorAll('.dot');
-  const slideCount = document.querySelectorAll('.carousel-slide').length;
-  let current = 0;
-  let autoPlayTimer;
-  let touchStartX = 0;
-  let touchDeltaX = 0;
-
-  function goToSlide(index) {
-    current = ((index % slideCount) + slideCount) % slideCount;
-    track.style.transform = `translateX(-${current * 100}%)`;
-    dots.forEach((d, i) => d.classList.toggle('active', i === current));
-  }
-
-  function nextSlide() {
-    goToSlide(current + 1);
-  }
-
-  function startAutoPlay() {
-    stopAutoPlay();
-    autoPlayTimer = setInterval(nextSlide, 3500);
-  }
-
-  function stopAutoPlay() {
-    clearInterval(autoPlayTimer);
-  }
-
-  // Dot click
-  dots.forEach(dot => {
-    dot.addEventListener('click', () => {
-      goToSlide(parseInt(dot.dataset.index));
-      startAutoPlay();
-    });
-  });
-
-  // Touch support
-  viewport.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchDeltaX = 0;
-    stopAutoPlay();
-    track.style.transition = 'none';
-  }, { passive: true });
-
-  viewport.addEventListener('touchmove', (e) => {
-    touchDeltaX = e.touches[0].clientX - touchStartX;
-    const offset = -(current * viewport.offsetWidth) + touchDeltaX;
-    track.style.transform = `translateX(${offset}px)`;
-  }, { passive: true });
-
-  viewport.addEventListener('touchend', () => {
-    track.style.transition = 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    if (touchDeltaX > 50) {
-      goToSlide(current - 1);
-    } else if (touchDeltaX < -50) {
-      goToSlide(current + 1);
-    } else {
-      goToSlide(current);
-    }
-    startAutoPlay();
-  });
-
-  // Tab click
-  document.querySelectorAll('.tab-item').forEach(tab => {
+  // Top tabs
+  document.querySelectorAll('.top-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
     });
   });
 
-  // iOS Tab Bar click (filled/outlined toggle)
-  document.querySelectorAll('.bottom-nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
+  // Category pills
+  document.querySelectorAll('.category-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
     });
   });
 
-  // Init
-  startAutoPlay();
+  // Bottom nav
+  document.querySelectorAll('.bnav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.bnav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
 </script>
 
 </body>

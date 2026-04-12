@@ -41,7 +41,7 @@ function parseHeader(dv) {
   const charset        = dv.getUint8(7);
   const mapVersion     = readAscii(dv, 8, 8);
 
-  // Route search info (28 bytes starting at offset 16)
+  // Route search info (24 bytes starting at offset 16)
   const routeSearch = {
     optionCode:       dv.getUint8(16),
     tollWeightOption: dv.getUint8(17),
@@ -58,39 +58,48 @@ function parseHeader(dv) {
     evReachableFlag:  dv.getUint8(38),
   };
 
-  // Map info (224 bytes starting at offset 44)
-  const coordSystem  = dv.getUint8(44);
-  const tileInfoCode = dv.getUint8(45);
+  // Map info (224 bytes starting at offset 40)
+  const coordSystem  = dv.getUint8(40);
+  const tileInfoCode = dv.getUint8(41);
+  // bytes 42-43: reserved
 
-  const departureX = dv.getInt32(48, true);
-  const departureY = dv.getInt32(52, true);
-  const destX      = dv.getInt32(56, true);
-  const destY      = dv.getInt32(60, true);
+  // Departure/Destination: 8-byte compound PointInTile each
+  // [UShort xTileCode, UShort yTileCode, UShort xInTile, UShort yInTile]
+  const depTileX = dv.getUint16(44, true);
+  const depTileY = dv.getUint16(46, true);
+  const depInX   = dv.getUint16(48, true);
+  const depInY   = dv.getUint16(50, true);
 
-  const departureName = readString(dv, 64, 100, charset);
-  const destName      = readString(dv, 164, 100, charset);
+  const dstTileX = dv.getUint16(52, true);
+  const dstTileY = dv.getUint16(54, true);
+  const dstInX   = dv.getUint16(56, true);
+  const dstInY   = dv.getUint16(58, true);
 
-  const indexCount = dv.getUint16(264, true);
+  const departureName = readString(dv, 60, 100, charset);
+  const destName      = readString(dv, 160, 100, charset);
+
+  const indexCount = dv.getUint16(260, true);
+  // bytes 262-263: reserved
 
   const mapInfo = {
     coordSystem, tileInfoCode,
-    departure: { x: departureX, y: departureY },
-    destination: { x: destX, y: destY },
+    departure: { tileX: depTileX, tileY: depTileY, inX: depInX, inY: depInY },
+    destination: { tileX: dstTileX, tileY: dstTileY, inX: dstInX, inY: dstInY },
     departureName, destinationName: destName,
     indexCount,
   };
 
-  // Info index data (12 bytes each, starting at offset 268)
+  // Info index data (12 bytes each, starting at offset 264)
   const infoIndices = [];
   for (let i = 0; i < indexCount; i++) {
-    const base = 268 + i * 12;
+    const base = 264 + i * 12;
     const id     = readAscii(dv, base, 4).replace(/\0+$/, '');
     const offset = dv.getInt32(base + 4, true);
     const size   = dv.getInt32(base + 8, true);
     infoIndices.push({ id, offset, size });
   }
 
-  const headerSize = 268 + indexCount * 12;
+  const headerSize = 264 + indexCount * 12;
 
   return {
     totalSize, version, language, charset, mapVersion,
@@ -467,23 +476,16 @@ export function resolveVertexCoordinates(tvasResult) {
 /**
  * Convert PointInTile header coordinates to WGS84.
  */
+/**
+ * Convert compound PointInTile {tileX, tileY, inX, inY} to WGS84.
+ */
 export function resolvePointInTile(pit, tileInfoCode) {
-  // PointInTile: bytes 0-1 = xTileCode, 2-3 = yTileCode packed in lower bytes
-  // Actually stored as full int with tile code embedded:
-  // For header departure/destination, the format is:
-  // [xTileCode(2B)|yTileCode(2B)] in upper/lower halves
-  // and [xInTile(2B)|yInTile(2B)] in the second int
-  // But spec says 4 bytes for X coord, 4 bytes for Y coord as PointInTile
-  // PointInTile: Tile code + coordinate in tile (link format)
-  // Actually: SK정규화좌표 (8-digit integer format, 0.01 second precision)
-  // skX = raw value, skY = raw value
-  // Then Bessel degree = SK/360000
-
-  // The header stores departure/destination as SK normalized 8-digit coordinates
-  const besselLon = pit.x / 360000.0;
-  const besselLat = pit.y / 360000.0;
+  const tile = { xCode: pit.tileX, yCode: pit.tileY };
+  const sk = tileToSkCoord(tile, pit.inX, pit.inY, tileInfoCode);
+  const besselLon = sk.skX / 360000.0;
+  const besselLat = sk.skY / 360000.0;
   if (besselLon < 120 || besselLon > 135 || besselLat < 30 || besselLat > 45) {
-    return null; // Invalid Korean coordinate
+    return null;
   }
   return besselToWgs84(besselLon, besselLat);
 }

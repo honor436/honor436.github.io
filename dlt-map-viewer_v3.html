@@ -1850,22 +1850,52 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   // ---- TL5: 차로안내 ---- //
   if (tvasResult.laneGuidance && tvasResult.laneGuidance.length > 0) {
     const busCode = (c) => ({0:'없음',1:'우측(전일)',2:'우측(시간제)',3:'중앙(전일)',4:'중앙(시간제)'}[c] || c);
-    const laneBits = (val, total) => {
-      let s = '';
-      for (let b = 0; b < Math.max(total, 8); b++) {
-        const on = (val >> b) & 1;
-        s += on ? '<span style="color:#22c55e;font-weight:700">|</span>' : '<span style="color:#475569">|</span>';
+    // 차로 시각화: 각 차로를 권장/유효/포켓 상태로 표시
+    const laneVisual = (tl) => {
+      const n = tl.totalLanes;
+      if (n === 0) return '<span style="color:var(--muted)">차로 없음</span>';
+      let html = '<div style="display:flex;gap:2px;margin:3px 0">';
+      for (let b = 0; b < n; b++) {
+        const isRecommend = (tl.recommendLane >> b) & 1;
+        const isValid = (tl.validLane >> b) & 1;
+        const isLeftPocket = b < tl.leftPocket;
+        const isRightPocket = b >= (n - tl.rightPocket);
+        const isPocket = isLeftPocket || isRightPocket;
+        // 색상: 권장=초록, 유효만=파랑, 무효=회색
+        let bg, border, label;
+        if (isRecommend) {
+          bg = '#166534'; border = '#22c55e'; // 초록 (권장)
+        } else if (isValid) {
+          bg = '#1e3a5f'; border = '#3b82f6'; // 파랑 (유효)
+        } else {
+          bg = '#1e293b'; border = '#475569'; // 회색 (무효)
+        }
+        // 포켓 차로 표시
+        let pocketLabel = '';
+        if (isLeftPocket) pocketLabel = '<div style="font-size:7px;color:#fbbf24">P좌</div>';
+        if (isRightPocket) pocketLabel = '<div style="font-size:7px;color:#fbbf24">P우</div>';
+        html += `<div style="width:28px;text-align:center;padding:2px 0;border-radius:3px;background:${bg};border:1.5px solid ${border};font-size:9px;color:#e2e8f0;line-height:1.3">
+          ${b+1}
+          ${pocketLabel}
+        </div>`;
       }
-      return s;
+      html += '</div>';
+      // 범례
+      html += '<div style="font-size:9px;color:var(--muted);display:flex;gap:8px;margin-top:1px">';
+      html += '<span><span style="color:#22c55e">■</span>권장</span>';
+      html += '<span><span style="color:#3b82f6">■</span>유효</span>';
+      html += '<span><span style="color:#475569">■</span>무효</span>';
+      if (tl.leftPocket || tl.rightPocket) html += '<span><span style="color:#fbbf24">P</span>포켓</span>';
+      html += '</div>';
+      return html;
     };
     const rows = tvasResult.laneGuidance.map((tl, i) =>
-      `<div style="padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
-        [${i}] ${vx(tl.vxIdx, coords)} ${tl.totalLanes}차로 (좌포켓${tl.leftPocket} 우포켓${tl.rightPocket})<br>
-        <span style="color:var(--muted)">권장:</span> ${laneBits(tl.recommendLane, tl.totalLanes)} <span style="color:var(--muted)">(0x${tl.recommendLane.toString(16).padStart(4,'0')})</span><br>
-        <span style="color:var(--muted)">유효:</span> ${laneBits(tl.validLane, tl.totalLanes)} <span style="color:var(--muted)">(0x${tl.validLane.toString(16).padStart(4,'0')})</span>
-        ${tl.overpassLane ? '<br><span style="color:var(--muted)">고가:</span> 0x'+tl.overpassLane.toString(16).padStart(4,'0') : ''}
-        ${tl.underpassLane ? '<br><span style="color:var(--muted)">지하:</span> 0x'+tl.underpassLane.toString(16).padStart(4,'0') : ''}
-        ${tl.busLaneCode ? '<br>버스전용: '+busCode(tl.busLaneCode) : ''}
+      `<div style="padding:4px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(tl.vxIdx, coords)} <span style="color:var(--muted)">${tl.totalLanes}차로</span>
+        ${laneVisual(tl)}
+        ${tl.overpassLane ? '<span style="color:var(--muted);font-size:9px">고가:0x'+tl.overpassLane.toString(16).padStart(4,'0')+'</span> ' : ''}
+        ${tl.underpassLane ? '<span style="color:var(--muted);font-size:9px">지하:0x'+tl.underpassLane.toString(16).padStart(4,'0')+'</span> ' : ''}
+        ${tl.busLaneCode ? '<span style="color:var(--muted);font-size:9px">버스:'+busCode(tl.busLaneCode)+'</span>' : ''}
       </div>`
     ).join('');
     html += sectionDetail('차로안내', 'TL5', tvasResult.laneGuidance.length, rows);

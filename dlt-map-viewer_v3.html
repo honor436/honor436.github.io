@@ -666,24 +666,96 @@
     }
     #error-close:hover { background: #dc2626; }
 
-    /* ======== TVAS Route Request Panel ======== */
-    #tvas-panel {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid var(--border);
+    /* ======== TVAS Sidebar Button ======== */
+    #tvas-menu-btn {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(168,85,247,0.12);
+      border: 1px solid rgba(168,85,247,0.3);
       border-radius: 10px;
-      padding: 12px 14px;
+      color: #c4b5fd;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
       display: flex;
-      flex-direction: column;
+      align-items: center;
       gap: 8px;
     }
-    #tvas-panel h2 { font-size: 13px; font-weight: 600; color: var(--text); }
+    #tvas-menu-btn:hover {
+      background: rgba(168,85,247,0.2);
+      border-color: rgba(168,85,247,0.5);
+    }
+    #tvas-menu-btn .tvas-menu-icon {
+      font-size: 16px;
+    }
+
+    /* ======== TVAS Floating Popup ======== */
+    #tvas-popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 8000;
+      background: rgba(0,0,0,0.35);
+    }
+    #tvas-popup-overlay.visible { display: flex; align-items: center; justify-content: center; }
+
+    #tvas-popup {
+      background: #111827;
+      border: 1px solid rgba(148,163,184,0.22);
+      border-radius: 14px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+      width: 580px;
+      max-width: 95vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #tvas-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      cursor: move;
+      user-select: none;
+    }
+    #tvas-popup-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+    }
+    #tvas-popup-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    #tvas-popup-close:hover { color: #f87171; }
+
+    #tvas-popup-body {
+      padding: 16px 18px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ---- Popup inner styles ---- */
+    .tvas-field-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
     #tvas-url {
       background: rgba(15,23,42,0.8);
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text);
       font-size: 12px;
-      padding: 5px 8px;
+      padding: 7px 10px;
       width: 100%;
       outline: none;
     }
@@ -693,8 +765,9 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 6px;
     }
-    .tvas-section-label label { font-size: 11px; color: var(--muted); }
+    .tvas-section-label label { font-size: 12px; color: var(--muted); font-weight: 600; }
     .tvas-section-label button {
       background: none;
       border: none;
@@ -713,16 +786,16 @@
     }
     .tvas-header-row {
       display: flex;
-      gap: 4px;
+      gap: 6px;
       align-items: center;
     }
     .tvas-header-row input {
       background: rgba(15,23,42,0.8);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 5px;
       color: var(--text);
-      font-size: 11px;
-      padding: 3px 6px;
+      font-size: 12px;
+      padding: 5px 8px;
       outline: none;
     }
     .tvas-header-row input:focus { border-color: var(--accent); }
@@ -733,8 +806,8 @@
       border: none;
       color: #f87171;
       cursor: pointer;
-      font-size: 13px;
-      padding: 0 3px;
+      font-size: 14px;
+      padding: 0 4px;
       line-height: 1;
     }
     .tvas-hdr-del:hover { color: #ef4444; }
@@ -744,12 +817,12 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text);
-      font-size: 11px;
+      font-size: 12px;
       font-family: "Cascadia Code", "Fira Code", monospace;
-      padding: 6px 8px;
+      padding: 8px 10px;
       width: 100%;
-      min-height: 120px;
-      max-height: 300px;
+      min-height: 200px;
+      max-height: 400px;
       resize: vertical;
       outline: none;
       white-space: pre;
@@ -759,36 +832,36 @@
 
     .tvas-actions {
       display: flex;
-      gap: 6px;
+      gap: 8px;
     }
     #tvas-send-btn {
       flex: 1;
-      padding: 7px 0;
+      padding: 9px 0;
       background: var(--accent);
       color: #0b1220;
       border: none;
-      border-radius: 7px;
-      font-size: 12px;
+      border-radius: 8px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
     }
     #tvas-send-btn:hover { opacity: 0.85; }
     #tvas-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .tvas-sub-btn {
-      padding: 7px 10px;
+      padding: 9px 14px;
       background: rgba(148,163,184,0.1);
       border: 1px solid var(--border);
-      border-radius: 7px;
+      border-radius: 8px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
     }
     .tvas-sub-btn:hover { opacity: 0.75; }
 
     #tvas-status {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--muted);
-      min-height: 14px;
+      min-height: 16px;
       white-space: pre-line;
       word-break: break-all;
     }
@@ -799,8 +872,8 @@
       background: rgba(15,23,42,0.6);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 11px;
+      padding: 10px 12px;
+      font-size: 12px;
       line-height: 1.7;
     }
     #tvas-result-summary:empty { display: none; }
@@ -812,15 +885,15 @@
     .tvas-summary-row .tvas-sv { color: var(--text); font-weight: 600; }
 
     #tvas-response-raw {
-      font-size: 11px;
+      font-size: 12px;
     }
     #tvas-response-raw pre {
       max-height: 200px;
       overflow: auto;
       background: rgba(0,0,0,0.2);
       border-radius: 6px;
-      padding: 6px;
-      font-size: 10px;
+      padding: 8px;
+      font-size: 11px;
       white-space: pre-wrap;
       word-break: break-all;
       color: var(--muted);
@@ -939,38 +1012,10 @@
     <div id="ruler-status">모드를 켜고 지도를 클릭하세요.</div>
   </div>
 
-  <!-- ======== TVAS Route Request Test Panel ======== -->
-  <div id="tvas-panel">
-    <h2>경로 요청 테스트</h2>
-    <div class="coord-input-row">
-      <label>URL</label>
-      <input type="text" id="tvas-url" placeholder="https://경로서버주소/path">
-    </div>
-    <div>
-      <div class="tvas-section-label">
-        <label>Headers</label>
-        <button id="tvas-add-header">+ 추가</button>
-      </div>
-      <div id="tvas-headers" class="tvas-header-list"></div>
-    </div>
-    <div>
-      <div class="tvas-section-label" style="margin-bottom:4px">
-        <label>Body (JSON)</label>
-        <button id="tvas-prettify-btn" class="tvas-sub-btn" style="padding:2px 8px;font-size:11px;border-radius:4px">정렬</button>
-      </div>
-      <textarea id="tvas-body" spellcheck="false"></textarea>
-    </div>
-    <div class="tvas-actions">
-      <button id="tvas-send-btn">요청 전송</button>
-      <button id="tvas-clear-btn" class="tvas-sub-btn">지우기</button>
-    </div>
-    <div id="tvas-status"></div>
-    <div id="tvas-result-summary"></div>
-    <details id="tvas-response-raw" style="display:none">
-      <summary>응답 원문</summary>
-      <pre id="tvas-response-pre"></pre>
-    </details>
-  </div>
+  <!-- TVAS Route Request Test (sidebar button only) -->
+  <button id="tvas-menu-btn">
+    <span class="tvas-menu-icon">&#128739;</span> 경로 요청 테스트
+  </button>
 
   <!-- SHP Link/Node Layer -->
   <div id="shp-panel">
@@ -1046,6 +1091,46 @@
   </div>
 </aside>
 
+<!-- ======== TVAS Floating Popup ======== -->
+<div id="tvas-popup-overlay">
+  <div id="tvas-popup">
+    <div id="tvas-popup-header">
+      <h2>경로 요청 테스트</h2>
+      <button id="tvas-popup-close">&times;</button>
+    </div>
+    <div id="tvas-popup-body">
+      <div>
+        <div class="tvas-field-label">URL</div>
+        <input type="text" id="tvas-url" value="https://ntmapdev.tmap.co.kr:9443/tmap-channel/rsd/ev/route" placeholder="https://경로서버주소/path">
+      </div>
+      <div>
+        <div class="tvas-section-label">
+          <label>Headers</label>
+          <button id="tvas-add-header">+ 추가</button>
+        </div>
+        <div id="tvas-headers" class="tvas-header-list"></div>
+      </div>
+      <div>
+        <div class="tvas-section-label">
+          <label>Body (JSON)</label>
+          <button id="tvas-prettify-btn" class="tvas-sub-btn" style="padding:3px 10px;font-size:11px;border-radius:5px">정렬</button>
+        </div>
+        <textarea id="tvas-body" spellcheck="false"></textarea>
+      </div>
+      <div class="tvas-actions">
+        <button id="tvas-send-btn">요청 전송</button>
+        <button id="tvas-clear-btn" class="tvas-sub-btn">지우기</button>
+      </div>
+      <div id="tvas-status"></div>
+      <div id="tvas-result-summary"></div>
+      <details id="tvas-response-raw" style="display:none">
+        <summary>응답 원문</summary>
+        <pre id="tvas-response-pre"></pre>
+      </details>
+    </div>
+  </div>
+</div>
+
 <!-- Error popup -->
 <div id="error-overlay">
   <div id="error-box">
@@ -1070,6 +1155,44 @@
 import { parseTvas, resolveVertexCoordinates, resolvePointInTile } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayerGroup } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
+
+// ---- Popup open/close ---- //
+const tvasMenuBtn     = document.getElementById('tvas-menu-btn');
+const tvasOverlay     = document.getElementById('tvas-popup-overlay');
+const tvasPopupClose  = document.getElementById('tvas-popup-close');
+
+tvasMenuBtn.addEventListener('click', () => tvasOverlay.classList.add('visible'));
+tvasPopupClose.addEventListener('click', () => tvasOverlay.classList.remove('visible'));
+tvasOverlay.addEventListener('click', (e) => {
+  if (e.target === tvasOverlay) tvasOverlay.classList.remove('visible');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && tvasOverlay.classList.contains('visible')) {
+    tvasOverlay.classList.remove('visible');
+  }
+});
+
+// ---- Draggable popup ---- //
+{
+  const hdr = document.getElementById('tvas-popup-header');
+  const popup = document.getElementById('tvas-popup');
+  let dragging = false, dx = 0, dy = 0;
+  hdr.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    const rect = popup.getBoundingClientRect();
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    popup.style.position = 'fixed';
+    popup.style.margin = '0';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    popup.style.left = (e.clientX - dx) + 'px';
+    popup.style.top = (e.clientY - dy) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+}
 
 // ---- DOM refs ---- //
 const tvasUrl        = document.getElementById('tvas-url');

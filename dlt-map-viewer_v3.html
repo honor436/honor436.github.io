@@ -1519,7 +1519,12 @@ tvasSendBtn.addEventListener('click', async () => {
     }
 
   } catch (e) {
-    setStatus('요청 실패: ' + e.message, 'error');
+    let detail = e.message || String(e);
+    if (e instanceof TypeError && detail.includes('fetch')) {
+      detail += '\n\n가능한 원인:\n- CORS 정책으로 차단됨\n- 서버 연결 불가 (URL/포트 확인)\n- 네트워크 연결 끊김\n- HTTPS 인증서 오류';
+    }
+    setStatus('요청 실패: ' + detail, 'error');
+    console.error('TVAS request error:', e);
   } finally {
     tvasSendBtn.disabled = false;
   }

@@ -116,11 +116,10 @@ function parseTiles(dv, offset, size) {
   const dataStart = offset + 8;
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 8;
-    const tileCode  = dv.getInt32(base, true);
-    const xCode     = (tileCode >> 16) & 0xFFFF;
-    const yCode     = tileCode & 0xFFFF;
+    const xCode     = dv.getUint16(base, true);      // bytes 0-1: X방향 타일 Code (경도)
+    const yCode     = dv.getUint16(base + 2, true);  // bytes 2-3: Y방향 타일 Code (위도)
     const lastVxIdx = dv.getUint16(base + 4, true);
-    tiles.push({ xCode, yCode, lastVxIdx, tileCode });
+    tiles.push({ xCode, yCode, lastVxIdx });
   }
   return tiles;
 }

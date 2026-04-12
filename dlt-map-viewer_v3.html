@@ -1735,9 +1735,9 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
 
   // ---- RO4: 도로 정보 ---- //
   if (tvasResult.roads.length > 0) {
-    const rtName = (c) => ({0:'고속도로',1:'도시고속',2:'국도',3:'지방도',4:'주요도로1',5:'주요도로2',6:'주요도로3',7:'기타1',8:'기타2',9:'페리'}[c] || c);
-    const ltName = (c) => ({0:'일반',1:'터널',2:'교량',3:'지하',4:'고가',5:'분리',6:'측도',7:'단지내',8:'기타'}[c] || c);
-    const fcName = (c) => ({0:'없음',1:'교량',2:'터널',3:'고가',4:'지하차도',5:'나들목',6:'분기점',7:'휴게소',8:'톨게이트'}[c] || c);
+    const rtName = (c) => ({0:'고속국도',1:'도시고속',2:'국도',3:'국가지원지방도',4:'지방도',5:'주요도로1',6:'주요도로2',7:'주요도로3',8:'기타도로1',9:'이면도로',10:'페리항로',11:'단지내',12:'단지내2',16:'일반도로',20:'번화가'}[c] || c);
+    const ltName = (c) => ({0:'미조사',1:'본선(비분리)',2:'본선(분리)',3:'연결로(JC)',4:'교차점내',5:'연결로(IC)',7:'SA',8:'로터리',9:'유턴',10:'P턴',12:'졸음쉼터',13:'회전교차로',14:'교차로내'}[c] || c);
+    const fcName = (c) => ({0:'일반',1:'교량',2:'터널',3:'고가',4:'지하도로',5:'교차로통과',6:'철도건널목',7:'댐/방파제',90:'한강교량'}[c] || c);
     const rows = tvasResult.roads.map((r, i) =>
       `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
         [${i}] VX~${r.lastVxIdx} | ${rtName(r.roadType)} | 링크:${ltName(r.linkType)} | 시설:${fcName(r.facilityCode)} | ${r.roadLength}m | ${r.laneCount}차선 | ${r.speedLimit}km/h | ${r.energyConsumption}Wh

@@ -667,27 +667,48 @@
     #error-close:hover { background: #dc2626; }
 
     /* ======== TVAS Sidebar Button ======== */
+    .tvas-sidebar-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
     #tvas-menu-btn {
       width: 100%;
-      padding: 10px 14px;
-      background: rgba(168,85,247,0.12);
-      border: 1px solid rgba(168,85,247,0.3);
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      border: none;
       border-radius: 10px;
-      color: #c4b5fd;
-      font-size: 13px;
-      font-weight: 600;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.15s;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
+      box-shadow: 0 2px 8px rgba(124,58,237,0.4);
     }
     #tvas-menu-btn:hover {
-      background: rgba(168,85,247,0.2);
-      border-color: rgba(168,85,247,0.5);
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      box-shadow: 0 4px 16px rgba(124,58,237,0.5);
+      transform: translateY(-1px);
     }
-    #tvas-menu-btn .tvas-menu-icon {
-      font-size: 16px;
+    #tvas-clear-route-btn {
+      width: 100%;
+      padding: 8px 14px;
+      background: rgba(148,163,184,0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    #tvas-clear-route-btn:hover {
+      background: rgba(239,68,68,0.1);
+      border-color: rgba(239,68,68,0.3);
+      color: #f87171;
     }
 
     /* ======== TVAS Right Panel ======== */
@@ -1045,10 +1066,11 @@
     <div id="ruler-status">모드를 켜고 지도를 클릭하세요.</div>
   </div>
 
-  <!-- TVAS Route Request Test (sidebar button only) -->
-  <button id="tvas-menu-btn">
-    <span class="tvas-menu-icon">&#128739;</span> 경로 요청 테스트
-  </button>
+  <!-- TVAS Route Request (sidebar buttons) -->
+  <div class="tvas-sidebar-btns">
+    <button id="tvas-menu-btn">경로 요청</button>
+    <button id="tvas-clear-route-btn">경로 데이터 지우기</button>
+  </div>
 
   <!-- SHP Link/Node Layer -->
   <div id="shp-panel">
@@ -1213,8 +1235,29 @@ const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
 const tvasPanel      = document.getElementById('tvas-right-panel');
 const tvasPanelClose = document.getElementById('tvas-panel-close');
 
+const tvasClearRouteBtn = document.getElementById('tvas-clear-route-btn');
+
 tvasMenuBtn.addEventListener('click', () => { applyWaypointsToBody(); tvasPanel.classList.add('open'); });
 tvasPanelClose.addEventListener('click', () => tvasPanel.classList.remove('open'));
+
+// ---- Clear ALL route data from map ---- //
+tvasClearRouteBtn.addEventListener('click', () => {
+  const map = getMap();
+  if (map) clearTvasRoute(map);
+  // Remove waypoint markers
+  ['depart','dest'].forEach(k => { if (wpMarkers[k]) { map.removeLayer(wpMarkers[k]); wpMarkers[k] = null; } routeWaypoints[k] = null; });
+  updateWpBar();
+  // Reset panel state
+  tvasSummary.innerHTML = '';
+  tvasRespRaw.style.display = 'none';
+  tvasRespPre.textContent = '';
+  tvasSaveRespBtn.style.display = 'none';
+  tvasLayerToggles.style.display = 'none';
+  lastResponseJson = null;
+  lastBinaryResponse = null;
+  lastCoords = null;
+  setStatus('');
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && tvasPanel.classList.contains('open')) tvasPanel.classList.remove('open');
 });
@@ -1242,8 +1285,11 @@ let lastCoords = null;  // 마지막 파싱된 좌표 (VX 클릭 이동용)
 const routeWaypoints = { depart: null, dest: null };
 let wpMarkers = { depart: null, dest: null };
 
-function wpIconHtml(label, color) {
-  return '<div style="width:28px;height:28px;line-height:28px;text-align:center;background:'+color+';color:#fff;border-radius:50%;font-size:14px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #fff">'+label+'</div>';
+function wpIconHtml(label, color, sub) {
+  return '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="width:36px;height:36px;line-height:36px;text-align:center;background:'+color+';color:#fff;border-radius:50%;font-size:16px;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.5);border:3px solid #fff">'+label+'</div>' +
+    (sub ? '<div style="margin-top:2px;padding:1px 6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:600;border-radius:8px;white-space:nowrap">'+sub+'</div>' : '') +
+    '</div>';
 }
 
 function updateWpBar() {
@@ -1274,10 +1320,11 @@ function setWaypoint(type, lat, lon) {
   if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
   const label = type === 'depart' ? 'S' : 'E';
   const color = type === 'depart' ? '#22c55e' : '#ef4444';
+  const subLabel = type === 'depart' ? '출발' : '도착';
   wpMarkers[type] = L.marker([lat, lon], {
-    icon: L.divIcon({ className: '', html: wpIconHtml(label, color), iconSize: [28, 28], iconAnchor: [14, 14] }),
+    icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
     zIndexOffset: 2000,
-  }).addTo(map);
+  }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
   updateWpBar();
 }
 
@@ -1823,14 +1870,28 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   const fmt = s.formatDistFn, fmtT = s.formatTimeFn;
 
   // ---- Header summary ---- //
-  let html = sr('Session ID', respInfo?.sessionId || '-') +
+  // Departure/Destination highlight bar
+  const depCoord = coords.length > 0 ? coords[0] : null;
+  const dstCoord = coords.length > 0 ? coords[coords.length - 1] : null;
+  let wpHtml = '<div style="display:flex;gap:6px;margin-bottom:8px">';
+  wpHtml += '<div style="flex:1;padding:6px 8px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);font-size:11px">';
+  wpHtml += '<b style="color:#4ade80">S 출발</b><br>';
+  wpHtml += '<span style="color:var(--text)">' + esc(s.departureName || '-') + '</span>';
+  if (depCoord) wpHtml += '<br><span class="vx-link" onclick="window._flyToVx(0)" style="font-size:10px">' + depCoord.lat.toFixed(5) + ', ' + depCoord.lon.toFixed(5) + '</span>';
+  wpHtml += '</div>';
+  wpHtml += '<div style="flex:1;padding:6px 8px;border-radius:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);font-size:11px">';
+  wpHtml += '<b style="color:#f87171">E 도착</b><br>';
+  wpHtml += '<span style="color:var(--text)">' + esc(s.destinationName || '-') + '</span>';
+  if (dstCoord) wpHtml += '<br><span class="vx-link" onclick="window._flyToVx(' + (coords.length-1) + ')" style="font-size:10px">' + dstCoord.lat.toFixed(5) + ', ' + dstCoord.lon.toFixed(5) + '</span>';
+  wpHtml += '</div></div>';
+
+  let html = wpHtml +
+    sr('Session ID', respInfo?.sessionId || '-') +
     sr('경로 옵션', s.routeOption) +
     sr('경로 타입', s.routeType) +
     sr('총 거리', fmt(s.totalDistance)) +
     sr('총 시간', fmtT(s.totalTime)) +
     sr('택시 요금', s.taxiFare > 0 ? s.taxiFare.toLocaleString() + '원' : '-') +
-    sr('출발지', s.departureName || '-') +
-    sr('목적지', s.destinationName || '-') +
     sr('TVAS 버전', s.version) +
     sr('맵 버전', s.mapVersion) +
     sr('EV 도달', s.evReachable === 1 ? '가능' : s.evReachable === 0 ? '불가능' : '-') +

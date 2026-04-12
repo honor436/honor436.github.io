@@ -343,6 +343,35 @@ function parseHighwayMode(dv, offset, size) {
   return segments;
 }
 
+function parseLaneGuidance(dv, offset, size) {
+  // Header: 20 bytes
+  const count = dv.getUint16(offset, true);
+  const dataStart = offset + 20;
+  const lanes = [];
+  for (let i = 0; i < count; i++) {
+    const base = dataStart + i * 32;
+    const vxIdx          = dv.getUint16(base, true);
+    const totalLanes     = dv.getUint8(base + 2);
+    const leftPocket     = dv.getUint8(base + 3);
+    const rightPocket    = dv.getUint8(base + 4);
+    const invalidCount   = dv.getUint8(base + 5);
+    const busLaneCode    = dv.getUint8(base + 7);
+    const recommendLane  = dv.getUint16(base + 12, true);
+    const recommendAngle = dv.getUint16(base + 14, true);
+    const validLane      = dv.getUint16(base + 16, true);
+    const validAngle     = dv.getUint16(base + 18, true);
+    const overpassLane   = dv.getUint16(base + 24, true);
+    const underpassLane  = dv.getUint16(base + 26, true);
+    const roadTypeCode   = dv.getUint8(base + 28);
+    lanes.push({
+      vxIdx, totalLanes, leftPocket, rightPocket, invalidCount, busLaneCode,
+      recommendLane, recommendAngle, validLane, validAngle,
+      overpassLane, underpassLane, roadTypeCode,
+    });
+  }
+  return lanes;
+}
+
 function parseCityBoundary(dv, offset, size, charset) {
   const count = dv.getUint16(offset, true);
   const dataStart = offset + 8;
@@ -376,6 +405,7 @@ export function parseTvas(arrayBuffer) {
     intersectionNames: null,
     tollGates: null,
     restAreas: null,
+    laneGuidance: null,
     forcedReroute: null,
     highwayMode: null,
     cityBoundary: null,
@@ -416,6 +446,9 @@ export function parseTvas(arrayBuffer) {
         break;
       case 'SA3':
         result.restAreas = parseRestAreas(dv, absOffset, idx.size, charset);
+        break;
+      case 'TL5':
+        result.laneGuidance = parseLaneGuidance(dv, absOffset, idx.size);
         break;
       case 'DRG3':
         result.forcedReroute = parseForcedReroute(dv, absOffset, idx.size);

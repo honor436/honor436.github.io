@@ -1836,6 +1836,30 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
     html += sectionDetail('휴게소', 'SA3', tvasResult.restAreas.length, rows);
   }
 
+  // ---- TL5: 차로안내 ---- //
+  if (tvasResult.laneGuidance && tvasResult.laneGuidance.length > 0) {
+    const busCode = (c) => ({0:'없음',1:'우측(전일)',2:'우측(시간제)',3:'중앙(전일)',4:'중앙(시간제)'}[c] || c);
+    const laneBits = (val, total) => {
+      let s = '';
+      for (let b = 0; b < Math.max(total, 8); b++) {
+        const on = (val >> b) & 1;
+        s += on ? '<span style="color:#22c55e;font-weight:700">|</span>' : '<span style="color:#475569">|</span>';
+      }
+      return s;
+    };
+    const rows = tvasResult.laneGuidance.map((tl, i) =>
+      `<div style="padding:3px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] VX${tl.vxIdx} ${tl.totalLanes}차로 (좌포켓${tl.leftPocket} 우포켓${tl.rightPocket})<br>
+        <span style="color:var(--muted)">권장:</span> ${laneBits(tl.recommendLane, tl.totalLanes)} <span style="color:var(--muted)">(0x${tl.recommendLane.toString(16).padStart(4,'0')})</span><br>
+        <span style="color:var(--muted)">유효:</span> ${laneBits(tl.validLane, tl.totalLanes)} <span style="color:var(--muted)">(0x${tl.validLane.toString(16).padStart(4,'0')})</span>
+        ${tl.overpassLane ? '<br><span style="color:var(--muted)">고가:</span> 0x'+tl.overpassLane.toString(16).padStart(4,'0') : ''}
+        ${tl.underpassLane ? '<br><span style="color:var(--muted)">지하:</span> 0x'+tl.underpassLane.toString(16).padStart(4,'0') : ''}
+        ${tl.busLaneCode ? '<br>버스전용: '+busCode(tl.busLaneCode) : ''}
+      </div>`
+    ).join('');
+    html += sectionDetail('차로안내', 'TL5', tvasResult.laneGuidance.length, rows);
+  }
+
   // ---- HW: 고속모드 ---- //
   if (tvasResult.highwayMode && tvasResult.highwayMode.length > 0) {
     const rows = tvasResult.highwayMode.map((hw, i) =>

@@ -3,39 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CJ더마켓 - TDS Sample</title>
+  <title>CJ더마켓 - 디자인 샘플 목록</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" rel="stylesheet">
   <style>
-    :root {
-      --grey50: #f9fafb;
-      --grey100: #f2f4f6;
-      --grey200: #e5e8eb;
-      --grey300: #d1d6db;
-      --grey400: #b0b8c1;
-      --grey500: #8b95a1;
-      --grey600: #6b7684;
-      --grey700: #4e5968;
-      --grey800: #333d4b;
-      --grey900: #191f28;
-      --blue500: #3182f6;
-      --red500: #f04452;
-      --green500: #22c55e;
-      --bg: #FFFFFF;
-      --text: var(--grey900);
-      --muted: var(--grey500);
-      --accent: var(--blue500);
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Toss Product Sans', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Roboto, 'Noto Sans KR', sans-serif;
-      background: var(--grey100);
-      color: var(--text);
-      font-size: 15px;
-      line-height: 1.5;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+      background: #f2f4f6;
+      color: #191f28;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -43,628 +20,396 @@
       max-width: 430px;
       margin: 0 auto;
       min-height: 100vh;
-      background: var(--bg);
-      box-shadow: 0 0 40px rgba(0,0,0,0.06);
-      padding-bottom: 80px;
-      position: relative;
+      background: #fff;
     }
 
-    /* ---- Header ---- */
     .header {
-      padding: 14px 16px 0;
-      background: var(--bg);
+      padding: 20px 20px 16px;
+      background: #fff;
       position: sticky;
       top: 0;
       z-index: 100;
+      border-bottom: 1px solid #f2f4f6;
     }
 
-    .header-logo {
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .logo {
       font-size: 20px;
       font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.5px;
-      margin-bottom: 12px;
+      color: #111;
+      letter-spacing: -0.3px;
     }
 
-    .header-logo span {
-      color: #2b9e3f;
+    .logo em {
+      font-style: normal;
+      color: #0c8050;
     }
 
-    /* ---- Top Tabs ---- */
-    .top-tabs {
+    .header-badge {
+      font-size: 12px;
+      color: #8b95a1;
+      font-weight: 500;
+    }
+
+    .header-desc {
+      font-size: 13px;
+      color: #8b95a1;
+      margin-top: 2px;
+    }
+
+    .category-tabs {
       display: flex;
-      gap: 0;
+      gap: 8px;
+      padding: 12px 20px;
       overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
-      border-bottom: 1px solid var(--grey200);
-      background: var(--bg);
+      background: #fff;
     }
-    .top-tabs::-webkit-scrollbar { display: none; }
 
-    .top-tab {
+    .category-tabs::-webkit-scrollbar { display: none; }
+
+    .cat-tab {
       flex-shrink: 0;
-      padding: 10px 14px 12px;
+      padding: 7px 16px;
+      border-radius: 20px;
       font-size: 14px;
       font-weight: 500;
-      color: var(--grey500);
+      color: #4e5968;
+      background: #f2f4f6;
       cursor: pointer;
-      position: relative;
-      white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.2s;
-    }
-
-    .top-tab.active {
-      color: var(--grey900);
-      font-weight: 700;
-    }
-
-    .top-tab.active::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 14px;
-      right: 14px;
-      height: 2.5px;
-      background: var(--grey900);
-      border-radius: 2px;
-    }
-
-    /* ---- Banner Carousel ---- */
-    .banner-section {
-      padding: 16px 0 20px;
-    }
-
-    .banner-scroll {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      padding: 0 16px;
-      scroll-snap-type: x mandatory;
-    }
-    .banner-scroll::-webkit-scrollbar { display: none; }
-
-    .banner-card {
-      flex-shrink: 0;
-      width: 280px;
-      height: 320px;
-      border-radius: 16px;
-      overflow: hidden;
-      position: relative;
-      cursor: pointer;
-      scroll-snap-align: start;
+      transition: all 0.2s;
+      border: none;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .banner-card:active {
-      opacity: 0.9;
-    }
-
-    .banner-bg {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 20px;
-      position: relative;
-    }
-
-    .banner-card-1 .banner-bg {
-      background: linear-gradient(160deg, #f0f4e8 0%, #e8eddf 40%, #dde4d3 100%);
-    }
-    .banner-card-2 .banner-bg {
-      background: linear-gradient(160deg, #1a2a1a 0%, #0d1f0d 100%);
-    }
-    .banner-card-3 .banner-bg {
-      background: linear-gradient(160deg, #fff5f0 0%, #ffe8dd 100%);
-    }
-    .banner-card-4 .banner-bg {
-      background: linear-gradient(160deg, #eef0ff 0%, #dde2ff 100%);
-    }
-
-    /* 배너 내 이미지 장식 */
-    .banner-deco {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      width: 140px;
-      height: 160px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 80px;
-      opacity: 0.9;
-    }
-
-    .banner-badge {
-      position: absolute;
-      top: auto;
-      bottom: 100px;
-      right: 16px;
-      background: #2b9e3f;
+    .cat-tab.active {
+      background: #191f28;
       color: #fff;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 6px 10px;
-      border-radius: 10px;
-      line-height: 1.3;
-      text-align: center;
-      z-index: 2;
-    }
-
-    .banner-badge small {
-      font-size: 10px;
       font-weight: 600;
-      display: block;
     }
 
-    .banner-subtitle {
-      font-size: 12px;
-      color: var(--grey600);
-      font-weight: 500;
-      margin-bottom: 4px;
-      position: relative;
-      z-index: 2;
+    .cat-tab:active {
+      transform: scale(0.95);
     }
 
-    .banner-card-2 .banner-subtitle { color: rgba(255,255,255,0.6); }
-
-    .banner-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--grey900);
-      line-height: 1.35;
-      letter-spacing: -0.5px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .banner-card-2 .banner-title { color: #fff; }
-
-    .banner-desc {
-      font-size: 12px;
-      color: var(--grey500);
-      margin-top: 4px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .banner-card-2 .banner-desc { color: rgba(255,255,255,0.5); }
-
-    /* ---- Quick Menu (가로 스크롤, 둥근 사각형 아이콘) ---- */
-    .quick-section {
-      padding: 0 0 20px;
-    }
-
-    .quick-scroll {
-      display: flex;
-      gap: 14px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      padding: 0 16px;
-    }
-    .quick-scroll::-webkit-scrollbar { display: none; }
-
-    .quick-item {
-      flex-shrink: 0;
+    .card-grid {
       display: flex;
       flex-direction: column;
+      gap: 10px;
+      padding: 12px 20px 20px;
+    }
+
+    .card {
+      display: flex;
       align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      width: 56px;
-    }
-
-    .quick-item:active .quick-icon {
-      transform: scale(0.92);
-    }
-
-    .quick-icon {
-      width: 52px;
-      height: 52px;
+      gap: 14px;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid #e5e8eb;
       border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .card:active {
+      background: #f9fafb;
+      transform: scale(0.99);
+    }
+
+    .card-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 13px;
-      font-weight: 800;
-      transition: transform 0.15s;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .card-num.home { background: #e8f5e9; color: #0c8050; }
+    .card-num.thanks { background: #fff3e0; color: #e65100; }
+    .card-num.best { background: #e3f2fd; color: #1565c0; }
+    .card-num.full { background: #f3e5f5; color: #7b1fa2; }
+
+    .card-info { flex: 1; min-width: 0; }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #191f28;
+      letter-spacing: -0.3px;
+      line-height: 1.4;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: #8b95a1;
+      margin-top: 2px;
+      white-space: nowrap;
       overflow: hidden;
-      position: relative;
+      text-overflow: ellipsis;
     }
 
-    .quick-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    /* 각 퀵메뉴 색상 */
-    .qi-shooting { background: linear-gradient(135deg, #ffecd2, #fcb69f); }
-    .qi-fresh { background: linear-gradient(135deg, #e8f5e9, #a5d6a7); }
-    .qi-emart { background: #ffe500; color: #222; }
-    .qi-smart { background: linear-gradient(135deg, #e3f2fd, #90caf9); }
-    .qi-best { background: linear-gradient(135deg, #f3e5f5, #ce93d8); }
-    .qi-new { background: linear-gradient(135deg, #fff3e0, #ffb74d); }
-    .qi-event { background: linear-gradient(135deg, #fce4ec, #f48fb1); }
-    .qi-gift { background: linear-gradient(135deg, #e8eaf6, #9fa8da); }
-
-    .quick-icon-text {
-      font-size: 9px;
-      font-weight: 800;
-      line-height: 1.2;
-      text-align: center;
-      color: #fff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.15);
-    }
-
-    .quick-label {
-      font-size: 11px;
-      color: var(--grey700);
-      font-weight: 500;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    /* ---- Category Pills ---- */
-    .category-section {
-      padding: 0 16px 20px;
-    }
-
-    .category-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .category-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 20px;
-      border: 1px solid var(--grey200);
-      background: var(--bg);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--grey800);
-      cursor: pointer;
-      white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.15s, border-color 0.15s;
-    }
-
-    .category-pill:active {
-      background: var(--grey100);
-    }
-
-    .category-pill.active {
-      background: var(--grey900);
-      color: #fff;
-      border-color: var(--grey900);
-    }
-
-    .category-pill .pill-icon {
+    .card-arrow {
+      flex-shrink: 0;
       width: 20px;
       height: 20px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
+      color: #d1d6db;
     }
 
-    .category-pill.active .pill-icon {
-      filter: brightness(10);
+    .card-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-bottom: 4px;
     }
 
-    /* ---- Liquid Glass Tab Bar ---- */
-    .bottom-nav {
-      position: fixed;
-      bottom: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 32px);
-      max-width: 398px;
-      height: 56px;
-      background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.4) 100%);
-      backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
-      -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
-      border: 0.5px solid rgba(255,255,255,0.55);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04),
-        inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -0.5px 0 rgba(255,255,255,0.2);
-      border-radius: 22px;
-      display: flex;
-      align-items: stretch;
-      justify-content: space-around;
-      z-index: 200;
-      overflow: hidden;
-    }
+    .tag-home { background: #e8f5e9; color: #0c8050; }
+    .tag-thanks { background: #fff3e0; color: #e65100; }
+    .tag-best { background: #e3f2fd; color: #1565c0; }
+    .tag-full { background: #f3e5f5; color: #7b1fa2; }
 
-    .bottom-nav::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 10%; right: 10%; height: 50%;
-      background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 100%);
-      border-radius: 22px 22px 50% 50%;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .bnav-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      padding: 6px 0;
-      position: relative;
-      z-index: 2;
-      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
-    }
-
-    .bnav-item:active { transform: scale(0.88); }
-
-    .bnav-item.active::before {
-      content: '';
-      position: absolute;
-      inset: 6px 6px;
-      background: linear-gradient(135deg, rgba(49,130,246,0.18) 0%, rgba(49,130,246,0.06) 100%);
-      border: 0.5px solid rgba(49,130,246,0.2);
-      border-radius: 14px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 4px rgba(49,130,246,0.1);
-    }
-
-    .bnav-icon {
-      width: 24px; height: 24px;
-      color: var(--grey500);
-      display: flex; align-items: center; justify-content: center;
-      position: relative; z-index: 3;
-    }
-    .bnav-icon svg { width: 22px; height: 22px; }
-    .bnav-icon .i-f { display: none; }
-    .bnav-icon .i-o { display: block; }
-    .bnav-item.active .bnav-icon .i-f { display: block; }
-    .bnav-item.active .bnav-icon .i-o { display: none; }
-    .bnav-item.active .bnav-icon { color: var(--accent); }
-
-    .bnav-label {
-      font-size: 10px; line-height: 12px;
-      color: var(--grey500); font-weight: 500;
-      text-align: center; position: relative; z-index: 3;
-    }
-    .bnav-item.active .bnav-label { color: var(--accent); font-weight: 700; }
-
-    .bnav-badge {
-      position: absolute; top: 2px; right: calc(50% - 18px);
-      min-width: 15px; height: 15px; padding: 0 4px;
-      background: var(--red500); color: #fff;
-      font-size: 9px; font-weight: 700; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      border: 1.5px solid rgba(255,255,255,0.6); z-index: 4;
-    }
-
-    .bnav-dot {
-      position: absolute; top: 4px; right: calc(50% - 16px);
-      width: 6px; height: 6px;
-      background: var(--red500); border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.6); z-index: 4;
+    .footer {
+      padding: 24px 20px 40px;
+      text-align: center;
+      font-size: 12px;
+      color: #b0b8c1;
+      border-top: 1px solid #f2f4f6;
     }
   </style>
 </head>
 <body>
 
 <div class="app">
-  <!-- Header -->
+
   <header class="header">
-    <div class="header-logo"><span>CJ</span>더마켓</div>
+    <div class="header-top">
+      <div class="logo"><em>CJ</em>더마켓</div>
+      <span class="header-badge">Design Samples</span>
+    </div>
+    <p class="header-desc">모바일 메인화면 디자인 변형 모음</p>
   </header>
 
-  <!-- Top Tabs -->
-  <div class="top-tabs">
-    <div class="top-tab active">홈</div>
-    <div class="top-tab">실속장보기</div>
-    <div class="top-tab">신상발견</div>
-    <div class="top-tab">베스트</div>
-    <div class="top-tab">이벤트</div>
-    <div class="top-tab">매거진</div>
-    <div class="top-tab">선물하기</div>
+  <div class="category-tabs">
+    <button class="cat-tab active" data-filter="all">전체 <b>18</b></button>
+    <button class="cat-tab" data-filter="home">홈 메인 <b>6</b></button>
+    <button class="cat-tab" data-filter="thanks">고객감사제 <b>3</b></button>
+    <button class="cat-tab" data-filter="best">홈+베스트 <b>4</b></button>
+    <button class="cat-tab" data-filter="full">풀페이지 <b>5</b></button>
   </div>
 
-  <!-- Banner Carousel (카드형 가로 스크롤) -->
-  <section class="banner-section">
-    <div class="banner-scroll">
-      <div class="banner-card banner-card-1">
-        <div class="banner-bg">
-          <div class="banner-deco">📖🍴</div>
-          <div class="banner-badge"><small>더마켓</small>PICK</div>
-          <div class="banner-subtitle">Magazine CJ</div>
-          <div class="banner-title">YUMMY TIME<br>그랜드 오픈</div>
-          <div class="banner-desc">담을 때마다 2% 적립</div>
-        </div>
-      </div>
-      <div class="banner-card banner-card-2">
-        <div class="banner-bg">
-          <div class="banner-deco">🥦✨</div>
-          <div class="banner-title">4월 미리보기<br>잘먹겠습니다</div>
-          <div class="banner-desc">담을 때마다 2% 적립</div>
-        </div>
-      </div>
-      <div class="banner-card banner-card-3">
-        <div class="banner-bg">
-          <div class="banner-deco">🎁🎉</div>
-          <div class="banner-badge"><small>더마켓</small>PICK</div>
-          <div class="banner-title">프리미엄<br>선물세트 특가</div>
-          <div class="banner-desc">최대 40% 할인</div>
-        </div>
-      </div>
-      <div class="banner-card banner-card-4">
-        <div class="banner-bg">
-          <div class="banner-deco">🥟🍲</div>
-          <div class="banner-title">비비고 인기상품<br>1+1 대전</div>
-          <div class="banner-desc">만두부터 국물요리까지</div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <div class="card-grid" id="cardGrid">
 
-  <!-- Quick Menu (가로 스크롤, 둥근 사각형) -->
-  <section class="quick-section">
-    <div class="quick-scroll">
-      <div class="quick-item">
-        <div class="quick-icon qi-shooting">
-          <span class="quick-icon-text">슈팅<br>배송</span>
-        </div>
-        <div class="quick-label">슈팅배송</div>
+    <a class="card" href="sample/home-v1.html" data-cat="home">
+      <div class="card-num home">1</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 A - 탭 좌측 시작</div>
+        <div class="card-desc">슈팅배송 퀵메뉴 + 카테고리 칩</div>
       </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-fresh">
-          <span class="quick-icon-text">신선<br>밥상</span>
-        </div>
-        <div class="quick-label">신선밥상</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-emart">
-          <span class="quick-icon-text" style="color:#222;text-shadow:none;">emart</span>
-        </div>
-        <div class="quick-label">이마트</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-smart">
-          <span class="quick-icon-text" style="color:#1565c0;text-shadow:none;">스마트<br>장보기</span>
-        </div>
-        <div class="quick-label">스마트장보기</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-best">
-          <span class="quick-icon-text" style="color:#7b1fa2;text-shadow:none;">미트플러스<br><b>BEST</b></span>
-        </div>
-        <div class="quick-label">베스트</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-new">
-          <span class="quick-icon-text" style="color:#e65100;text-shadow:none;">NEW<br>✨</span>
-        </div>
-        <div class="quick-label">신상품</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-event">
-          <span class="quick-icon-text" style="color:#c2185b;text-shadow:none;">🎪<br>이벤트</span>
-        </div>
-        <div class="quick-label">이벤트</div>
-      </div>
-      <div class="quick-item">
-        <div class="quick-icon qi-gift">
-          <span class="quick-icon-text" style="color:#283593;text-shadow:none;">🎁<br>선물</span>
-        </div>
-        <div class="quick-label">선물하기</div>
-      </div>
-    </div>
-  </section>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
 
-  <!-- Category Pills -->
-  <section class="category-section">
-    <div class="category-row">
-      <div class="category-pill active">
-        <span class="pill-icon">🔖</span> 전체
+    <a class="card" href="sample/home-v2.html" data-cat="home">
+      <div class="card-num home">2</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 B - 검색바 + 장바구니</div>
+        <div class="card-desc">원형 퀵메뉴 2x3 그리드</div>
       </div>
-      <div class="category-pill">
-        <span class="pill-icon">🥬</span> 채소/두부
-      </div>
-      <div class="category-pill">
-        <span class="pill-icon">🍎</span> 과일
-      </div>
-      <div class="category-pill">
-        <span class="pill-icon">🍖</span> 축산
-      </div>
-    </div>
-    <div class="category-row">
-      <div class="category-pill">
-        <span class="pill-icon">💧</span> 생수/음료
-      </div>
-      <div class="category-pill">
-        <span class="pill-icon">🥛</span> 우유/유제품
-      </div>
-      <div class="category-pill">
-        <span class="pill-icon">💊</span> 건강식품
-      </div>
-    </div>
-  </section>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
 
-  <!-- Liquid Glass Tab Bar -->
-  <nav class="bottom-nav">
-    <div class="bnav-item active" data-tab="home">
-      <div class="bnav-icon">
-        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.4L2 11.3h2.8v9.2c0 .6.4 1 1 1h3.7v-5.8c0-.4.3-.7.7-.7h3.6c.4 0 .7.3.7.7v5.8h3.7c.6 0 1-.4 1-1v-9.2H22L12 2.4z"/></svg>
-        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l8-8 8 8"/><path d="M6 10.5v9c0 .5.4.9 1 .9h3.5v-5.5c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v5.5H17c.5 0 1-.4 1-.9v-9"/></svg>
+    <a class="card" href="sample/home-v3.html" data-cat="home">
+      <div class="card-num home">3</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 C - 로고 전용 헤더</div>
+        <div class="card-desc">CJ더마켓 로고만, 원형 퀵메뉴</div>
       </div>
-      <div class="bnav-label">홈</div>
-    </div>
-    <div class="bnav-item" data-tab="category">
-      <div class="bnav-icon">
-        <svg class="i-f" viewBox="0 0 24 24"><rect fill="currentColor" x="3" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="3" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="3" y="13" width="8" height="8" rx="2.5"/><rect fill="currentColor" x="13" y="13" width="8" height="8" rx="2.5"/></svg>
-        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/home-v4.html" data-cat="home">
+      <div class="card-num home">4</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 D - 2배너 슬라이드</div>
+        <div class="card-desc">Yummy Time + 4월 더세페 배너</div>
       </div>
-      <div class="bnav-label">카테고리</div>
-    </div>
-    <div class="bnav-item" data-tab="benefit">
-      <div class="bnav-icon">
-        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M20 7h-1.5A3.5 3.5 0 0012 4.05 3.5 3.5 0 005.5 7H4a2 2 0 00-2 2v2h20V9a2 2 0 00-2-2zM8.5 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm7 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM2 12v8a2 2 0 002 2h16a2 2 0 002-2v-8H2z"/></svg>
-        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13"/><path d="M3 12h18"/><path d="M8.5 8a2.5 2.5 0 010-5C10.5 3 12 5.5 12 8"/><path d="M15.5 8a2.5 2.5 0 000-5C13.5 3 12 5.5 12 8"/></svg>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/home-v5.html" data-cat="home">
+      <div class="card-num home">5</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 E - 더마켓 PICK 배지</div>
+        <div class="card-desc">배너에 더마켓 PICK 오버레이</div>
       </div>
-      <div class="bnav-label">혜택</div>
-      <span class="bnav-badge">5</span>
-    </div>
-    <div class="bnav-item" data-tab="wish">
-      <div class="bnav-icon">
-        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.35l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.54L12 20.35z"/></svg>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/home-v6.html" data-cat="home">
+      <div class="card-num home">6</div>
+      <div class="card-info">
+        <span class="card-tag tag-home">홈 메인</span>
+        <div class="card-title">홈 F - 문화/공연 퀵메뉴</div>
+        <div class="card-desc">뮤지컬, 콘서트, 스포츠, 클래식</div>
       </div>
-      <div class="bnav-label">찜</div>
-      <span class="bnav-dot"></span>
-    </div>
-    <div class="bnav-item" data-tab="my">
-      <div class="bnav-icon">
-        <svg class="i-f" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3.5a3.25 3.25 0 110 6.5 3.25 3.25 0 010-6.5zm0 14.2a7.2 7.2 0 01-5.6-2.7c.04-1.86 3.72-2.88 5.6-2.88 1.86 0 5.56 1.02 5.6 2.88A7.2 7.2 0 0112 19.7z"/></svg>
-        <svg class="i-o" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="9.5" r="3"/><path d="M5.8 19c1-2.4 3.4-4 6.2-4s5.2 1.6 6.2 4"/></svg>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/thanks-v1.html" data-cat="thanks">
+      <div class="card-num thanks">7</div>
+      <div class="card-info">
+        <span class="card-tag tag-thanks">고객감사제</span>
+        <div class="card-title">감사제 A - 초록 배경 SALE</div>
+        <div class="card-desc">SALE 봉투 + 백화점 카테고리</div>
       </div>
-      <div class="bnav-label">마이</div>
-    </div>
-  </nav>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/thanks-v2.html" data-cat="thanks">
+      <div class="card-num thanks">8</div>
+      <div class="card-info">
+        <span class="card-tag tag-thanks">고객감사제</span>
+        <div class="card-title">감사제 B - 올리브 배경</div>
+        <div class="card-desc">시크릿특가 오픈 + 적립금 받기</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/thanks-v3.html" data-cat="thanks">
+      <div class="card-num thanks">9</div>
+      <div class="card-info">
+        <span class="card-tag tag-thanks">고객감사제</span>
+        <div class="card-title">감사제 C - 하늘색 더세페</div>
+        <div class="card-desc">하늘색 배경 + 네온 더세페</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/best-v1.html" data-cat="best">
+      <div class="card-num best">10</div>
+      <div class="card-info">
+        <span class="card-tag tag-best">홈+베스트</span>
+        <div class="card-title">베스트 A - Yummy Time + 적립금</div>
+        <div class="card-desc">2025 베스트 상품 리스트</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/best-v2.html" data-cat="best">
+      <div class="card-num best">11</div>
+      <div class="card-info">
+        <span class="card-tag tag-best">홈+베스트</span>
+        <div class="card-title">베스트 B - 15,000원 쿠폰</div>
+        <div class="card-desc">쿠폰 티켓 + 무료배송</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/best-v3.html" data-cat="best">
+      <div class="card-num best">12</div>
+      <div class="card-info">
+        <span class="card-tag tag-best">홈+베스트</span>
+        <div class="card-title">베스트 C - 혜택 확인하기</div>
+        <div class="card-desc">배송정보 + 25% 쿠폰 배지</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/best-v4.html" data-cat="best">
+      <div class="card-num best">13</div>
+      <div class="card-info">
+        <span class="card-tag tag-best">홈+베스트</span>
+        <div class="card-title">베스트 D - 더세페 + 바이너리샵</div>
+        <div class="card-desc">네온 배너 + 서비스 퀵메뉴</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/full-v1.html" data-cat="full">
+      <div class="card-num full">14</div>
+      <div class="card-info">
+        <span class="card-tag tag-full">풀페이지</span>
+        <div class="card-title">풀 A - 둥근 탭 + 상품사진 배너</div>
+        <div class="card-desc">필 탭 스타일 + 아이콘 퀵메뉴</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/full-v2.html" data-cat="full">
+      <div class="card-num full">15</div>
+      <div class="card-info">
+        <span class="card-tag tag-full">풀페이지</span>
+        <div class="card-title">풀 B - Yummy Time + 패션 퀵메뉴</div>
+        <div class="card-desc">풀배너 + 의류 썸네일</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/full-v3.html" data-cat="full">
+      <div class="card-num full">16</div>
+      <div class="card-info">
+        <span class="card-tag tag-full">풀페이지</span>
+        <div class="card-title">풀 C - 텍스트 상단 레이아웃</div>
+        <div class="card-desc">텍스트 먼저 + 이미지 2개</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/full-v4.html" data-cat="full">
+      <div class="card-num full">17</div>
+      <div class="card-info">
+        <span class="card-tag tag-full">풀페이지</span>
+        <div class="card-title">풀 D - 하단 네비게이션 바</div>
+        <div class="card-desc">배너+탭+퀵메뉴+하단바 (검정 버튼)</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+    <a class="card" href="sample/full-v5.html" data-cat="full">
+      <div class="card-num full">18</div>
+      <div class="card-info">
+        <span class="card-tag tag-full">풀페이지</span>
+        <div class="card-title">풀 E - 하단바 + 흰 버튼</div>
+        <div class="card-desc">배너+탭+퀵메뉴+하단바 (흰 버튼)</div>
+      </div>
+      <svg class="card-arrow" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4l6 6-6 6"/></svg>
+    </a>
+
+  </div>
+
+  <div class="footer">
+    CJ더마켓 모바일 메인 디자인 샘플 v1.0
+  </div>
+
 </div>
 
 <script>
-  // Top tabs
-  document.querySelectorAll('.top-tab').forEach(tab => {
+  document.querySelectorAll('.cat-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-    });
-  });
-
-  // Category pills
-  document.querySelectorAll('.category-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-    });
-  });
-
-  // Bottom nav
-  document.querySelectorAll('.bnav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.bnav-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
+      const filter = tab.dataset.filter;
+      document.querySelectorAll('.card').forEach(card => {
+        card.style.display = (filter === 'all' || card.dataset.cat === filter) ? '' : 'none';
+      });
     });
   });
 </script>

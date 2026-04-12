@@ -1257,7 +1257,7 @@
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
 
@@ -1470,6 +1470,13 @@ window._flyToVx = function(idx) {
   if (!map) return;
   const c = lastCoords[idx];
   map.setView([c.lat, c.lon], 17, { animate: true });
+};
+
+// Show EV charger on map from list click
+window._showEvCharger = function(idx) {
+  const map = getMap();
+  if (!map) return;
+  showEvChargerOnMap(map, idx);
 };
 
 function esc(s) {
@@ -1947,7 +1954,7 @@ function sectionDetail(title, id, count, contentHtml) {
   if (!count) return '';
   return `<details style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
     <summary style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer">
-      ${esc(title)} (${id}) — ${count}건
+      ${title} (${id}) — ${count}건
     </summary>
     <div style="max-height:300px;overflow-y:auto;margin-top:6px;font-size:11px;line-height:1.6">${contentHtml}</div>
   </details>`;
@@ -2208,6 +2215,7 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   if (tvasResult.evChargers && tvasResult.evChargers.length > 0) {
     const speedName = (s) => ({0:'정보없음',1:'완속',2:'급속',3:'초급속'}[s] || s);
     const mustCount = tvasResult.evChargers.filter(e => e.mustCharge).length;
+    const normalCount = tvasResult.evChargers.length - mustCount;
     const rows = tvasResult.evChargers.map((ev, i) => {
       let sockets = [];
       if (ev.dcCha) sockets.push('DC차데모');
@@ -2216,12 +2224,13 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
       if (ev.slow) sockets.push('완속');
       if (ev.tesla) sockets.push('테슬라');
       const isMust = ev.mustCharge === 1;
-      const rowBg = isMust ? 'background:rgba(240,68,82,0.08);border-left:3px solid #f04452;padding-left:8px;margin-left:-4px;' : '';
-      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);${rowBg}">
+      const rowBg = isMust ? 'background:rgba(240,68,82,0.08);border-left:3px solid #f04452;padding-left:8px;margin-left:-4px;' : 'cursor:pointer;';
+      const clickAction = isMust ? '' : `onclick="window._showEvCharger(${i})"`;
+      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);${rowBg}" ${clickAction}>
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:${isMust?16:13}px">${isMust?'&#9889;':'&#9889;'}</span>
-          <b style="${isMust?'color:#f04452;font-size:14px':'font-size:12px'}">${esc(ev.name)}</b>
-          ${isMust ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">필수충전</span>' : ''}
+          <span style="font-size:${isMust?18:14}px;${isMust?'':'color:var(--accent)'}">⚡</span>
+          <b style="${isMust?'color:#f04452;font-size:14px':'font-size:12px;color:var(--text)'}">${esc(ev.name)}</b>
+          ${isMust ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">필수충전</span>' : '<span style="color:var(--muted);font-size:10px">(클릭하면 지도 표시)</span>'}
         </div>
         ${vx(ev.vxIdx, coords)} | ${ev.onRoute===0?'경로상':'경로주변'} | POI:${ev.poiId}<br>
         소켓: ${sockets.join(', ') || '-'} | 충전기: <b>${ev.availChargers}</b>/${ev.totalChargers} | ${speedName(ev.chargeSpeed)}

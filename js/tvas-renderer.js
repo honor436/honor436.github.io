@@ -304,72 +304,102 @@ function renderRestAreas(lg, coords, restAreas) {
   }
 }
 
+// Store individual charger markers for show/hide from list
+let evChargerMarkers = [];
+
+function buildEvPopup(ev, lat, lon) {
+  const isMust = ev.mustCharge === 1;
+  const speedName = {0:'정보없음',1:'완속',2:'급속',3:'초급속'}[ev.chargeSpeed] || '';
+  let sockets = [];
+  if (ev.dcCha) sockets.push('DC차데모');
+  if (ev.ac3) sockets.push('AC3상');
+  if (ev.dcCombo) sockets.push('DC콤보');
+  if (ev.slow) sockets.push('완속');
+  if (ev.tesla) sockets.push('테슬라');
+
+  let popup = `<div style="font-size:12px;line-height:1.6;max-width:320px">`;
+  popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
+  popup += `<span style="font-size:20px">⚡</span>`;
+  popup += `<b style="font-size:15px">${esc(ev.name || '충전소')}</b>`;
+  if (isMust) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">필수충전</span>`;
+  popup += `</div>`;
+  popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">위치</td><td>${ev.onRoute === 0 ? '<b style="color:#3182f6">경로상</b>' : '경로주변'}</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">소켓</td><td>${sockets.join(', ') || '-'}</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전기</td><td><b>${ev.availChargers}</b>/${ev.totalChargers} (${speedName})</td></tr>`;
+  if (ev.chargeTime) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전시간</td><td>${Math.floor(ev.chargeTime/60)}분 ${ev.chargeTime%60}초</td></tr>`;
+  if (ev.chargePower) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전 파워</td><td>${ev.chargePower} kW</td></tr>`;
+  if (ev.arrivalSoc) popup += `<tr><td style="color:#8b95a1;padding:2px 0">SoC</td><td>도착 ${ev.arrivalSoc}% → ${ev.expectedSoc}%</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${ev.poiId}</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
+  if (ev.manualStation) popup += `<tr><td style="color:#8b95a1">구분</td><td style="color:#fbbf24">수동충전소</td></tr>`;
+  if (ev.isSelf) popup += `<tr><td style="color:#8b95a1">셀프</td><td>셀프 충전</td></tr>`;
+  popup += `</table></div>`;
+  return popup;
+}
+
+function resolveEvCoord(ev, coords) {
+  let lat = null, lon = null;
+  if (ev.locX && ev.locY && ev.locX > 100000 && ev.locY > 100000) {
+    const bLon = ev.locX / 360000.0, bLat = ev.locY / 360000.0;
+    if (bLon > 120 && bLon < 135 && bLat > 30 && bLat < 45) {
+      [lat, lon] = besselToWgs84(bLon, bLat);
+    }
+  }
+  if (lat == null && ev.vxIdx > 0 && ev.vxIdx < coords.length) {
+    lat = coords[ev.vxIdx].lat; lon = coords[ev.vxIdx].lon;
+  }
+  return lat != null ? { lat, lon } : null;
+}
+
 function renderEvChargers(lg, coords, evChargers) {
-  for (const ev of evChargers) {
-    let lat, lon;
-
-    // Use SK coord (locX/locY) from TVAS for accurate position
-    if (ev.locX && ev.locY && ev.locX > 100000 && ev.locY > 100000) {
-      const bLon = ev.locX / 360000.0;
-      const bLat = ev.locY / 360000.0;
-      if (bLon > 120 && bLon < 135 && bLat > 30 && bLat < 45) {
-        [lat, lon] = besselToWgs84(bLon, bLat);
-      }
-    }
-
-    // Fallback to VX coord
-    if (lat == null && ev.vxIdx > 0 && ev.vxIdx < coords.length) {
-      lat = coords[ev.vxIdx].lat;
-      lon = coords[ev.vxIdx].lon;
-    }
-    if (lat == null) continue;
-
+  evChargerMarkers = [];
+  for (let idx = 0; idx < evChargers.length; idx++) {
+    const ev = evChargers[idx];
+    const pos = resolveEvCoord(ev, coords);
+    if (!pos) { evChargerMarkers.push(null); continue; }
+    const { lat, lon } = pos;
     const isMust = ev.mustCharge === 1;
-    const speedName = {0:'정보없음',1:'완속',2:'급속',3:'초급속'}[ev.chargeSpeed] || '';
-    let sockets = [];
-    if (ev.dcCha) sockets.push('DC차데모');
-    if (ev.ac3) sockets.push('AC3상');
-    if (ev.dcCombo) sockets.push('DC콤보');
-    if (ev.slow) sockets.push('완속');
-    if (ev.tesla) sockets.push('테슬라');
 
-    // Icon: must charge = large pulsing red, others = small green
+    // Must charge: 빨간 원 38px + 펄스, 일반: 초록 26px
     const size = isMust ? 38 : 26;
     const zOff = isMust ? 1500 : 400;
     let iconHtml;
     if (isMust) {
-      iconHtml = `<div style="position:relative;width:${size}px;height:${size}px">
-        <div style="position:absolute;inset:0;background:rgba(240,68,82,0.25);border-radius:50%;animation:evPulse 1.5s ease-in-out infinite"></div>
-        <div style="position:absolute;inset:4px;background:#f04452;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(240,68,82,0.6);border:2px solid #fff;color:#fff;font-weight:700">⚡</div>
+      iconHtml = `<div style="display:flex;flex-direction:column;align-items:center">
+        <div style="position:relative;width:${size}px;height:${size}px">
+          <div style="position:absolute;inset:0;background:rgba(240,68,82,0.25);border-radius:50%;animation:evPulse 1.5s ease-in-out infinite"></div>
+          <div style="position:absolute;inset:4px;background:#f04452;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 12px rgba(240,68,82,0.6);border:2px solid #fff;color:#fff;font-weight:700">⚡</div>
+        </div>
+        <div style="margin-top:2px;padding:1px 6px;background:rgba(240,68,82,0.9);color:#fff;font-size:8px;font-weight:700;border-radius:6px;white-space:nowrap">필수충전</div>
       </div>`;
     } else {
-      iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:rgba(34,197,94,0.9);border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">⚡</div>`;
+      iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:rgba(49,130,246,0.85);border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⚡</div>`;
     }
 
-    let popup = `<div style="font-size:12px;line-height:1.6;max-width:320px">`;
-    popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
-    popup += `<span style="font-size:20px">⚡</span>`;
-    popup += `<b style="font-size:15px">${esc(ev.name || '충전소')}</b>`;
-    if (isMust) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">필수충전</span>`;
-    popup += `</div>`;
-    popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
-    popup += `<tr><td style="color:#8b95a1;padding:2px 0">위치</td><td>${ev.onRoute === 0 ? '<b style="color:#3182f6">경로상</b>' : '경로주변'}</td></tr>`;
-    popup += `<tr><td style="color:#8b95a1;padding:2px 0">소켓</td><td>${sockets.join(', ') || '-'}</td></tr>`;
-    popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전기</td><td><b>${ev.availChargers}</b>/${ev.totalChargers} (${speedName})</td></tr>`;
-    if (ev.chargeTime) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전시간</td><td>${Math.floor(ev.chargeTime/60)}분 ${ev.chargeTime%60}초</td></tr>`;
-    if (ev.chargePower) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전 파워</td><td>${ev.chargePower} kW</td></tr>`;
-    if (ev.arrivalSoc) popup += `<tr><td style="color:#8b95a1;padding:2px 0">SoC</td><td>도착 ${ev.arrivalSoc}% → ${ev.expectedSoc}%</td></tr>`;
-    popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${ev.poiId}</td></tr>`;
-    popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
-    if (ev.manualStation) popup += `<tr><td style="color:#8b95a1">구분</td><td style="color:#fbbf24">수동충전소</td></tr>`;
-    if (ev.isSelf) popup += `<tr><td style="color:#8b95a1">셀프</td><td>셀프 충전</td></tr>`;
-    popup += `</table></div>`;
-
-    L.marker([lat, lon], {
-      icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, size], iconAnchor: [size/2, size/2] }),
+    const popup = buildEvPopup(ev, lat, lon);
+    const marker = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, isMust ? size+16 : size], iconAnchor: [size/2, isMust ? (size+16)/2 : size/2] }),
       zIndexOffset: zOff,
-    }).bindPopup(popup, { maxWidth: 320 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 320 });
+
+    evChargerMarkers.push({ marker, lat, lon, isMust });
+
+    // Only must-charge chargers are shown by default
+    if (isMust) marker.addTo(lg);
   }
+}
+
+// Show a specific non-must charger on map (called from list click)
+export function showEvChargerOnMap(map, idx) {
+  if (!evChargerMarkers[idx]) return;
+  const { marker, lat, lon, isMust } = evChargerMarkers[idx];
+  if (!map.hasLayer(marker)) {
+    const lg = tvasLayers.evCharger;
+    if (lg) marker.addTo(lg);
+  }
+  map.setView([lat, lon], 17, { animate: true });
+  marker.openPopup();
 }
 
 function buildLanePopup(tl, c) {

@@ -107,7 +107,11 @@ if (navigator.geolocation) {
 
 document.querySelectorAll('[data-layer]').forEach(cb => {
   cb.addEventListener('change', e => {
-    toggleLayer(e.target.dataset.layer, e.target.checked);
+    const layer = e.target.dataset.layer;
+    const checked = e.target.checked;
+    toggleLayer(layer, checked);
+    // Sync all checkboxes with the same data-layer
+    document.querySelectorAll(`[data-layer="${layer}"]`).forEach(other => { other.checked = checked; });
   });
 });
 
@@ -583,6 +587,7 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   const dltSync = { 'dlt-stat-points': locationLogs.length, 'dlt-stat-gps': gpsCount, 'dlt-stat-drgps': drGpsCount, 'dlt-stat-mmgps': mmGpsCount, 'dlt-stat-mmmatch': mmMatchCount, 'dlt-stat-route': routeRequests.length, 'dlt-stat-tts': ttsLogs.length };
   Object.entries(dltSync).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
   const dltEmpty = document.getElementById('dlt-panel-empty'); if (dltEmpty) dltEmpty.style.display = 'none';
+  const dltLayerPanel = document.getElementById('dlt-layer-panel'); if (dltLayerPanel) dltLayerPanel.style.display = '';
 
   const allTimestamps = [
     ...locationLogs.map(p => p.timestamp),

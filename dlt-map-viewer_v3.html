@@ -1136,33 +1136,7 @@
   </div>
 
   <!-- Layer toggle -->
-  <div id="layer-panel" hidden>
-    <h2>레이어 토글</h2>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="gps" checked>
-      <span class="layer-dot" style="background:var(--gps)"></span>GPS
-    </label>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="drGps" checked>
-      <span class="layer-dot" style="background:var(--drgps)"></span>DR_GPS
-    </label>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="mmGps" checked>
-      <span class="layer-dot" style="background:var(--mmgps)"></span>MM GPS Pos
-    </label>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="mmMatch" checked>
-      <span class="layer-dot" style="background:var(--mmmatch)"></span>MM Match Pos
-    </label>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="routeRequest" checked>
-      <span class="layer-dot" style="background:var(--route)"></span>경로 요청
-    </label>
-    <label class="layer-row">
-      <input type="checkbox" data-layer="tts" checked>
-      <span class="layer-dot" style="background:var(--tts)"></span>음성안내
-    </label>
-  </div>
+  <div id="layer-panel" hidden></div>
   <!-- Bottom: analysis count + logo -->
   <div id="sidebar-bottom">
     <div id="analysis-count-bar">
@@ -1318,6 +1292,34 @@
         <div class="stat-label">시간 범위</div>
         <div class="stat-value small" id="dlt-stat-timerange">-</div>
       </div>
+    </div>
+    <!-- Layer toggles -->
+    <div id="dlt-layer-panel" style="display:none">
+      <h2 style="font-size:14px;font-weight:700;margin:12px 0 8px;color:var(--text)">레이어 토글</h2>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="gps" checked>
+        <span class="layer-dot" style="background:var(--gps)"></span>GPS
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="drGps" checked>
+        <span class="layer-dot" style="background:var(--drgps)"></span>DR_GPS
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="mmGps" checked>
+        <span class="layer-dot" style="background:var(--mmgps)"></span>MM GPS Pos
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="mmMatch" checked>
+        <span class="layer-dot" style="background:var(--mmmatch)"></span>MM Match Pos
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="routeRequest" checked>
+        <span class="layer-dot" style="background:var(--route)"></span>경로 요청
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="tts" checked>
+        <span class="layer-dot" style="background:var(--tts)"></span>음성안내
+      </label>
     </div>
     <div id="dlt-panel-empty" style="text-align:center;padding:40px 0;color:var(--muted);font-size:12px">
       DLT 로그 파일을 드래그&드롭하면<br>분석 결과가 여기에 표시됩니다.

@@ -601,23 +601,16 @@ function parseRouteSummary(dv, offset, size, charset) {
   const roadAttr        = dv.getUint8(offset + 44);           // +44 Byte 1   경로내 도로 속성
   const roadNameCount   = dv.getUint16(offset + 45, true);    // +45 UShort 2 주요 도로 명칭 데이터 개수
   const ecoSaving       = dv.getUint8(offset + 47);           // +47 Byte 1   Eco 에너지 저감 값(%)
-                                                               // 스펙상 +47 이후 구분(1B)+통제구분코드(1B) 존재할 수 있으나
-                                                               // 48byte 헤더 내에서 +48은 데이터 시작이므로 아래에서 처리
-  // 48byte 헤더 끝 부분에 추가 필드가 있을 수 있음 (구분, 통제구분코드는 ecoSaving 뒤)
-  // 하지만 전체 48byte이므로 offset+47이 마지막 byte — 실제로는:
-  // ecoSaving=+47 → 구분=offset+48? 아니면 48byte 안에 다 들어있어야 함
-  // 스펙: 2+1+1+4+12+2+1+1+12+4+4+1+2+1+1+1 = 48 bytes ✓
-  const linkNodeType    = dv.getUint8(offset + 48 - 2);      // +46 Byte 1   구분(1:Link, 2:Node)
-  const controlCode     = dv.getUint8(offset + 48 - 1);      // +47 Byte 1   통제구분코드
+  // 헤더 합계: 2+1+1+4+12+2+1+1+12+4+4+1+2+1 = 48 bytes
+
+  // 배치: 헤더(48) → 경로요약DATA(32×n) → 주요도로DATA(16×m) → 경로요약명칭blob → 주요도로명칭blob
+  const dataStart = offset + 48;
+  const roadDataStart = dataStart + count * 32;                        // 주요도로 DATA
+  const nameBlobStart = roadDataStart + roadNameCount * 16;            // 경로요약 명칭 blob
+  const roadNameBlobStart = nameBlobStart + nameBlobSize;              // 주요도로 명칭 blob
 
   // 경로요약 DATA: 32byte × count
-  const dataStart = offset + 48;
   const items = [];
-
-  // 명칭 blob 시작 = 헤더(48) + 경로요약DATA(32*count) + 주요도로DATA(16*roadNameCount)
-  const roadDataStart = dataStart + count * 32;
-  const nameBlobStart = roadDataStart + roadNameCount * 16;
-
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 32;
     if (base + 32 > offset + size) break;
@@ -632,7 +625,7 @@ function parseRouteSummary(dv, offset, size, charset) {
     const turnCode    = dv.getUint8(base + 19);               // +19 Byte 1   RSD회전코드
     const energy      = dv.getInt32(base + 20, true);          // +20 Int 4    에너지 소모량(W)
     const manualStation = dv.getUint8(base + 24);             // +24 Byte 1   수동 충전소 여부
-    // +25~27: reserved 3bytes
+    // +25~31: reserved 7bytes
 
     // 명칭 blob에서 이름 읽기
     let name = '';
@@ -647,8 +640,6 @@ function parseRouteSummary(dv, offset, size, charset) {
 
   // 주요도로 명칭 DATA: 16byte × roadNameCount
   const roadNames = [];
-  // 주요도로 명칭 blob 시작 = nameBlobStart + nameBlobSize
-  const roadNameBlobStart = nameBlobStart + nameBlobSize;
   for (let i = 0; i < roadNameCount; i++) {
     const base = roadDataStart + i * 16;
     if (base + 16 > offset + size) break;

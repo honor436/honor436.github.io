@@ -361,6 +361,8 @@ function startProgress(name = '') {
   layerPanel.hidden = true;
   progressFiles.innerHTML = '';
   folderName.textContent = name ? `📁 ${name}` : '';
+  const dltFolder = document.getElementById('dlt-panel-folder');
+  if (dltFolder) { dltFolder.textContent = name ? `📁 ${name}` : ''; dltFolder.style.display = name ? '' : 'none'; }
 }
 
 function setProgress(pct, label, detail = '') {
@@ -449,6 +451,11 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   statRoute.textContent   = routeRequests.length;
   statTts.textContent     = ttsLogs.length;
 
+  // Sync to DLT right panel
+  const dltSync = { 'dlt-stat-points': locationLogs.length, 'dlt-stat-gps': gpsCount, 'dlt-stat-drgps': drGpsCount, 'dlt-stat-mmgps': mmGpsCount, 'dlt-stat-mmmatch': mmMatchCount, 'dlt-stat-route': routeRequests.length, 'dlt-stat-tts': ttsLogs.length };
+  Object.entries(dltSync).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
+  const dltEmpty = document.getElementById('dlt-panel-empty'); if (dltEmpty) dltEmpty.style.display = 'none';
+
   const allTimestamps = [
     ...locationLogs.map(p => p.timestamp),
     ...mmLogs.map(p => p.timestamp),
@@ -459,9 +466,12 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   if (allTimestamps.length > 0) {
     const first = new Date(Math.min(...allTimestamps));
     const last  = new Date(Math.max(...allTimestamps));
-    statTimeRange.textContent = `${formatTimestamp(first)}\n${formatTimestamp(last)}`;
+    const timeStr = `${formatTimestamp(first)}\n${formatTimestamp(last)}`;
+    statTimeRange.textContent = timeStr;
+    const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = timeStr;
   } else {
     statTimeRange.textContent = 'N/A';
+    const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = 'N/A';
   }
 
   statsSection.hidden = false;

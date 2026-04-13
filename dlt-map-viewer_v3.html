@@ -732,7 +732,8 @@
     }
 
     /* ======== TVAS Right Panel ======== */
-    #tvas-right-panel {
+    /* ---- Right sliding panels (shared) ---- */
+    .right-slide-panel {
       position: fixed;
       right: -440px;
       top: 0;
@@ -744,11 +745,50 @@
       z-index: 5000;
       display: flex;
       flex-direction: column;
-      transition: right 0.25s ease;
+      transition: right 0.3s cubic-bezier(.4,0,.2,1);
     }
-    #tvas-right-panel.open { right: 0; }
+    .right-slide-panel.open { right: 0; }
 
-    #tvas-panel-header {
+    /* ---- Bookmark tabs ---- */
+    .bookmark-tab {
+      position: fixed;
+      right: 0;
+      width: 28px;
+      padding: 12px 4px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: 8px 0 0 8px;
+      cursor: pointer;
+      z-index: 5001;
+      transition: right 0.3s cubic-bezier(.4,0,.2,1), box-shadow 0.15s ease;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.3);
+      border: 1px solid;
+      border-right: none;
+      user-select: none;
+      text-align: center;
+      line-height: 1;
+    }
+    .bookmark-tab:hover { box-shadow: -3px 0 12px rgba(0,0,0,0.5); }
+    .bookmark-tab.active { right: 420px; }
+
+    #tab-tvas {
+      top: 80px;
+      background: #1e3a5f;
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
+    #tab-dlt {
+      top: 200px;
+      background: #1a3a2a;
+      border-color: #22c55e;
+      color: #4ade80;
+    }
+
+    /* Panel headers (shared) */
+    .right-panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -756,11 +796,25 @@
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    #tvas-panel-header h2 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; }
-    #tvas-panel-close {
-      background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+    .right-panel-header h2 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; }
+
+    /* DLT Analysis result panel */
+    #dlt-right-panel .dlt-panel-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    #tvas-panel-close:hover { color: #f87171; }
+    #dlt-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #dlt-stats-grid .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+    }
+    #dlt-stats-grid .stat-card.wide { grid-column: span 2; }
 
     #tvas-panel-body {
       padding: 12px 16px;
@@ -1020,40 +1074,8 @@
   </div>
 
   <!-- Stats -->
-  <div id="stats-section" hidden>
-    <div class="stat-card wide">
-      <div class="stat-label">총 위치 포인트</div>
-      <div class="stat-value" id="stat-points">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#2563eb">GPS</div>
-      <div class="stat-value" id="stat-gps">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#64748b">DR_GPS</div>
-      <div class="stat-value" id="stat-drgps">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#06b6d4">MM GPS Pos</div>
-      <div class="stat-value" id="stat-mmgps">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#22c55e">MM Match Pos</div>
-      <div class="stat-value" id="stat-mmmatch">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#0f766e">경로 요청</div>
-      <div class="stat-value" id="stat-route">-</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label" style="color:#f97316">음성안내</div>
-      <div class="stat-value" id="stat-tts">-</div>
-    </div>
-    <div class="stat-card wide">
-      <div class="stat-label">시간 범위</div>
-      <div class="stat-value small" id="stat-timerange">-</div>
-    </div>
-  </div>
+  <!-- stats moved to DLT right panel -->
+  <div id="stats-section" hidden></div>
 
   <!-- Coordinate search -->
   <div id="coord-panel">
@@ -1172,23 +1194,39 @@
   </div>
 </aside>
 
+<!-- ======== Bookmark Tabs ======== -->
+<div id="tab-tvas" class="bookmark-tab" title="경로 요청">경로 요청</div>
+<div id="tab-dlt" class="bookmark-tab" title="DLT GPS Log">DLT GPS Log</div>
+
 <!-- ======== TVAS Right Panel ======== -->
-<div id="tvas-right-panel">
-  <div id="tvas-panel-header">
-    <h2>경로 요청 테스트</h2>
-    <button id="tvas-panel-close">&times;</button>
+<div id="tvas-right-panel" class="right-slide-panel">
+  <div class="right-panel-header" style="border-left:3px solid #3b82f6">
+    <h2>경로 요청</h2>
   </div>
   <div id="tvas-panel-body">
     <!-- CORS notice -->
     <details id="cors-notice" style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.25);border-radius:8px;padding:6px 10px;font-size:10px;color:#fb923c;line-height:1.5">
       <summary style="font-size:11px;cursor:pointer">⚠️ CORS 우회 안내</summary>
       <div style="margin-top:6px;font-size:10px;color:#fdba74;line-height:1.6">
-        <p style="margin:0 0 4px">서버가 CORS를 허용하지 않으면 브라우저에서 직접 요청할 수 없습니다.<br>아래 명령어로 CORS 비활성화된 Chrome을 열어 사용하세요.</p>
-        <div style="display:flex;gap:4px;margin-top:4px">
-          <code style="flex:1;display:block;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:4px;color:#fbbf24;font-size:10px;word-break:break-all;user-select:all">open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/chrome-cors</code>
-          <button onclick="navigator.clipboard.writeText('open -na &quot;Google Chrome&quot; --args --disable-web-security --user-data-dir=/tmp/chrome-cors').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)})" style="flex-shrink:0;padding:4px 8px;background:#f59e0b;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600" title="클립보드에 복사">📋</button>
+        <p style="margin:0 0 6px">서버가 CORS를 허용하지 않으면 브라우저에서 직접 요청할 수 없습니다.<br>아래 방법 중 하나를 선택하세요.</p>
+        <!-- 방법 1: 확장 프로그램 -->
+        <div style="margin-bottom:8px;padding:6px 8px;background:rgba(49,130,246,0.1);border:1px solid rgba(49,130,246,0.2);border-radius:6px">
+          <div style="font-size:11px;font-weight:600;color:#60a5fa;margin-bottom:4px">방법 1. Chrome 확장 프로그램 (권장)</div>
+          <p style="margin:0 0 4px;color:#94a3b8;font-size:10px">확장 프로그램 설치 후 아이콘 클릭으로 CORS 우회 ON/OFF</p>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#3182f6;color:#fff;border-radius:4px;font-size:10px;font-weight:600;text-decoration:none">Allow CORS 설치</a>
+            <a href="https://chromewebstore.google.com/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#475569;color:#e2e8f0;border-radius:4px;font-size:10px;font-weight:600;text-decoration:none">CORS Unblock 설치</a>
+          </div>
         </div>
-        <p style="margin:6px 0 2px;color:#a3a3a3;font-size:9px">💡 터미널(Terminal.app)에 붙여넣기 후 Enter를 누르세요. 기존 Chrome과 별도로 실행됩니다.</p>
+        <!-- 방법 2: 터미널 명령어 -->
+        <div style="padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px">
+          <div style="font-size:11px;font-weight:600;color:#fbbf24;margin-bottom:4px">방법 2. CORS 비활성 Chrome 실행</div>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <code style="flex:1;display:block;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:4px;color:#fbbf24;font-size:10px;word-break:break-all;user-select:all">open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/chrome-cors</code>
+            <button onclick="navigator.clipboard.writeText('open -na &quot;Google Chrome&quot; --args --disable-web-security --user-data-dir=/tmp/chrome-cors').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)})" style="flex-shrink:0;padding:4px 8px;background:#f59e0b;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600" title="클립보드에 복사">📋</button>
+          </div>
+          <p style="margin:4px 0 0;color:#a3a3a3;font-size:9px">터미널에 붙여넣기 후 Enter. 기존 Chrome과 별도로 실행됩니다.</p>
+        </div>
       </div>
     </details>
     <!-- Waypoints from map -->
@@ -1242,6 +1280,53 @@
   </div>
 </div>
 
+<!-- ======== DLT Analysis Right Panel ======== -->
+<div id="dlt-right-panel" class="right-slide-panel">
+  <div class="right-panel-header" style="border-left:3px solid #22c55e">
+    <h2>DLT GPS Log</h2>
+  </div>
+  <div class="dlt-panel-body">
+    <div id="dlt-panel-folder" style="font-size:12px;font-weight:600;color:var(--accent);word-break:break-all;padding:4px 8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:6px;display:none"></div>
+    <div id="dlt-stats-grid">
+      <div class="stat-card wide">
+        <div class="stat-label">총 위치 포인트</div>
+        <div class="stat-value" id="dlt-stat-points">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#2563eb">GPS</div>
+        <div class="stat-value" id="dlt-stat-gps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#64748b">DR_GPS</div>
+        <div class="stat-value" id="dlt-stat-drgps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#06b6d4">MM GPS Pos</div>
+        <div class="stat-value" id="dlt-stat-mmgps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#22c55e">MM Match Pos</div>
+        <div class="stat-value" id="dlt-stat-mmmatch">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#0f766e">경로 요청</div>
+        <div class="stat-value" id="dlt-stat-route">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#f97316">음성안내</div>
+        <div class="stat-value" id="dlt-stat-tts">-</div>
+      </div>
+      <div class="stat-card wide">
+        <div class="stat-label">시간 범위</div>
+        <div class="stat-value small" id="dlt-stat-timerange">-</div>
+      </div>
+    </div>
+    <div id="dlt-panel-empty" style="text-align:center;padding:40px 0;color:var(--muted);font-size:12px">
+      DLT 로그 파일을 드래그&드롭하면<br>분석 결과가 여기에 표시됩니다.
+    </div>
+  </div>
+</div>
+
 <!-- Error popup -->
 <div id="error-overlay">
   <div id="error-box">
@@ -1269,14 +1354,37 @@ import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
 
 // ---- Right panel open/close ---- //
-const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
 const tvasPanel      = document.getElementById('tvas-right-panel');
-const tvasPanelClose = document.getElementById('tvas-panel-close');
+const dltPanel       = document.getElementById('dlt-right-panel');
+const tabTvas        = document.getElementById('tab-tvas');
+const tabDlt         = document.getElementById('tab-dlt');
+const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
 
 const tvasClearRouteBtn = document.getElementById('tvas-clear-route-btn');
 
-tvasMenuBtn.addEventListener('click', () => { applyWaypointsToBody(); tvasPanel.classList.add('open'); });
-tvasPanelClose.addEventListener('click', () => tvasPanel.classList.remove('open'));
+// ---- Bookmark tab toggle logic ---- //
+function togglePanel(panel, tab, otherPanel, otherTab) {
+  const isOpen = panel.classList.contains('open');
+  // Close other panel first
+  otherPanel.classList.remove('open');
+  otherTab.classList.remove('active');
+  if (isOpen) {
+    panel.classList.remove('open');
+    tab.classList.remove('active');
+  } else {
+    panel.classList.add('open');
+    tab.classList.add('active');
+    if (panel === tvasPanel) applyWaypointsToBody();
+  }
+}
+tabTvas.addEventListener('click', () => togglePanel(tvasPanel, tabTvas, dltPanel, tabDlt));
+tabDlt.addEventListener('click', () => togglePanel(dltPanel, tabDlt, tvasPanel, tabTvas));
+// Sidebar button also opens TVAS panel
+tvasMenuBtn.addEventListener('click', () => {
+  dltPanel.classList.remove('open'); tabDlt.classList.remove('active');
+  applyWaypointsToBody();
+  tvasPanel.classList.add('open'); tabTvas.classList.add('active');
+});
 
 // ---- Clear ALL route data from map ---- //
 tvasClearRouteBtn.addEventListener('click', () => {
@@ -1300,7 +1408,10 @@ tvasClearRouteBtn.addEventListener('click', () => {
   setStatus('');
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && tvasPanel.classList.contains('open')) tvasPanel.classList.remove('open');
+  if (e.key === 'Escape') {
+    if (tvasPanel.classList.contains('open')) { tvasPanel.classList.remove('open'); tabTvas.classList.remove('active'); }
+    if (dltPanel.classList.contains('open')) { dltPanel.classList.remove('open'); tabDlt.classList.remove('active'); }
+  }
 });
 
 // ---- DOM refs ---- //
@@ -1398,6 +1509,14 @@ function setWaypoint(type, lat, lon) {
     }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
   }
   updateWpBar();
+  // Auto-open route request panel when waypoint set
+  if (!tvasPanel.classList.contains('open')) {
+    dltPanel.classList.remove('open'); tabDlt.classList.remove('active');
+    applyWaypointsToBody();
+    tvasPanel.classList.add('open'); tabTvas.classList.add('active');
+  } else {
+    applyWaypointsToBody();
+  }
 }
 
 function applyWaypointsToBody() {

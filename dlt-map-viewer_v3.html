@@ -1053,28 +1053,7 @@
     <p class="subtitle">.dlt 파일 분석 + SHP 링크/노드 + TVAS 경로 요청 테스트</p>
   </div>
 
-  <!-- File drop zone -->
-  <div id="drop-zone">
-    <p>DLT 파일이 있는 <b>폴더</b>를 드래그 &amp; 드롭하거나<br>아래 버튼으로 선택하세요.<br><span style="font-size:11px">하위 디렉토리까지 자동으로 탐색합니다.</span></p>
-    <button id="browse-btn">폴더 선택</button>
-    <p id="browser-warn" style="font-size:11px;color:#f97316;margin-top:6px;display:none">
-      Chrome 또는 Edge 브라우저에서만 지원됩니다.
-    </p>
-  </div>
-
-  <!-- Progress -->
-  <div id="progress-section" hidden>
-    <div id="folder-name"></div>
-    <div class="progress-track">
-      <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
-    </div>
-    <div id="progress-label">준비 중...</div>
-    <div id="progress-detail"></div>
-    <div id="progress-files"></div>
-  </div>
-
-  <!-- Stats -->
-  <!-- stats moved to DLT right panel -->
+  <!-- drop-zone, progress, stats moved to DLT right panel -->
   <div id="stats-section" hidden></div>
 
   <!-- Coordinate search -->
@@ -1286,6 +1265,25 @@
     <h2>DLT GPS Log</h2>
   </div>
   <div class="dlt-panel-body">
+    <!-- File drop zone -->
+    <div id="drop-zone">
+      <p>DLT 파일이 있는 <b>폴더</b>를 드래그 &amp; 드롭하거나<br>아래 버튼으로 선택하세요.<br><span style="font-size:11px">하위 디렉토리까지 자동으로 탐색합니다.</span></p>
+      <button id="browse-btn">폴더 선택</button>
+      <p id="browser-warn" style="font-size:11px;color:#f97316;margin-top:6px;display:none">
+        Chrome 또는 Edge 브라우저에서만 지원됩니다.
+      </p>
+    </div>
+    <!-- Progress -->
+    <div id="progress-section" hidden>
+      <div id="folder-name"></div>
+      <div class="progress-track">
+        <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      </div>
+      <div id="progress-label">준비 중...</div>
+      <div id="progress-detail"></div>
+      <div id="progress-files"></div>
+    </div>
+    <!-- Stats -->
     <div id="dlt-panel-folder" style="font-size:12px;font-weight:600;color:var(--accent);word-break:break-all;padding:4px 8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:6px;display:none"></div>
     <div id="dlt-stats-grid">
       <div class="stat-card wide">
@@ -2147,26 +2145,34 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
       <br>명칭blob: ${rs.nameBlobSize}B | 도로명blob: ${rs.roadNameBlobSize}B | 도로명수: ${rs.roadNameCount}
     </div>`;
 
-    // 구간별 상세
+    // 구간별 상세 — 모든 항목 표시
+    const gpName = (c) => ({1:'도곽점',2:'타일점',11:'직진',12:'좌회전',13:'우회전',14:'U턴',15:'P턴',16:'8시좌회전',17:'10시좌회전',18:'2시우회전',19:'4시우회전',43:'오른쪽',44:'왼쪽',51:'직진방향',77:'왼쪽출구',78:'오른쪽출구',101:'우측고속입구',102:'좌측고속입구',104:'우측고속출구',105:'좌측고속출구',150:'졸음쉼터',151:'휴게소',160:'EV충전소',170:'Ferry진입',171:'Ferry진출',200:'출발지',201:'목적지',204:'톨게이트'}[c] || '코드'+c);
     rs7Html += rs.items.map((item, i) => {
-      const dist = (item.distance / 1000).toFixed(1) + 'km';
+      const dist = (item.distance / 1000).toFixed(1) + 'km (' + item.distance.toLocaleString() + 'm)';
       const timeSec = item.time;
       const timeStr = timeSec >= 60 ? Math.floor(timeSec / 60) + '분 ' + (timeSec % 60) + '초' : timeSec + '초';
+      timeStr2 = '(' + timeSec.toLocaleString() + '초)';
       const cong = congName(item.congestion);
       const congColor = {'원활':'#4ade80','서행':'#fbbf24','정체':'#f87171'}[cong] || 'var(--muted)';
-      return `<div style="padding:4px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+      return `<div style="padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.1)">
         <div style="display:flex;align-items:center;gap:6px">
           <b style="color:var(--accent)">[${i}]</b>
           <span style="flex:1;color:var(--text);font-weight:600">${esc(item.name || '-')}</span>
           <span style="color:${congColor};font-weight:600">${cong}</span>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px">
-          ${vxRange(item.startVxIdx, item.endVxIdx, coords)}<br>
-          거리: ${dist} | 시간: ${timeStr} | 속도: ${item.speed}km/h<br>
-          에너지: ${item.energy}W | 세도로: ${narrowName(item.narrowRoad)} | 회전: ${item.turnCode}
-          ${item.turnCode === 160 ? ' <span style="color:#f04452;font-weight:600">⚡충전소' + (item.manualStation ? '(수동)' : '') + '</span>' : ''}
-          <br><span style="color:var(--muted);font-size:9px">nameOffset=${item.nameOffset}</span>
-        </div>
+        <table style="font-size:10px;color:var(--muted);margin-top:3px;border-collapse:collapse;width:100%">
+          <tr><td style="padding:1px 6px 1px 0;white-space:nowrap">명칭 Offset</td><td style="color:var(--text)">${item.nameOffset}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">구간거리(m)</td><td style="color:var(--text)">${dist}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">구간시간(초)</td><td style="color:var(--text)">${timeStr} ${timeStr2}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">교통수집 속도</td><td style="color:var(--text)">${item.speed} km/h</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">교통수집 혼잡도</td><td><span style="color:${congColor};font-weight:600">${cong}</span> (${item.congestion})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">시작 보간점 Idx</td><td style="color:var(--text)">${item.startVxIdx} ${coords[item.startVxIdx] ? '→ (' + coords[item.startVxIdx].lat.toFixed(5) + ', ' + coords[item.startVxIdx].lon.toFixed(5) + ')' : ''}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">마지막 보간점 Idx</td><td style="color:var(--text)">${item.endVxIdx} ${coords[item.endVxIdx] ? '→ (' + coords[item.endVxIdx].lat.toFixed(5) + ', ' + coords[item.endVxIdx].lon.toFixed(5) + ')' : ''}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">세도로 포함 여부</td><td style="color:var(--text)">${narrowName(item.narrowRoad)} (${item.narrowRoad})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">RSD회전코드</td><td style="color:var(--text)">${gpName(item.turnCode)} (${item.turnCode})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">에너지 소모량(W)</td><td style="color:#a78bfa;font-weight:600">${item.energy.toLocaleString()} W</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">수동 충전소 여부</td><td style="color:var(--text)">${item.turnCode === 160 ? (item.manualStation ? '<span style="color:#f04452">수동(1)</span>' : '자동(0)') : '-'}</td></tr>
+        </table>
       </div>`;
     }).join('');
 

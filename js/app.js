@@ -231,6 +231,15 @@ browseBtn.addEventListener('click', async () => {
     return;
   }
 
+  // Auto-open DLT panel
+  const dltP2 = document.getElementById('dlt-right-panel');
+  const tabD2 = document.getElementById('tab-dlt');
+  if (dltP2 && !dltP2.classList.contains('open')) {
+    const tvasP2 = document.getElementById('tvas-right-panel');
+    const tabT2 = document.getElementById('tab-tvas');
+    if (tvasP2) { tvasP2.classList.remove('open'); tabT2?.classList.remove('active'); }
+    dltP2.classList.add('open'); tabD2?.classList.add('active');
+  }
   startProgress(dirHandle.name);
   setProgress(0, '디렉토리 스캔 중...', '하위 디렉토리를 탐색하고 있습니다.');
 
@@ -254,6 +263,15 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-ove
 dropZone.addEventListener('drop', async e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
+  // Auto-open DLT panel
+  const dltP = document.getElementById('dlt-right-panel');
+  const tabD = document.getElementById('tab-dlt');
+  if (dltP && !dltP.classList.contains('open')) {
+    const tvasP = document.getElementById('tvas-right-panel');
+    const tabT = document.getElementById('tab-tvas');
+    if (tvasP) { tvasP.classList.remove('open'); tabT?.classList.remove('active'); }
+    dltP.classList.add('open'); tabD?.classList.add('active');
+  }
 
   const rootName = [...e.dataTransfer.items]
     .map(i => i.webkitGetAsEntry?.())

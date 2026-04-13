@@ -609,33 +609,38 @@ function parseRouteSummary(dv, offset, size, charset) {
   const nameBlobStart = roadDataStart + roadNameCount * 16;            // 경로요약 명칭 blob
   const roadNameBlobStart = nameBlobStart + nameBlobSize;              // 주요도로 명칭 blob
 
-  // 경로요약 DATA: 32byte × count
+  // 경로요약 DATA: 32byte × count — 먼저 전체 읽기
   const items = [];
+  const nameOffsets = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 32;
     if (base + 32 > offset + size) break;
-    const nameOffset  = dv.getInt32(base, true);             // +0  Int 4    명칭 데이터 Offset
-    const distance    = dv.getInt32(base + 4, true);          // +4  Int 4    구간거리(m)
-    const time        = dv.getInt32(base + 8, true);          // +8  Int 4    구간시간(초)
-    const speed       = dv.getUint8(base + 12);               // +12 Byte 1   교통수집 속도
-    const congestion  = String.fromCharCode(dv.getUint8(base + 13)); // +13 Char 1 혼잡도
-    const startVxIdx  = dv.getUint16(base + 14, true);        // +14 UShort 2 시작 보간점 Idx
-    const endVxIdx    = dv.getUint16(base + 16, true);        // +16 UShort 2 마지막 보간점 Idx
-    const narrowRoad  = dv.getUint8(base + 18);               // +18 Byte 1   세도로 포함 여부
-    const turnCode    = dv.getUint8(base + 19);               // +19 Byte 1   RSD회전코드
-    const energy      = dv.getInt32(base + 20, true);          // +20 Int 4    에너지 소모량(W)
-    const manualStation = dv.getUint8(base + 24);             // +24 Byte 1   수동 충전소 여부
-    // +25~31: reserved 7bytes
-
-    // 명칭 blob에서 이름 읽기
-    let name = '';
-    if (nameOffset >= 0 && nameBlobStart + nameOffset < offset + size) {
-      name = readString(dv, nameBlobStart + nameOffset, Math.min(200, offset + size - nameBlobStart - nameOffset), charset);
-    }
+    nameOffsets.push(dv.getInt32(base, true));
     items.push({
-      nameOffset, name, distance, time, speed, congestion,
-      startVxIdx, endVxIdx, narrowRoad, turnCode, energy, manualStation,
+      nameOffset: nameOffsets[i],
+      name: '',
+      distance:    dv.getInt32(base + 4, true),
+      time:        dv.getInt32(base + 8, true),
+      speed:       dv.getUint8(base + 12),
+      congestion:  String.fromCharCode(dv.getUint8(base + 13)),
+      startVxIdx:  dv.getUint16(base + 14, true),
+      endVxIdx:    dv.getUint16(base + 16, true),
+      narrowRoad:  dv.getUint8(base + 18),
+      turnCode:    dv.getUint8(base + 19),
+      energy:      dv.getInt32(base + 20, true),
+      manualStation: dv.getUint8(base + 24),
     });
+  }
+
+  // 명칭 blob에서 이름 읽기: 현재 offset ~ 다음 offset 까지
+  for (let i = 0; i < items.length; i++) {
+    const curOff = nameOffsets[i];
+    const nextOff = (i + 1 < nameOffsets.length) ? nameOffsets[i + 1] : nameBlobSize;
+    const namePos = nameBlobStart + curOff;
+    const nameLen = nextOff - curOff;
+    if (curOff >= 0 && nameLen > 0 && namePos >= 0 && namePos + nameLen <= offset + size) {
+      try { items[i].name = readString(dv, namePos, nameLen, charset); } catch(e) { /* skip */ }
+    }
   }
 
   // 주요도로 명칭 DATA: 16byte × roadNameCount
@@ -649,8 +654,10 @@ function parseRouteSummary(dv, offset, size, charset) {
     // +8~15: reserved 8bytes
 
     let roadName = '';
-    if (rNameOffset >= 0 && roadNameBlobStart + rNameOffset < offset + size) {
-      roadName = readString(dv, roadNameBlobStart + rNameOffset, Math.min(200, offset + size - roadNameBlobStart - rNameOffset), charset);
+    const rnPos = roadNameBlobStart + rNameOffset;
+    const rnLen = offset + size - rnPos;
+    if (rNameOffset >= 0 && roadNameBlobStart < offset + size && rnPos < offset + size && rnLen > 0) {
+      try { roadName = readString(dv, rnPos, Math.min(200, rnLen), charset); } catch(e) { /* skip */ }
     }
     roadNames.push({ startVxIdx: rStartVxIdx, endVxIdx: rEndVxIdx, name: roadName });
   }

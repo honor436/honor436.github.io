@@ -1344,7 +1344,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-<script type="module" src="js/shp-app.js"></script>
+<script type="module" src="js/shp-app.js?v=20260413"></script>
 
 <!-- TVAS Route Request Test Module -->
 <script type="module">
@@ -2153,7 +2153,7 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
       const dist = (item.distance / 1000).toFixed(1) + 'km (' + item.distance.toLocaleString() + 'm)';
       const timeSec = item.time;
       const timeStr = timeSec >= 60 ? Math.floor(timeSec / 60) + '분 ' + (timeSec % 60) + '초' : timeSec + '초';
-      timeStr2 = '(' + timeSec.toLocaleString() + '초)';
+      const timeStr2 = '(' + timeSec.toLocaleString() + '초)';
       const cong = congName(item.congestion);
       const congColor = {'원활':'#4ade80','서행':'#fbbf24','정체':'#f87171'}[cong] || 'var(--muted)';
       return `<div style="padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.1)">

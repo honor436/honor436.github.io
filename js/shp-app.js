@@ -484,10 +484,13 @@ async function collectFromEntry(entry, files, names, prefix) {
 
 function startProgress(name = '') {
   progressSection.hidden = false;
-  statsSection.hidden = true;
-  layerPanel.hidden = true;
+  if (statsSection) statsSection.hidden = true;
+  if (layerPanel) layerPanel.hidden = true;
   progressFiles.innerHTML = '';
   folderName.textContent = name ? `📁 ${name}` : '';
+  // Sync folder name to DLT right panel
+  const dltFolder = document.getElementById('dlt-panel-folder');
+  if (dltFolder) { dltFolder.textContent = name; dltFolder.style.display = name ? '' : 'none'; }
 }
 
 function setProgress(pct, label, detail = '') {
@@ -576,6 +579,11 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   if (statRoute) statRoute.textContent   = routeRequests.length;
   if (statTts) statTts.textContent     = ttsLogs.length;
 
+  // Sync to DLT right panel
+  const dltSync = { 'dlt-stat-points': locationLogs.length, 'dlt-stat-gps': gpsCount, 'dlt-stat-drgps': drGpsCount, 'dlt-stat-mmgps': mmGpsCount, 'dlt-stat-mmmatch': mmMatchCount, 'dlt-stat-route': routeRequests.length, 'dlt-stat-tts': ttsLogs.length };
+  Object.entries(dltSync).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
+  const dltEmpty = document.getElementById('dlt-panel-empty'); if (dltEmpty) dltEmpty.style.display = 'none';
+
   const allTimestamps = [
     ...locationLogs.map(p => p.timestamp),
     ...mmLogs.map(p => p.timestamp),
@@ -586,9 +594,12 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   if (allTimestamps.length > 0) {
     const first = new Date(Math.min(...allTimestamps));
     const last  = new Date(Math.max(...allTimestamps));
-    if (statTimeRange) statTimeRange.textContent = `${formatTimestamp(first)}\n${formatTimestamp(last)}`;
+    const timeStr = `${formatTimestamp(first)}\n${formatTimestamp(last)}`;
+    if (statTimeRange) statTimeRange.textContent = timeStr;
+    const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = timeStr;
   } else {
     if (statTimeRange) statTimeRange.textContent = 'N/A';
+    const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = 'N/A';
   }
 
   if (statsSection) statsSection.hidden = false;

@@ -57,18 +57,30 @@ function findMarker(buf, fromIndex = 0) {
 
 /**
  * Find all marker positions in a Uint8Array.
- * Returns an array of indices.
+ * Reuses a pre-allocated array to avoid GC pressure.
  */
+const _markerPositions = { arr: new Int32Array(65536), len: 0 };
+
 function findAllMarkers(buf) {
-  const positions = [];
-  let from = 0;
-  while (true) {
-    const idx = findMarker(buf, from);
-    if (idx < 0) break;
-    positions.push(idx);
-    from = idx + 4;
+  let count = 0;
+  let cap = _markerPositions.arr.length;
+  let arr = _markerPositions.arr;
+  const len = buf.length - 3;
+  for (let i = 0; i <= len; i++) {
+    if (buf[i] === 0x44 && buf[i + 1] === 0x4C && buf[i + 2] === 0x54 && buf[i + 3] === 0x01) {
+      if (count >= cap) {
+        cap *= 2;
+        const next = new Int32Array(cap);
+        next.set(arr);
+        arr = next;
+      }
+      arr[count++] = i;
+      i += 3; // skip past marker
+    }
   }
-  return positions;
+  _markerPositions.arr = arr;
+  _markerPositions.len = count;
+  return _markerPositions;
 }
 
 /**
@@ -104,22 +116,23 @@ function decodeRecord(recordBytes) {
  * All required record types (#RpLog, #onLocationChanged, [MM_RESULT], requestTTS)
  * carry their marker prefix in every DLT record — no fallback scan needed.
  */
-function isInterestingRecord(recordBytes, interestingMarkers) {
+function isInterestingRecord(buf, start, end, interestingMarkers) {
   if (!interestingMarkers || interestingMarkers.length === 0) return true;
   for (const marker of interestingMarkers) {
-    if (bytesContain(recordBytes, marker)) return true;
+    if (bytesContain(buf, start, end, marker)) return true;
   }
   return false;
 }
 
-function bytesContain(haystack, needle) {
+function bytesContain(haystack, hStart, hEnd, needle) {
   if (needle.length === 0) return true;
   const first = needle[0];
-  const limit = haystack.length - needle.length;
-  for (let i = 0; i <= limit; i++) {
+  const nLen = needle.length;
+  const limit = hEnd - nLen;
+  for (let i = hStart; i <= limit; i++) {
     if (haystack[i] !== first) continue;
     let match = true;
-    for (let j = 1; j < needle.length; j++) {
+    for (let j = 1; j < nLen; j++) {
       if (haystack[i + j] !== needle[j]) { match = false; break; }
     }
     if (match) return true;
@@ -169,16 +182,17 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
   const offsetSamples = [];
   let relativeOffset = null; // wallclock - relativeTime
 
-  function buildRecord(recordBytes) {
-    if (!isInterestingRecord(recordBytes, interestingMarkers)) return null;
+  // Build record from a region of buf[start..end) — avoids slice when filtering
+  function buildRecord(buf, start, end) {
+    if (!isInterestingRecord(buf, start, end, interestingMarkers)) return null;
 
+    const recordBytes = buf.subarray(start, end);
     const text = decodeRecord(recordBytes);
     const wallclock = parseDltTimestamp(text);
     const relativeTime = extractRelativeTime(recordBytes);
 
     if (wallclock !== null && relativeTime !== null && offsetSamples.length < 512) {
       offsetSamples.push(wallclock.getTime() / 1000 - relativeTime);
-      // Recompute median only at geometric steps (1,2,4,8,...) to avoid O(n²)
       const n = offsetSamples.length;
       if (n === 1 || (n & (n - 1)) === 0) relativeOffset = medianOf(offsetSamples);
     }
@@ -193,8 +207,8 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
 
   let offset = 0;
   while (offset < totalSize) {
-    const end = Math.min(offset + CHUNK_SIZE, totalSize);
-    const slice = file.slice(offset, end);
+    const chunkEnd = Math.min(offset + CHUNK_SIZE, totalSize);
+    const slice = file.slice(offset, chunkEnd);
     const ab = await slice.arrayBuffer();
     const chunk = new Uint8Array(ab);
     bytesRead += chunk.length;
@@ -202,10 +216,19 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
 
     if (progressCallback) progressCallback(Math.min(bytesRead, totalSize), totalSize);
 
-    let buffer = concatUint8(carry, chunk);
-    const positions = findAllMarkers(buffer);
+    // Avoid concat when carry is empty (common case for large chunks)
+    let buffer;
+    if (carry.length === 0) {
+      buffer = chunk;
+    } else {
+      buffer = concatUint8(carry, chunk);
+    }
 
-    if (positions.length === 0) {
+    const markers = findAllMarkers(buffer);
+    const posArr = markers.arr;
+    const posLen = markers.len;
+
+    if (posLen === 0) {
       carry = firstMarkerFound
         ? buffer.slice(Math.max(0, buffer.length - 3))
         : buffer;
@@ -214,39 +237,30 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
 
     firstMarkerFound = true;
 
-    // Trim buffer to start at first marker
-    if (positions[0] > 0) {
-      const shift = positions[0];
-      buffer = buffer.slice(shift);
-      for (let i = 0; i < positions.length; i++) positions[i] -= shift;
-    }
-
     // We can only emit records for which we know the end (= next marker start)
-    if (positions.length === 1) {
-      carry = buffer;
+    if (posLen === 1) {
+      carry = buffer.slice(posArr[0]);
       continue;
     }
 
-    for (let i = 0; i < positions.length - 1; i++) {
-      const start = positions[i];
-      const end2 = positions[i + 1];
-      const record = buildRecord(buffer.slice(start, end2));
+    for (let i = 0; i < posLen - 1; i++) {
+      const record = buildRecord(buffer, posArr[i], posArr[i + 1]);
       if (record !== null) yield record;
     }
 
-    carry = buffer.slice(positions[positions.length - 1]);
+    carry = buffer.slice(posArr[posLen - 1]);
   }
 
   // Flush carry
   if (carry.length > 0) {
-    if (carry[0] === 0x44 && carry[1] === 0x4C && carry[2] === 0x54 && carry[3] === 0x01) {
-      const record = buildRecord(carry);
+    if (carry.length >= 4 &&
+        carry[0] === 0x44 && carry[1] === 0x4C && carry[2] === 0x54 && carry[3] === 0x01) {
+      const record = buildRecord(carry, 0, carry.length);
       if (record !== null) yield record;
     } else {
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(carry);
-      const trimmed = text.replace(/\0/g, '').trim();
-      if (trimmed) {
-        yield { text: trimmed, timestamp: parseDltTimestamp(trimmed) };
+      const text = _utf8.decode(carry).replace(/\0/g, '').trim();
+      if (text) {
+        yield { text, timestamp: parseDltTimestamp(text) };
       }
     }
   }

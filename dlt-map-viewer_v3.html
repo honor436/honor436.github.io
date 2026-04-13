@@ -1576,8 +1576,9 @@ function setupMapContextMenu() {
     content.querySelector('#_wp_dst').addEventListener('click', () => { setWaypoint('dest', lat, lng); map.closePopup(popup); });
   });
 }
-// Retry setup until map is ready
+// Setup on initial map load + re-setup whenever map is recreated (e.g. after DLT analysis)
 const _cmInterval = setInterval(() => { if (getMap()) { setupMapContextMenu(); clearInterval(_cmInterval); } }, 500);
+window.addEventListener('map-init', () => setupMapContextMenu());
 
 // ---- Layer toggles ---- //
 tvasLayerToggles.querySelectorAll('.tvas-ltog').forEach(btn => {

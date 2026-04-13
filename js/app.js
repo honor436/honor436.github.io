@@ -375,8 +375,8 @@ async function collectFromEntry(entry, files, names, prefix) {
 
 function startProgress(name = '') {
   progressSection.hidden = false;
-  statsSection.hidden = true;
-  layerPanel.hidden = true;
+  if (statsSection) statsSection.hidden = true;
+  if (layerPanel) layerPanel.hidden = true;
   progressFiles.innerHTML = '';
   folderName.textContent = name ? `📁 ${name}` : '';
   const dltFolder = document.getElementById('dlt-panel-folder');
@@ -460,14 +460,14 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
   const mmGpsCount   = mmLogs.filter(p => p.sourceType === 'mm_gps').length;
   const mmMatchCount = mmLogs.filter(p => p.sourceType === 'mm_match').length;
 
-  statPoints.textContent  = locationLogs.length;
+  if (statPoints) statPoints.textContent  = locationLogs.length;
   updateCountDisplay();
-  statGps.textContent     = gpsCount;
-  statDrGps.textContent   = drGpsCount;
-  statMmGps.textContent   = mmGpsCount;
-  statMmMatch.textContent = mmMatchCount;
-  statRoute.textContent   = routeRequests.length;
-  statTts.textContent     = ttsLogs.length;
+  if (statGps) statGps.textContent     = gpsCount;
+  if (statDrGps) statDrGps.textContent   = drGpsCount;
+  if (statMmGps) statMmGps.textContent   = mmGpsCount;
+  if (statMmMatch) statMmMatch.textContent = mmMatchCount;
+  if (statRoute) statRoute.textContent   = routeRequests.length;
+  if (statTts) statTts.textContent     = ttsLogs.length;
 
   // Sync to DLT right panel
   const dltSync = { 'dlt-stat-points': locationLogs.length, 'dlt-stat-gps': gpsCount, 'dlt-stat-drgps': drGpsCount, 'dlt-stat-mmgps': mmGpsCount, 'dlt-stat-mmmatch': mmMatchCount, 'dlt-stat-route': routeRequests.length, 'dlt-stat-tts': ttsLogs.length };
@@ -485,15 +485,15 @@ function displayResults({ locationLogs, mmLogs, routeRequests, ttsLogs }) {
     const first = new Date(Math.min(...allTimestamps));
     const last  = new Date(Math.max(...allTimestamps));
     const timeStr = `${formatTimestamp(first)}\n${formatTimestamp(last)}`;
-    statTimeRange.textContent = timeStr;
+    if (statTimeRange) statTimeRange.textContent = timeStr;
     const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = timeStr;
   } else {
-    statTimeRange.textContent = 'N/A';
+    if (statTimeRange) statTimeRange.textContent = 'N/A';
     const dltTr = document.getElementById('dlt-stat-timerange'); if (dltTr) dltTr.textContent = 'N/A';
   }
 
-  statsSection.hidden = false;
-  layerPanel.hidden   = false;
+  if (statsSection) statsSection.hidden = false;
+  if (layerPanel) layerPanel.hidden   = false;
 
   const firstLoc = [...locationLogs, ...mmLogs, ...routeRequests, ...ttsLogs]
     .find(p => (p.lat ?? p.requestLat) != null);

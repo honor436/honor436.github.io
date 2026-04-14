@@ -1157,7 +1157,12 @@
     <h2>경로 요청</h2>
   </div>
   <div id="tvas-panel-body">
-    <!-- CORS Unblock 확장 프로그램 설치 -->
+    <!-- CORS Unblock 확장 프로그램 설치 안내 -->
+    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.6;color:#78350f">
+      <div style="font-weight:700;margin-bottom:4px">⚠️ 설치 필수 — CORS Unblock 확장</div>
+      <div>경로 서버(<code style="background:#fde68a;padding:1px 4px;border-radius:3px">ntmapstg.tmap.co.kr</code>)는 브라우저의 <b>교차 출처(CORS)</b> 요청을 허용하지 않습니다. 확장 프로그램이 없으면 요청 전송 시 브라우저가 즉시 차단하여 응답을 받을 수 없습니다.</div>
+      <div style="margin-top:4px">설치 후 브라우저 툴바의 방패 아이콘을 클릭해 <b>ON</b> 상태로 켜주세요.</div>
+    </div>
     <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;background:#3182f6;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">
       🛡️ CORS Unblock 확장 프로그램 설치
     </a>
@@ -1209,6 +1214,25 @@
       <summary>응답 원문</summary>
       <pre id="tvas-response-pre"></pre>
     </details>
+  </div>
+</div>
+
+<!-- ======== CORS Error Modal ======== -->
+<div id="cors-error-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:18px;font-weight:700;color:#dc2626;margin-bottom:12px">🚫 CORS 차단 — 요청이 실패했습니다</div>
+    <div style="font-size:13px;line-height:1.7;color:#374151;margin-bottom:16px">
+      브라우저가 교차 출처(CORS) 정책에 따라 경로 서버 요청을 차단했습니다.<br>
+      <b>CORS Unblock</b> 확장 프로그램을 설치하고 <b>ON</b> 상태로 켜야 요청이 서버에 도달합니다.
+    </div>
+    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;color:#78350f;margin-bottom:16px">
+      <b>이미 설치되어 있다면:</b><br>
+      브라우저 툴바의 🛡️ 방패 아이콘을 클릭해 토글을 <b>ON</b>으로 바꾸고 다시 시도하세요.
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="cors-modal-close" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">닫기</button>
+      <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="padding:8px 16px;background:#3182f6;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">확장 프로그램 설치</a>
+    </div>
   </div>
 </div>
 
@@ -2042,14 +2066,29 @@ tvasSendBtn.addEventListener('click', async () => {
 
   } catch (e) {
     let detail = e.message || String(e);
-    if (e instanceof TypeError && detail.includes('fetch')) {
-      detail += '\n\n가능한 원인:\n- CORS 정책으로 차단됨\n- 서버 연결 불가 (URL/포트 확인)\n- 네트워크 연결 끊김\n- HTTPS 인증서 오류';
+    const isCorsLike = e instanceof TypeError && /fetch|network|load failed/i.test(detail);
+    if (isCorsLike) {
+      detail += '\n\n가능한 원인:\n- CORS 정책으로 차단됨 (가장 흔함)\n- 서버 연결 불가 (URL/포트 확인)\n- 네트워크 연결 끊김\n- HTTPS 인증서 오류';
+      showCorsErrorModal();
     }
     setStatus('요청 실패: ' + detail, 'error');
     console.error('TVAS request error:', e);
   } finally {
     tvasSendBtn.disabled = false;
   }
+});
+
+function showCorsErrorModal() {
+  const modal = document.getElementById('cors-error-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+}
+document.getElementById('cors-modal-close')?.addEventListener('click', () => {
+  const modal = document.getElementById('cors-error-modal');
+  if (modal) modal.style.display = 'none';
+});
+document.getElementById('cors-error-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'cors-error-modal') e.currentTarget.style.display = 'none';
 });
 
 function sr(k, v) {

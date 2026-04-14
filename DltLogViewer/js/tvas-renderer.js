@@ -111,11 +111,27 @@ function decodeLaneAngles(angleVal, laneVal, totalLanes) {
   return angles;
 }
 
-function laneIconHtml(tl) {
+export function laneIconHtml(tl) {
   const n = tl.totalLanes;
   if (n === 0) return '';
   const recArrow = angleToArrow(tl.recommendAngle);
   const valArrow = angleToArrow(tl.validAngle);
+
+  // Build per-lane invalid arrows (multiple directions can be invalid per lane)
+  const invalidArrowsByLane = [];
+  if (tl.invalidLanes && tl.invalidLanes.length > 0) {
+    for (const iv of tl.invalidLanes) {
+      const a = angleToArrow(iv.angle);
+      if (!a || a === '?') continue;
+      for (let b = 0; b < n; b++) {
+        if ((iv.lane >> b) & 1) {
+          if (!invalidArrowsByLane[b]) invalidArrowsByLane[b] = '';
+          invalidArrowsByLane[b] += a;
+        }
+      }
+    }
+  }
+
   let html = '<div style="display:flex;gap:1px;background:rgba(15,23,42,0.92);padding:3px 4px;border-radius:5px;border:1px solid #475569;box-shadow:0 2px 6px rgba(0,0,0,.6)">';
   for (let b = 0; b < n; b++) {
     const isRec = (tl.recommendLane >> b) & 1;
@@ -136,8 +152,12 @@ function laneIconHtml(tl) {
     if (isOverpass) extra = '<div style="font-size:6px;color:#f97316">고</div>';
     if (isUnderpass) extra = '<div style="font-size:6px;color:#06b6d4">지</div>';
     if (isBus) extra = '<div style="font-size:6px;color:#a78bfa">B</div>';
+    // 비유효 방향 화살표 (빨간색, 작은 글씨로 본 화살표 아래)
+    const invHtml = invalidArrowsByLane[b]
+      ? `<div style="font-size:9px;color:#ef4444;line-height:1">${invalidArrowsByLane[b]}</div>`
+      : '';
     html += `<div style="width:16px;text-align:center;border-radius:2px;background:${bg};border:1px solid ${border};padding:1px 0;line-height:1.1">
-      <div style="font-size:10px;color:#fff">${arrow}</div>${extra}</div>`;
+      <div style="font-size:10px;color:#fff">${arrow}</div>${invHtml}${extra}</div>`;
   }
   html += '</div>';
   return html;

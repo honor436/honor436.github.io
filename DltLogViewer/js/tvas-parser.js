@@ -343,7 +343,7 @@ function parseHighwayMode(dv, offset, size) {
   return segments;
 }
 
-function parseLaneGuidance(dv, offset, size) {
+export function parseLaneGuidance(dv, offset, size) {
   // Header: 20 bytes
   const count          = dv.getUint16(offset, true);
   const invalidBlobSize = dv.getInt32(offset + 8, true);
@@ -378,6 +378,10 @@ function parseLaneGuidance(dv, offset, size) {
         const ivOff = ivBase + j * 4;
         if (ivOff + 4 <= offset + size) {
           invalidLanes.push({
+            // TVAS v5.9 비유효차로 쌍 (4B × N):
+            //   +0 (Byte[2] = UShort LE)  레인정보: 차로 비트맵
+            //                              (bit n = 1 → (n+1)차로가 해당 방향으로 invalid)
+            //   +2 (UShort LE)            각도정보: 0/45/90/135/180/225/270/315
             lane:  dv.getUint16(ivOff, true),
             angle: dv.getUint16(ivOff + 2, true),
           });

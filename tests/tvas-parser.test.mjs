@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRouteSummary } from '../DltLogViewer/js/tvas-parser.js';
+import { parseRouteSummary, parseLaneGuidance } from '../DltLogViewer/js/tvas-parser.js';
+import { laneIconHtml } from '../DltLogViewer/js/tvas-renderer.js';
 
 // ---- RS7 parseRouteSummary ----------------------------------------------- //
 //
@@ -155,4 +156,101 @@ test('parseRouteSummary reads section names from blob', () => {
   const { items } = parseRouteSummary(dv, 0, size, 1);
   assert.equal(items[0].name, '서울');
   assert.equal(items[1].name, '부산');
+});
+
+// ---- TL5 parseLaneGuidance: invalid lane pair order -------------------- //
+//
+// 실 TVAS 바이너리 검증 결과:
+//   각 쌍(4B) = lane bitmap(UShort LE) + angle(UShort LE)
+//     +0 (2B)  차로 비트맵  — bit n set ⇒ (n+1)차로가 invalid
+//     +2 (2B)  각도         — 0/45/90/135/180/225/270/315
+//   (스펙 문서 라벨은 반대로 쓰여 있으나, 실 저장 파일이 기준)
+
+function buildTl5InvalidLaneFixture() {
+  // TL5 layout in this parser:
+  //   Header 20B (count=1, invalidBlobSize=8, busBlobSize=0)
+  //   Data   32B × 1 (vxIdx=10, invalidCount=2, invalidOffset=0)
+  //   Blob   4B × 2  (2쌍: lane+angle)
+  const headerSize = 20;
+  const dataSize = 32;
+  const blobSize = 4 * 2; // 2 pairs
+  const total = headerSize + dataSize + blobSize;
+  const buf = new ArrayBuffer(total);
+  const dv = new DataView(buf);
+
+  // Header
+  dv.setUint16(0, 1, true);       // count = 1
+  dv.setInt32(8, blobSize, true); // invalidBlobSize
+  dv.setInt32(12, 0, true);       // busBlobSize
+
+  // Data #0
+  const dBase = headerSize;
+  dv.setUint16(dBase + 0, 10, true); // vxIdx
+  dv.setUint8(dBase + 5, 2);          // invalidCount = 2
+  dv.setInt32(dBase + 20, 0, true);   // invalidOffset = 0 (blob 시작)
+
+  // Blob: 쌍 1 (+0 lane=0x0001 (1차로), +2 angle=90)
+  const blobBase = headerSize + dataSize;
+  dv.setUint16(blobBase + 0, 0x0001, true);
+  dv.setUint16(blobBase + 2, 90, true);
+  // 쌍 2 (+4 lane=0x0004 (3차로), +6 angle=0 (직진))
+  dv.setUint16(blobBase + 4, 0x0004, true);
+  dv.setUint16(blobBase + 6, 0, true);
+
+  return { dv, size: total };
+}
+
+test('parseLaneGuidance invalid-lane pair #1: lane bitmap at +0, angle at +2', () => {
+  const { dv, size } = buildTl5InvalidLaneFixture();
+  const lanes = parseLaneGuidance(dv, 0, size);
+  assert.equal(lanes[0].invalidLanes[0].lane, 0x0001, 'lane bitmap at +0');
+  assert.equal(lanes[0].invalidLanes[0].angle, 90, 'angle at +2');
+});
+
+test('parseLaneGuidance invalid-lane pair #2: lane bitmap at +0, angle at +2', () => {
+  const { dv, size } = buildTl5InvalidLaneFixture();
+  const lanes = parseLaneGuidance(dv, 0, size);
+  assert.equal(lanes[0].invalidLanes[1].lane, 0x0004, 'lane bitmap at +0');
+  assert.equal(lanes[0].invalidLanes[1].angle, 0, 'angle at +2');
+});
+
+// ---- laneIconHtml: invalid-lane arrows on map icon --------------------- //
+
+test('laneIconHtml renders invalid-lane arrows on map icon', () => {
+  // 3차로, 권장/유효 없음. invalidLanes:
+  //   1차로(bit0) 좌회전(270 → ←)
+  //   3차로(bit2) 우회전(90  → →)
+  const tl = {
+    totalLanes: 3,
+    leftPocket: 0, rightPocket: 0,
+    recommendLane: 0, recommendAngle: 0,
+    validLane: 0, validAngle: 0,
+    overpassLane: 0, underpassLane: 0,
+    busLaneCode: 0,
+    invalidLanes: [
+      { lane: 0b001, angle: 270 },
+      { lane: 0b100, angle: 90 },
+    ],
+  };
+  const html = laneIconHtml(tl);
+  // Expect both invalid arrows present in the rendered HTML.
+  assert.ok(html.includes('←'), `left-turn arrow missing: ${html}`);
+  assert.ok(html.includes('→'), `right-turn arrow missing: ${html}`);
+});
+
+test('laneIconHtml does NOT render invalid arrow on lanes outside the bitmap', () => {
+  // 3차로, invalidLanes는 1차로(bit0)에만 직진(↑) invalid
+  const tl = {
+    totalLanes: 3,
+    leftPocket: 0, rightPocket: 0,
+    recommendLane: 0, recommendAngle: 0,
+    validLane: 0, validAngle: 0,
+    overpassLane: 0, underpassLane: 0,
+    busLaneCode: 0,
+    invalidLanes: [{ lane: 0b001, angle: 0 }],
+  };
+  const html = laneIconHtml(tl);
+  // ↑ should appear exactly once (only on lane 1)
+  const upCount = (html.match(/↑/g) || []).length;
+  assert.equal(upCount, 1, `expected exactly 1 ↑, got ${upCount} in ${html}`);
 });

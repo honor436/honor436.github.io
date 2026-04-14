@@ -6,7 +6,7 @@ import {
   besselToWgs84,
   fitAffineTransform,
   applyAffineTransform,
-} from '../js/coordinate.js';
+} from '../DltLogViewer/js/coordinate.js';
 
 // ---- skCoordToWgs84 ------------------------------------------------------ //
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDltTimestamp, medianOf, encodeMarkers } from '../js/dlt-parser.js';
+import { parseDltTimestamp, medianOf, encodeMarkers } from '../DltLogViewer/js/dlt-parser.js';
 
 // ---- parseDltTimestamp --------------------------------------------------- //
 

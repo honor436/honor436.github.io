@@ -1157,31 +1157,10 @@
     <h2>경로 요청</h2>
   </div>
   <div id="tvas-panel-body">
-    <!-- CORS notice -->
-    <details id="cors-notice" style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.25);border-radius:8px;padding:6px 10px;font-size:10px;color:#fb923c;line-height:1.5">
-      <summary style="font-size:11px;cursor:pointer">⚠️ CORS 우회 안내</summary>
-      <div style="margin-top:6px;font-size:10px;color:#fdba74;line-height:1.6">
-        <p style="margin:0 0 6px">서버가 CORS를 허용하지 않으면 브라우저에서 직접 요청할 수 없습니다.<br>아래 방법 중 하나를 선택하세요.</p>
-        <!-- 방법 1: 확장 프로그램 -->
-        <div style="margin-bottom:8px;padding:6px 8px;background:rgba(49,130,246,0.1);border:1px solid rgba(49,130,246,0.2);border-radius:6px">
-          <div style="font-size:11px;font-weight:600;color:#60a5fa;margin-bottom:4px">방법 1. Chrome 확장 프로그램 (권장)</div>
-          <p style="margin:0 0 4px;color:#94a3b8;font-size:10px">확장 프로그램 설치 후 아이콘 클릭으로 CORS 우회 ON/OFF</p>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">
-            <a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#3182f6;color:#fff;border-radius:4px;font-size:10px;font-weight:600;text-decoration:none">Allow CORS 설치</a>
-            <a href="https://chromewebstore.google.com/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#475569;color:#e2e8f0;border-radius:4px;font-size:10px;font-weight:600;text-decoration:none">CORS Unblock 설치</a>
-          </div>
-        </div>
-        <!-- 방법 2: 터미널 명령어 -->
-        <div style="padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px">
-          <div style="font-size:11px;font-weight:600;color:#fbbf24;margin-bottom:4px">방법 2. CORS 비활성 Chrome 실행</div>
-          <div style="display:flex;gap:4px;margin-top:4px">
-            <code style="flex:1;display:block;padding:4px 6px;background:rgba(0,0,0,0.3);border-radius:4px;color:#fbbf24;font-size:10px;word-break:break-all;user-select:all">open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/chrome-cors</code>
-            <button onclick="navigator.clipboard.writeText('open -na &quot;Google Chrome&quot; --args --disable-web-security --user-data-dir=/tmp/chrome-cors').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋',1500)})" style="flex-shrink:0;padding:4px 8px;background:#f59e0b;color:#000;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600" title="클립보드에 복사">📋</button>
-          </div>
-          <p style="margin:4px 0 0;color:#a3a3a3;font-size:9px">터미널에 붙여넣기 후 Enter. 기존 Chrome과 별도로 실행됩니다.</p>
-        </div>
-      </div>
-    </details>
+    <!-- CORS Unblock 확장 프로그램 설치 -->
+    <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;background:#3182f6;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">
+      🛡️ CORS Unblock 확장 프로그램 설치
+    </a>
     <!-- Waypoints from map -->
     <div>
       <div class="tvas-field-label">출발지/목적지 (지도 우클릭으로 설정)</div>

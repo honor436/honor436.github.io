@@ -585,7 +585,7 @@ function parseIncidents(dv, offset, size, charset) {
   return items;
 }
 
-function parseRouteSummary(dv, offset, size, charset) {
+export function parseRouteSummary(dv, offset, size, charset) {
   // RS7 header: 48 bytes
   const count           = dv.getUint16(offset, true);       // +0  UShort 2  경로요약 정보 개수(n)
   const infoType        = dv.getUint8(offset + 2);           // +2  Byte 1   정보 인덱스 type
@@ -609,26 +609,43 @@ function parseRouteSummary(dv, offset, size, charset) {
   const nameBlobStart = roadDataStart + roadNameCount * 16;            // 경로요약 명칭 blob
   const roadNameBlobStart = nameBlobStart + nameBlobSize;              // 주요도로 명칭 blob
 
-  // 경로요약 DATA: 32byte × count — 먼저 전체 읽기
+  // 경로요약 DATA: 32byte × count — 먼저 전체 읽기 (TVAS v5.9 p.45)
+  //  +0  Byte    구분 (1=Link, 2=Node)
+  //  +1  Byte    통제구분코드
+  //  +2  2B      reserved
+  //  +4  Int     명칭 Offset
+  //  +8  Int     구간거리(m)
+  //  +12 Int     구간시간(초)
+  //  +16 Byte    속도
+  //  +17 Char    혼잡도
+  //  +18 UShort  시작 보간점
+  //  +20 UShort  끝 보간점
+  //  +22 Byte    세도로 포함 여부
+  //  +23 Byte    회전코드
+  //  +24 Int     에너지(W)
+  //  +28 Byte    수동충전소
+  //  +29 3B      reserved
   const items = [];
   const nameOffsets = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 32;
     if (base + 32 > offset + size) break;
-    nameOffsets.push(dv.getInt32(base, true));
+    nameOffsets.push(dv.getInt32(base + 4, true));
     items.push({
+      linkNodeType: dv.getUint8(base),
+      controlCode:  dv.getUint8(base + 1),
       nameOffset: nameOffsets[i],
       name: '',
-      distance:    dv.getInt32(base + 4, true),
-      time:        dv.getInt32(base + 8, true),
-      speed:       dv.getUint8(base + 12),
-      congestion:  String.fromCharCode(dv.getUint8(base + 13)),
-      startVxIdx:  dv.getUint16(base + 14, true),
-      endVxIdx:    dv.getUint16(base + 16, true),
-      narrowRoad:  dv.getUint8(base + 18),
-      turnCode:    dv.getUint8(base + 19),
-      energy:      dv.getInt32(base + 20, true),
-      manualStation: dv.getUint8(base + 24),
+      distance:    dv.getInt32(base + 8, true),
+      time:        dv.getInt32(base + 12, true),
+      speed:       dv.getUint8(base + 16),
+      congestion:  String.fromCharCode(dv.getUint8(base + 17)),
+      startVxIdx:  dv.getUint16(base + 18, true),
+      endVxIdx:    dv.getUint16(base + 20, true),
+      narrowRoad:  dv.getUint8(base + 22),
+      turnCode:    dv.getUint8(base + 23),
+      energy:      dv.getInt32(base + 24, true),
+      manualStation: dv.getUint8(base + 28),
     });
   }
 

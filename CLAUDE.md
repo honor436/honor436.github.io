@@ -6,7 +6,6 @@ DLT 바이너리 로그에서 GPS/MM 위치, 경로 요청(TVAS), 음성안내(T
 
 - 메인 페이지: `DltLogViewer/index.html` (`https://honor436.github.io/DltLogViewer/`)
 - 핵심 모듈: `DltLogViewer/js/dlt-parser.js`, `extractor.js`, `tvas-parser.js`, `coordinate.js`, `map-viewer.js`, `shp-app.js`
-- 루트 `dlt-map-viewer.html`은 `DltLogViewer/`로의 리다이렉트 페이지 (기존 URL 호환용)
 
 ## 개발 원칙: TDD (Test-Driven Development)
 
@@ -74,19 +73,19 @@ honor436.github.io/
 파싱 로직(`parseDltTimestamp`, `parseRouteSummary`, `skCoordToWgs84` 등)은 입력 → 출력이 명확하므로 가장 먼저 테스트한다.
 
 ```javascript
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { parseDltTimestamp } from '../js/dlt-parser.js';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { parseDltTimestamp } from "../js/dlt-parser.js";
 
-test('parseDltTimestamp wallclock format returns Date', () => {
-  const d = parseDltTimestamp('2026/04/06 10:16:43.698');
+test("parseDltTimestamp wallclock format returns Date", () => {
+  const d = parseDltTimestamp("2026/04/06 10:16:43.698");
   assert.equal(d.getFullYear(), 2026);
   assert.equal(d.getMonth(), 3);
   assert.equal(d.getMilliseconds(), 698);
 });
 
-test('parseDltTimestamp empty returns null', () => {
-  assert.equal(parseDltTimestamp(''), null);
+test("parseDltTimestamp empty returns null", () => {
+  assert.equal(parseDltTimestamp(""), null);
 });
 ```
 
@@ -134,4 +133,5 @@ test('parseDltTimestamp empty returns null', () => {
 ## 참고 — 실 로그 수동 검증 경로
 
 브라우저 통합 검증용 실 로그. 커밋 금지, `.gitignore` 대상:
+
 - `/Users/a201010147/Documents/Project/Claude/honor436.github.io/DLTLOG/1020/1020.dlt`

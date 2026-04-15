@@ -5,6 +5,9 @@ import {
   buildLanePopup,
   buildDirectionNameLabels,
   buildRoadNameLabels,
+  buildIntersectionNameLabels,
+  buildRangeSegments,
+  buildCongestionLabels,
 } from '../DltLogViewer/js/tvas-renderer.js';
 
 // ---- buildRouteArrowSpecs ------------------------------------------------- //
@@ -366,4 +369,145 @@ test('buildRoadNameLabels_skips_invalid_range', () => {
   const labels = buildRoadNameLabels(coords, rns);
   assert.equal(labels.length, 1);
   assert.equal(labels[0].name, '정상');
+});
+
+// ---- buildIntersectionNameLabels ---------------------------------------- //
+//
+// CN (교차로명칭) 항목은 `{lastVxIdx, name}` 형태. DN5와 유사하지만 typeCode 없음.
+// coords[lastVxIdx]에 라벨을 둔다. 빈 이름/범위 밖 인덱스는 스킵.
+
+test('buildIntersectionNameLabels_returns_empty_for_empty_input', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }];
+  assert.deepEqual(buildIntersectionNameLabels(coords, []), []);
+  assert.deepEqual(buildIntersectionNameLabels(coords, null), []);
+  assert.deepEqual(buildIntersectionNameLabels(coords, undefined), []);
+});
+
+test('buildIntersectionNameLabels_places_label_at_lastVxIdx', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+  ];
+  const items = [{ lastVxIdx: 1, name: '강남역' }];
+  const labels = buildIntersectionNameLabels(coords, items);
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0].lat, 37.1);
+  assert.equal(labels[0].lon, 127.1);
+  assert.equal(labels[0].name, '강남역');
+});
+
+test('buildIntersectionNameLabels_skips_empty_and_out_of_bounds', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
+  const items = [
+    { lastVxIdx: 0, name: '' },
+    { lastVxIdx: 99, name: '범위밖' },
+    { lastVxIdx: -1, name: '음수' },
+    { lastVxIdx: 1, name: '정상' },
+  ];
+  const labels = buildIntersectionNameLabels(coords, items);
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0].name, '정상');
+});
+
+// ---- buildRangeSegments ------------------------------------------------- //
+//
+// 범용 헬퍼: `{startVxIdx, endVxIdx, ...}` 형태의 item 배열을 받아 각 item을
+// `{latlngs: [[lat,lon],...], item}` 세그먼트로 변환. endVxIdx는 coords
+// 범위로 clamp. 유효하지 않은 범위는 스킵. TC/LT2/HW/RD5/WHR 등 공용.
+
+test('buildRangeSegments_returns_empty_for_empty_input', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
+  assert.deepEqual(buildRangeSegments(coords, []), []);
+  assert.deepEqual(buildRangeSegments(coords, null), []);
+  assert.deepEqual(buildRangeSegments(coords, undefined), []);
+});
+
+test('buildRangeSegments_builds_latlngs_for_valid_range', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+  ];
+  const item = { startVxIdx: 0, endVxIdx: 2, payload: 'x' };
+  const segs = buildRangeSegments(coords, [item]);
+  assert.equal(segs.length, 1);
+  assert.deepEqual(segs[0].latlngs, [[37.0, 127.0], [37.1, 127.1], [37.2, 127.2]]);
+  // Preserves original item reference for renderer access to extra fields
+  assert.equal(segs[0].item, item);
+});
+
+test('buildRangeSegments_clamps_endVxIdx_to_coords_length', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+  ];
+  const segs = buildRangeSegments(coords, [{ startVxIdx: 0, endVxIdx: 99 }]);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].latlngs.length, 2);
+  assert.deepEqual(segs[0].latlngs[1], [37.1, 127.1]);
+});
+
+// ---- buildCongestionLabels ---------------------------------------------- //
+//
+// TC 정체구간 라벨 — 각 항목 `{startVxIdx, endVxIdx, distance, time}`에 대해
+// 범위 중앙 vx 좌표 + 거리/시간을 반환. 지도 위 칩 라벨로 표시하기 위함.
+
+test('buildCongestionLabels_returns_empty_for_empty_input', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
+  assert.deepEqual(buildCongestionLabels(coords, []), []);
+  assert.deepEqual(buildCongestionLabels(coords, null), []);
+  assert.deepEqual(buildCongestionLabels(coords, undefined), []);
+});
+
+test('buildCongestionLabels_places_label_at_midpoint_with_distance_time', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+    { lat: 37.3, lon: 127.3 },
+    { lat: 37.4, lon: 127.4 },
+  ];
+  const items = [{ startVxIdx: 0, endVxIdx: 4, distance: 1500, time: 300 }];
+  const labels = buildCongestionLabels(coords, items);
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0].lat, 37.2);  // mid of [0,4] = 2
+  assert.equal(labels[0].lon, 127.2);
+  assert.equal(labels[0].distance, 1500);
+  assert.equal(labels[0].time, 300);
+});
+
+test('buildCongestionLabels_clamps_endVxIdx_and_skips_invalid', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+  ];
+  const items = [
+    { startVxIdx: 0, endVxIdx: 99, distance: 500, time: 60 }, // clamp end → mid of [0,2] = 1
+    { startVxIdx: 5, endVxIdx: 9,  distance: 100, time: 30 }, // out of range → skip
+    { startVxIdx: 2, endVxIdx: 0,  distance: 100, time: 30 }, // reversed → skip
+  ];
+  const labels = buildCongestionLabels(coords, items);
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0].lat, 37.1);  // mid = floor((0+2)/2) = 1
+  assert.equal(labels[0].distance, 500);
+});
+
+test('buildRangeSegments_skips_invalid_ranges', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+  ];
+  const items = [
+    { startVxIdx: 2, endVxIdx: 0 },  // reversed → skip
+    { startVxIdx: 1, endVxIdx: 1 },  // single point → skip (needs ≥2 points)
+    { startVxIdx: -1, endVxIdx: 2 }, // negative start → skip
+    { startVxIdx: 5, endVxIdx: 9 },  // start out of range → skip
+    { startVxIdx: 0, endVxIdx: 2 },  // valid
+  ];
+  const segs = buildRangeSegments(coords, items);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].latlngs.length, 3);
 });

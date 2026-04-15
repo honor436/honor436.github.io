@@ -15,15 +15,25 @@ import { besselToWgs84 } from './coordinate.js';
 // ---- Layer state ---------------------------------------------------------- //
 
 let tvasLayers = {
-  route: null,      // 경로 폴리라인
-  guidance: null,   // 안내점
-  danger: null,     // 위험지역
-  tollgate: null,   // 톨게이트
-  restArea: null,   // 휴게소
-  lane: null,       // 차로안내
-  evCharger: null,  // 전기차 충전소
-  direction: null,  // 방면 명칭 라벨
-  roadName: null,   // 도로 명칭 라벨
+  route: null,         // 경로 폴리라인
+  guidance: null,      // 안내점
+  danger: null,        // 위험지역
+  tollgate: null,      // 톨게이트
+  restArea: null,      // 휴게소
+  lane: null,          // 차로안내
+  evCharger: null,     // 전기차 충전소
+  direction: null,     // 방면 명칭 라벨
+  roadName: null,      // 도로 명칭 라벨
+  waypoint: null,      // 경유지
+  incident: null,      // 돌발정보
+  congestion: null,    // 정체구간
+  intersection: null,  // 교차로명칭
+  reroute: null,       // 강제재탐색
+  trafficInfo: null,   // 교통정보 구간 (LT2)
+  cityBoundary: null,  // 시도경계
+  highwayMode: null,   // 고속모드
+  rpLink: null,        // RP 링크 (RD5)
+  truck: null,         // 화물차 제한구간
 };
 
 // ---- Color schemes -------------------------------------------------------- //
@@ -176,20 +186,16 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0)
   clearTvasRoute(map);
 
   const { header, guidancePoints, dangerAreas, tollGates, restAreas,
-          directionNames, intersectionNames, laneGuidance, evChargers, routeSummary } = tvasResult;
+          directionNames, intersectionNames, laneGuidance, evChargers, routeSummary,
+          waypoints, incidents, congestion, forcedReroute,
+          trafficInfo, cityBoundary, highwayMode, rpLinks,
+          truckWidth, truckHeight, truckWeight } = tvasResult;
   const routeItems = (routeSummary && routeSummary.items) ? routeSummary.items : [];
   const summaryRoadNames = (routeSummary && routeSummary.roadNames) ? routeSummary.roadNames : [];
+  const rpLinkItems = (rpLinks && rpLinks.items) ? rpLinks.items : [];
 
   // Create separate layer groups
-  tvasLayers.route = L.layerGroup();
-  tvasLayers.guidance = L.layerGroup();
-  tvasLayers.danger = L.layerGroup();
-  tvasLayers.tollgate = L.layerGroup();
-  tvasLayers.restArea = L.layerGroup();
-  tvasLayers.lane = L.layerGroup();
-  tvasLayers.evCharger = L.layerGroup();
-  tvasLayers.direction = L.layerGroup();
-  tvasLayers.roadName = L.layerGroup();
+  Object.keys(tvasLayers).forEach(k => { tvasLayers[k] = L.layerGroup(); });
 
   if (resolvedCoords.length > 0) {
     renderRoutePolylines(tvasLayers.route, resolvedCoords, routeItems);
@@ -202,6 +208,16 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0)
     if (evChargers && evChargers.length > 0) renderEvChargers(tvasLayers.evCharger, resolvedCoords, evChargers);
     renderDirectionNames(tvasLayers.direction, resolvedCoords, directionNames);
     renderRoadNames(tvasLayers.roadName, resolvedCoords, summaryRoadNames);
+    renderWaypoints(tvasLayers.waypoint, resolvedCoords, waypoints);
+    renderIncidents(tvasLayers.incident, resolvedCoords, incidents);
+    renderCongestion(tvasLayers.congestion, resolvedCoords, congestion);
+    renderIntersectionNames(tvasLayers.intersection, resolvedCoords, intersectionNames);
+    renderForcedReroute(tvasLayers.reroute, resolvedCoords, forcedReroute);
+    renderTrafficInfo(tvasLayers.trafficInfo, resolvedCoords, trafficInfo);
+    renderCityBoundary(tvasLayers.cityBoundary, resolvedCoords, cityBoundary);
+    renderHighwayMode(tvasLayers.highwayMode, resolvedCoords, highwayMode);
+    renderRpLinks(tvasLayers.rpLink, resolvedCoords, rpLinkItems);
+    renderTruckRestrictions(tvasLayers.truck, resolvedCoords, { truckWidth, truckHeight, truckWeight });
   }
 
   // Add all layers to map
@@ -287,6 +303,73 @@ export function buildDirectionNameLabels(coords, directionNames) {
     if (typeof idx !== 'number' || idx < 0 || idx >= coords.length) continue;
     const c = coords[idx];
     labels.push({ lat: c.lat, lon: c.lon, name: dn.name.trim(), typeCode: dn.typeCode });
+  }
+  return labels;
+}
+
+/**
+ * Build label specs for 교차로 명칭 (CN intersectionNames).
+ * Entries are `{lastVxIdx, name}`. Places the label at coords[lastVxIdx].
+ * Skips empty names and out-of-range indices.
+ */
+export function buildIntersectionNameLabels(coords, names) {
+  if (!coords || coords.length === 0) return [];
+  if (!names || names.length === 0) return [];
+  const labels = [];
+  for (const cn of names) {
+    if (!cn || !cn.name || !cn.name.trim()) continue;
+    const idx = cn.lastVxIdx;
+    if (typeof idx !== 'number' || idx < 0 || idx >= coords.length) continue;
+    const c = coords[idx];
+    labels.push({ lat: c.lat, lon: c.lon, name: cn.name.trim() });
+  }
+  return labels;
+}
+
+/**
+ * Build latlng polyline segments from `{startVxIdx, endVxIdx, ...}` items.
+ * Used by TC/LT2/HW/RD5/WHR/HTR/WTR — any section that defines a VX range.
+ * Returns `[{latlngs, item}]`; skips invalid/reversed/single-point ranges.
+ * endVxIdx is clamped to coords.length-1.
+ */
+export function buildRangeSegments(coords, items) {
+  if (!coords || coords.length === 0) return [];
+  if (!items || items.length === 0) return [];
+  const out = [];
+  for (const item of items) {
+    const start = item.startVxIdx;
+    const endRaw = item.endVxIdx;
+    if (typeof start !== 'number' || start < 0 || start >= coords.length) continue;
+    if (typeof endRaw !== 'number' || endRaw <= start) continue;
+    const end = Math.min(endRaw, coords.length - 1);
+    if (end <= start) continue;
+    const latlngs = [];
+    for (let i = start; i <= end; i++) latlngs.push([coords[i].lat, coords[i].lon]);
+    out.push({ latlngs, item });
+  }
+  return out;
+}
+
+/**
+ * Build label specs for TC 정체구간. Each item is
+ * `{startVxIdx, endVxIdx, distance, time}`. Returns
+ * `[{lat, lon, distance, time}]` placed at the midpoint vertex.
+ * Invalid ranges are skipped; endVxIdx is clamped to coords range.
+ */
+export function buildCongestionLabels(coords, items) {
+  if (!coords || coords.length === 0) return [];
+  if (!items || items.length === 0) return [];
+  const labels = [];
+  for (const item of items) {
+    const start = item.startVxIdx;
+    const endRaw = item.endVxIdx;
+    if (typeof start !== 'number' || start < 0 || start >= coords.length) continue;
+    if (typeof endRaw !== 'number' || endRaw <= start) continue;
+    const end = Math.min(endRaw, coords.length - 1);
+    if (end <= start) continue;
+    const mid = Math.floor((start + end) / 2);
+    const c = coords[mid];
+    labels.push({ lat: c.lat, lon: c.lon, distance: item.distance, time: item.time });
   }
   return labels;
 }
@@ -423,12 +506,12 @@ function renderTollGates(lg, coords, tollGates) {
     const c = coords[tg.vxIdx];
     const typeNames = { 1:'개방형',2:'폐쇄형',3:'IC',4:'JC',5:'진출IC',6:'휴게소' };
     const congNames = { '1':'원활','2':'서행','4':'정체','0':'정보없음' };
-    let popup = `<b>🚧 ${esc(tg.name || '톨게이트')}</b><br>유형: ${typeNames[tg.guideType] || tg.guideType}`;
+    let popup = `<b>[TG] ${esc(tg.name || '톨게이트')}</b><br>유형: ${typeNames[tg.guideType] || tg.guideType}`;
     if (tg.fare > 0) popup += `<br>요금: ${tg.fare.toLocaleString()}원`;
     if (tg.hipassOnly) popup += `<br>하이패스 전용`;
     popup += `<br>혼잡도: ${congNames[tg.congestion] || tg.congestion}<br>VX: ${tg.vxIdx}`;
     L.marker([c.lat, c.lon], {
-      icon: L.divIcon({ className: '', html: `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(251,191,36,0.9);border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">🚧</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
+      icon: L.divIcon({ className: '', html: `<div style="width:26px;height:24px;line-height:24px;text-align:center;background:rgba(251,191,36,0.95);border-radius:6px;font-size:11px;font-weight:800;letter-spacing:-0.5px;color:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">TG</div>`, iconSize: [26, 24], iconAnchor: [13, 12] }),
     }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
   }
 }
@@ -437,10 +520,10 @@ function renderRestAreas(lg, coords, restAreas) {
   for (const ra of restAreas) {
     if (ra.entryVxIdx >= coords.length) continue;
     const c = coords[ra.entryVxIdx];
-    let popup = `<b>🅿 ${esc(ra.name || '휴게소')}</b><br>VX: ${ra.entryVxIdx}~${ra.exitVxIdx}`;
+    let popup = `<b>🍴 ${esc(ra.name || '휴게소')}</b><br>VX: ${ra.entryVxIdx}~${ra.exitVxIdx}`;
     if (ra.poiId) popup += `<br>POI: ${ra.poiId}`;
     L.marker([c.lat, c.lon], {
-      icon: L.divIcon({ className: '', html: `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(34,197,94,0.9);border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">🅿</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
+      icon: L.divIcon({ className: '', html: `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(34,197,94,0.9);border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">🍴</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
     }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
   }
 }
@@ -691,6 +774,190 @@ function renderRoadNames(lg, coords, roadNames) {
       interactive: false,
       zIndexOffset: 150,
     }).addTo(lg);
+  }
+}
+
+// ---- 경유지 / 돌발 / 재탐색 / 교차로명 / 시도경계 마커 ---------------------- //
+
+function waypointIconHtml(index) {
+  return `<div style="width:26px;height:26px;line-height:26px;text-align:center;background:#3b82f6;color:#fff;border-radius:50%;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #fff">${index + 1}</div>`;
+}
+
+function renderWaypoints(lg, coords, waypoints) {
+  if (!waypoints || waypoints.length === 0) return;
+  for (let i = 0; i < waypoints.length; i++) {
+    const wp = waypoints[i];
+    if (typeof wp.vxIdx !== 'number' || wp.vxIdx < 0 || wp.vxIdx >= coords.length) continue;
+    const c = coords[wp.vxIdx];
+    let popup = `<b>🚩 경유지 ${i + 1}</b><br>VX: ${wp.vxIdx}`;
+    if (wp.type) popup += `<br>유형: ${wp.type}`;
+    if (wp.poiId) popup += `<br>POI: ${wp.poiId}`;
+    popup += `<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+    L.marker([c.lat, c.lon], {
+      icon: L.divIcon({ className: '', html: waypointIconHtml(i), iconSize: [26, 26], iconAnchor: [13, 13] }),
+      zIndexOffset: 900,
+    }).bindPopup(popup, { maxWidth: 260 }).addTo(lg);
+  }
+}
+
+function incidentIconHtml(typeCode) {
+  const iconByType = { 'A':'🚧', 'B':'🚗', 'C':'⛔', 'D':'🚨', 'E':'🌊', 'F':'🌫' };
+  const ico = iconByType[typeCode] || '⚠';
+  return `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(234,88,12,0.9);color:#fff;border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">${ico}</div>`;
+}
+
+function renderIncidents(lg, coords, incidents) {
+  if (!incidents || incidents.length === 0) return;
+  for (const ua of incidents) {
+    if (typeof ua.startVxIdx !== 'number' || ua.startVxIdx < 0 || ua.startVxIdx >= coords.length) continue;
+    const c = coords[ua.startVxIdx];
+    let popup = `<b>돌발정보</b> (유형:${esc(ua.typeCode)})`;
+    if (ua.content) popup += `<br>${esc(ua.content)}`;
+    popup += `<br>VX: ${ua.startVxIdx}`;
+    L.marker([c.lat, c.lon], {
+      icon: L.divIcon({ className: '', html: incidentIconHtml(ua.typeCode), iconSize: [24, 24], iconAnchor: [12, 12] }),
+      zIndexOffset: 800,
+    }).bindPopup(popup, { maxWidth: 280 }).addTo(lg);
+  }
+}
+
+function rerouteIconHtml() {
+  return `<div style="width:22px;height:22px;line-height:22px;text-align:center;background:rgba(168,85,247,0.9);color:#fff;border-radius:50%;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">↻</div>`;
+}
+
+function renderForcedReroute(lg, coords, points) {
+  if (!points || points.length === 0) return;
+  for (const pt of points) {
+    if (typeof pt.vxIdx !== 'number' || pt.vxIdx < 0 || pt.vxIdx >= coords.length) continue;
+    const c = coords[pt.vxIdx];
+    let popup = `<b>강제재탐색</b>`;
+    if (pt.type) popup += `<br>유형: ${pt.type}`;
+    if (pt.distance) popup += `<br>거리: ${pt.distance}m`;
+    if (pt.rid) popup += `<br>RID: ${pt.rid}`;
+    popup += `<br>VX: ${pt.vxIdx}`;
+    L.marker([c.lat, c.lon], {
+      icon: L.divIcon({ className: '', html: rerouteIconHtml(), iconSize: [22, 22], iconAnchor: [11, 11] }),
+      zIndexOffset: 700,
+    }).bindPopup(popup, { maxWidth: 260 }).addTo(lg);
+  }
+}
+
+function intersectionLabelIconHtml(name) {
+  return `<div style="display:inline-block;background:rgba(15,23,42,0.85);color:#fbbf24;border:1px solid #f59e0b;border-radius:4px;padding:2px 6px;font-size:11px;line-height:1.2;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.5)">✕ ${esc(name)}</div>`;
+}
+
+function renderIntersectionNames(lg, coords, names) {
+  const labels = buildIntersectionNameLabels(coords, names);
+  for (const lb of labels) {
+    L.marker([lb.lat, lb.lon], {
+      icon: L.divIcon({ className: '', html: intersectionLabelIconHtml(lb.name), iconSize: null, iconAnchor: [0, 0] }),
+      interactive: false,
+      zIndexOffset: 180,
+    }).addTo(lg);
+  }
+}
+
+function cityBoundaryIconHtml(cityCode) {
+  return `<div style="display:inline-block;background:rgba(15,23,42,0.8);color:#cbd5e1;border:1px dashed #94a3b8;border-radius:3px;padding:1px 5px;font-size:10px;line-height:1.2;white-space:nowrap">시도 ${cityCode}</div>`;
+}
+
+function renderCityBoundary(lg, coords, boundaries) {
+  if (!boundaries || boundaries.length === 0) return;
+  for (const cb of boundaries) {
+    if (typeof cb.vxIdx !== 'number' || cb.vxIdx < 0 || cb.vxIdx >= coords.length) continue;
+    const c = coords[cb.vxIdx];
+    L.marker([c.lat, c.lon], {
+      icon: L.divIcon({ className: '', html: cityBoundaryIconHtml(cb.cityCode), iconSize: null, iconAnchor: [0, 0] }),
+      interactive: false,
+      zIndexOffset: 140,
+    }).addTo(lg);
+  }
+}
+
+// ---- 범위 기반 polyline 레이어 (TC/LT2/HW/RD5/truck) ------------------------ //
+
+function congestionLabelHtml(distance, time) {
+  const distText = formatDistance(distance);
+  const timeText = formatTime(time);
+  return `<div style="display:inline-block;background:#dc2626;color:#fff;border:2px solid #fff;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.5)">🚨 정체 ${distText} · ${timeText}</div>`;
+}
+
+function renderCongestion(lg, coords, items) {
+  // TC: 정체구간 — 빨간 굵은 점선 + 중앙에 항상 보이는 라벨
+  const segs = buildRangeSegments(coords, items);
+  for (const { latlngs, item } of segs) {
+    const popup = `<b>정체구간</b><br>거리: ${formatDistance(item.distance)}<br>시간: ${formatTime(item.time)}<br>VX: ${item.startVxIdx}~${item.endVxIdx}`;
+    L.polyline(latlngs, { color: '#dc2626', weight: 7, opacity: 0.55, dashArray: '10,6' })
+      .bindPopup(popup, { maxWidth: 260 })
+      .addTo(lg);
+  }
+
+  // 항상 보이는 칩 라벨 (중앙점)
+  const labels = buildCongestionLabels(coords, items);
+  for (const lb of labels) {
+    L.marker([lb.lat, lb.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: congestionLabelHtml(lb.distance, lb.time),
+        iconSize: null,
+        iconAnchor: [0, 0],
+      }),
+      interactive: false,
+      zIndexOffset: 600,
+    }).addTo(lg);
+  }
+}
+
+function renderTrafficInfo(lg, coords, items) {
+  // LT2: TSD링크교통정보 — 혼잡도별 색, 경로보다 얇게
+  const segs = buildRangeSegments(coords, items);
+  for (const { latlngs, item } of segs) {
+    const congChar = String.fromCharCode(item.congestion);
+    const color = CONGESTION_COLORS[congChar] || CONGESTION_FALLBACK_COLOR;
+    const congName = CONGESTION_NAMES[congChar] || `코드 ${item.congestion}`;
+    const popup = `<b>교통정보(LT2)</b><br>속도: ${item.speed}km/h<br>혼잡도: ${congName}<br>VX: ${item.startVxIdx}~${item.endVxIdx}`;
+    L.polyline(latlngs, { color, weight: 2, opacity: 0.85, dashArray: '2,6' })
+      .bindPopup(popup, { maxWidth: 260 })
+      .addTo(lg);
+  }
+}
+
+function renderHighwayMode(lg, coords, segments) {
+  // HW: 고속모드 범위 — 하늘색 굵은 대시
+  const segs = buildRangeSegments(coords, segments);
+  for (const { latlngs, item } of segs) {
+    L.polyline(latlngs, { color: '#0ea5e9', weight: 4, opacity: 0.5, dashArray: '12,8' })
+      .bindPopup(`<b>고속모드</b><br>VX: ${item.startVxIdx}~${item.endVxIdx}`, { maxWidth: 200 })
+      .addTo(lg);
+  }
+}
+
+function renderRpLinks(lg, coords, items) {
+  // RD5: RP 링크 — 노란색 얇은 선 + 방향 메타
+  const segs = buildRangeSegments(coords, items);
+  for (const { latlngs, item } of segs) {
+    const dirText = item.direction === 1 ? '역방향' : '정방향';
+    const popup = `<b>RP링크</b><br>RID: ${item.rid}<br>소요: ${item.ridTime}초<br>LinkID: ${item.linkId}<br>Mesh: ${item.meshCode}<br>방향: ${dirText}${item.superCruise ? '<br>Super Cruise' : ''}<br>VX: ${item.startVxIdx}~${item.endVxIdx}`;
+    L.polyline(latlngs, { color: '#eab308', weight: 2, opacity: 0.7 })
+      .bindPopup(popup, { maxWidth: 280 })
+      .addTo(lg);
+  }
+}
+
+function renderTruckRestrictions(lg, coords, { truckWidth, truckHeight, truckWeight }) {
+  const kinds = [
+    { arr: truckWidth,  label: '폭 제한',  unit: 'cm', color: '#f43f5e' },
+    { arr: truckHeight, label: '높이 제한', unit: 'cm', color: '#e11d48' },
+    { arr: truckWeight, label: '중량 제한', unit: 'kg', color: '#be123c' },
+  ];
+  for (const k of kinds) {
+    const segs = buildRangeSegments(coords, k.arr);
+    for (const { latlngs, item } of segs) {
+      const popup = `<b>화물차 ${k.label}</b><br>제한: ${item.limit}${k.unit}${item.overFlag ? '<br>초과' : ''}<br>VX: ${item.startVxIdx}~${item.endVxIdx}`;
+      L.polyline(latlngs, { color: k.color, weight: 5, opacity: 0.5, dashArray: '4,4' })
+        .bindPopup(popup, { maxWidth: 240 })
+        .addTo(lg);
+    }
   }
 }
 

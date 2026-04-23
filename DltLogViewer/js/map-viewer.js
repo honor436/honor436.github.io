@@ -13,6 +13,84 @@ let layers = {};
 let routeAnchorLayer = null;
 let coordLayer = null;
 
+// ---- Waypoint state (출발/경유/목적지 설정) -------------------------------- //
+const routeWaypoints = { depart: null, dest: null, vias: [] };
+let wpMarkers = { depart: null, dest: null, vias: [] };
+
+function wpIconHtml(label, color, sub) {
+  return '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="width:36px;height:36px;line-height:36px;text-align:center;background:'+color+';color:#fff;border-radius:50%;font-size:16px;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.5);border:3px solid #fff">'+label+'</div>' +
+    (sub ? '<div style="margin-top:2px;padding:1px 6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:600;border-radius:8px;white-space:nowrap">'+sub+'</div>' : '') +
+    '</div>';
+}
+
+function addViaMarker(lat, lon, idx) {
+  if (!map) return;
+  const marker = L.marker([lat, lon], {
+    icon: L.divIcon({ className: '', html: wpIconHtml('W'+(idx+1), '#f59e0b', '경유'+(idx+1)), iconSize: [36, 52], iconAnchor: [18, 26] }),
+    zIndexOffset: 1500,
+  }).bindPopup(`<b>경유지 ${idx+1}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  wpMarkers.vias[idx] = marker;
+}
+
+function setWaypoint(type, lat, lon) {
+  if (type === 'via') {
+    if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
+    routeWaypoints.vias.push({ lat, lon });
+    addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
+  } else {
+    routeWaypoints[type] = { lat, lon };
+    if (!map) return;
+    if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
+    const label = type === 'depart' ? 'S' : 'E';
+    const color = type === 'depart' ? '#22c55e' : '#ef4444';
+    const subLabel = type === 'depart' ? '출발' : '도착';
+    wpMarkers[type] = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
+      zIndexOffset: 2000,
+    }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  }
+  updateWpBar();
+}
+
+function removeWp(type, idx) {
+  if (type === 'via') {
+    routeWaypoints.vias.splice(idx, 1);
+    if (map && wpMarkers.vias[idx]) map.removeLayer(wpMarkers.vias[idx]);
+    wpMarkers.vias.splice(idx, 1);
+    wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
+    wpMarkers.vias = [];
+    routeWaypoints.vias.forEach((v, i) => addViaMarker(v.lat, v.lon, i));
+  } else {
+    routeWaypoints[type] = null;
+    if (map && wpMarkers[type]) { map.removeLayer(wpMarkers[type]); wpMarkers[type] = null; }
+  }
+  updateWpBar();
+}
+
+function updateWpBar() {
+  const bar = document.getElementById('wp-bar');
+  if (!bar) return;
+  let html = '';
+  if (routeWaypoints.depart) {
+    const d = routeWaypoints.depart;
+    html += `<span class="wp-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">S ${d.lat.toFixed(5)},${d.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('depart')">&times;</span></span> `;
+  }
+  routeWaypoints.vias.forEach((v, i) => {
+    html += `<span class="wp-badge" style="background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">W${i+1} ${v.lat.toFixed(5)},${v.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('via',${i})">&times;</span></span> `;
+  });
+  if (routeWaypoints.dest) {
+    const d = routeWaypoints.dest;
+    html += `<span class="wp-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">E ${d.lat.toFixed(5)},${d.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('dest')">&times;</span></span> `;
+  }
+  if (!html) html = '<span style="color:#8b95a1;font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
+  bar.innerHTML = html;
+  bar.style.display = '';
+}
+
+// Expose for inline onclick handlers
+window._removeWp = removeWp;
+
 // ---- Ruler state ---------------------------------------------------------- //
 let rulerLayer = null;
 let rulerActive = false;
@@ -20,6 +98,7 @@ let rulerStart = null;   // L.LatLng of first click
 let rulerOnStateChange = null;  // callback(state: 'off'|'ready'|'start')
 
 export function getMap() { return map; }
+export function getRouteWaypoints() { return routeWaypoints; }
 
 // ---- Popup HTML helpers -------------------------------------------------- //
 
@@ -130,6 +209,9 @@ export function initMap(containerId, center = [37.5665, 126.9780]) {
 
   map = L.map(containerId, { preferCanvas: true, maxZoom: 19, attributionControl: false }).setView(center, 15);
 
+  // Notify listeners that the map was (re)created
+  window.dispatchEvent(new CustomEvent('map-init'));
+
   L.tileLayer('https://tlpimg1.tmap.co.kr/tms/1.0.0/hd_tile/{z}/{x}/{-y}.png', {
     minZoom: 5, maxZoom: 19,
     attribution: 'TMAP',
@@ -188,24 +270,25 @@ export function initMap(containerId, center = [37.5665, 126.9780]) {
     clearRouteAnchors();
   });
 
-  // Long tap / right-click → coordinate popup
+  // Long tap / right-click → coordinate popup with waypoint buttons
   map.on('contextmenu', e => {
     L.DomEvent.preventDefault(e.originalEvent);
     const { lat, lng } = e.latlng;
     const sk = wgs84ToSkCoord(lat, lng);
-    L.popup({ maxWidth: 260 })
-      .setLatLng(e.latlng)
-      .setContent(`
-        <div style="font-size:12px;line-height:1.8">
-          <b>좌표 정보</b><br>
-          <b>WGS84</b><br>
-          위도: ${lat.toFixed(6)}<br>
-          경도: ${lng.toFixed(6)}<br>
-          <b>SK</b><br>
-          X: ${sk[0]}<br>
-          Y: ${sk[1]}
-        </div>`)
-      .openOn(map);
+    const content = document.createElement('div');
+    content.style.cssText = 'font-size:12px;line-height:1.8';
+    content.innerHTML = '<b>좌표 정보</b><br>' +
+      'WGS84: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
+      'SK: ' + sk[0] + ', ' + sk[1] + '<br>' +
+      '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">' +
+      '<button id="_wp_dep" style="flex:1;padding:5px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">출발지</button>' +
+      '<button id="_wp_via" style="flex:1;padding:5px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">경유지</button>' +
+      '<button id="_wp_dst" style="flex:1;padding:5px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">목적지</button>' +
+      '</div>';
+    const popup = L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(content).openOn(map);
+    content.querySelector('#_wp_dep').addEventListener('click', () => { setWaypoint('depart', lat, lng); map.closePopup(popup); });
+    content.querySelector('#_wp_via').addEventListener('click', () => { setWaypoint('via', lat, lng); map.closePopup(popup); });
+    content.querySelector('#_wp_dst').addEventListener('click', () => { setWaypoint('dest', lat, lng); map.closePopup(popup); });
   });
 
   rulerLayer = L.layerGroup().addTo(map);

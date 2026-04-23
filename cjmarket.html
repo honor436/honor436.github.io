@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CJ더마켓</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .app {
+      max-width: 393px;
+      margin: 0 auto;
+      min-height: 100vh;
+      background: #fff;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      padding: 16px 20px 0;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1a1a1a;
+      letter-spacing: -0.3px;
+    }
+    .logo em {
+      font-style: normal;
+      color: #2b9e3f;
+    }
+
+    /* ===== Tab Bar ===== */
+    .tabs {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 20px;
+      margin-top: 14px;
+      gap: 2px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      flex-shrink: 0;
+      padding: 10px 12px 11px;
+      font-size: 14px;
+      font-weight: 400;
+      color: #999;
+      cursor: pointer;
+      position: relative;
+      white-space: nowrap;
+      letter-spacing: -0.2px;
+    }
+    .tab.on {
+      color: #1a1a1a;
+      font-weight: 700;
+    }
+    .tab.on::after {
+      content: '';
+      position: absolute;
+      left: 12px; right: 12px; bottom: 0;
+      height: 2px;
+      background: #1a1a1a;
+      border-radius: 1px;
+    }
+
+    /* ===== Banner ===== */
+    .banners {
+      padding: 18px 0 22px;
+    }
+
+    .banner-track {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 20px;
+      scroll-snap-type: x mandatory;
+    }
+    .banner-track::-webkit-scrollbar { display: none; }
+
+    .card {
+      flex-shrink: 0;
+      width: 268px;
+      height: 310px;
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      scroll-snap-align: start;
+      cursor: pointer;
+    }
+    .card:active { opacity: 0.92; }
+
+    /* Card 1 – YUMMY TIME */
+    .card-1 {
+      background: #eef1e6;
+    }
+    .card-1-inner {
+      width: 100%; height: 100%;
+      position: relative;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    /* 음식 데코 상단 */
+    .card-1 .deco-plate {
+      position: absolute;
+      top: 10px; left: 50%; transform: translateX(-50%);
+      width: 240px; height: 170px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deco-plate .plate-left {
+      width: 90px; height: 90px;
+      background: radial-gradient(circle, #fff 60%, #f0f0e8 100%);
+      border-radius: 50%;
+      position: absolute;
+      top: 30px; left: 0;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+    }
+    .deco-plate .plate-right {
+      width: 80px; height: 80px;
+      background: radial-gradient(circle, #fff 60%, #f0f0e8 100%);
+      border-radius: 50%;
+      position: absolute;
+      top: 10px; right: 0;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+    }
+    .deco-plate .magazine {
+      width: 100px; height: 130px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      position: absolute;
+      top: 20px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      padding: 8px;
+      z-index: 2;
+    }
+    .magazine-label {
+      font-size: 7px;
+      color: #999;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    .magazine-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #1a1a1a;
+      margin-top: 2px;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .magazine-img {
+      width: 60px;
+      height: 60px;
+      margin-top: 6px;
+      border-radius: 4px;
+      background: #f5f0eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+    .deco-plate .fork {
+      position: absolute;
+      right: 30px; bottom: 0;
+      font-size: 44px;
+      transform: rotate(15deg);
+      opacity: 0.8;
+    }
+
+    /* 더마켓 PICK 뱃지 */
+    .pick-badge {
+      position: absolute;
+      right: 16px;
+      bottom: 98px;
+      background: #2b9e3f;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 10px;
+      text-align: center;
+      line-height: 1.25;
+      z-index: 3;
+    }
+    .pick-badge-sub {
+      font-size: 9px;
+      font-weight: 600;
+      display: block;
+      opacity: 0.9;
+    }
+    .pick-badge-main {
+      font-size: 13px;
+      font-weight: 800;
+      display: block;
+    }
+
+    .card-1 .c-sub {
+      font-size: 11px;
+      color: #888;
+      font-weight: 400;
+      margin-bottom: 2px;
+    }
+    .card-1 .c-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #1a1a1a;
+      line-height: 1.3;
+      letter-spacing: -0.5px;
+    }
+    .card-1 .c-desc {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    /* Card 2 – 4월 */
+    .card-2 {
+      background: linear-gradient(170deg, #1a331a 0%, #0a1a0a 100%);
+    }
+    .card-2-inner {
+      width: 100%; height: 100%;
+      position: relative;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .card-2 .deco-neon {
+      position: absolute;
+      top: 20px; right: 16px;
+      width: 120px; height: 120px;
+      background: radial-gradient(circle, rgba(0,255,100,0.15) 0%, transparent 70%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 56px;
+      filter: brightness(1.1);
+    }
+    .card-2 .c-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.3;
+      letter-spacing: -0.5px;
+    }
+    .card-2 .c-desc {
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 4px;
+    }
+
+    /* ===== Quick Menu ===== */
+    .quicks {
+      padding: 0 0 22px;
+    }
+    .quick-track {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 20px;
+    }
+    .quick-track::-webkit-scrollbar { display: none; }
+
+    .qi {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 58px;
+      cursor: pointer;
+    }
+    .qi:active .qi-box { transform: scale(0.93); }
+
+    .qi-box {
+      width: 54px;
+      height: 54px;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .qi-box span {
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: center;
+      z-index: 1;
+    }
+
+    .q-shoot {
+      background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%);
+      color: #fff;
+    }
+    .q-fresh {
+      background: linear-gradient(135deg, #b8e6a0 0%, #7cc95e 100%);
+      color: #fff;
+    }
+    .q-emart {
+      background: #ffe500;
+    }
+    .q-emart span { color: #1a1a1a; font-size: 11px; font-weight: 900; }
+    .q-smart {
+      background: linear-gradient(135deg, #b8d8f8 0%, #6db3f2 100%);
+    }
+    .q-smart span { color: #1a5ea6; font-size: 8px; }
+    .q-best {
+      background: linear-gradient(135deg, #f5c6d8 0%, #e891b0 100%);
+    }
+    .q-best span { color: #a0295a; font-size: 8px; }
+
+    .qi-name {
+      font-size: 11px;
+      color: #555;
+      font-weight: 500;
+      text-align: center;
+      white-space: nowrap;
+      letter-spacing: -0.3px;
+    }
+
+    /* ===== Categories ===== */
+    .cats {
+      padding: 0 20px 24px;
+    }
+    .cat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 18px;
+      border: 1px solid #e8e8e8;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      color: #444;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .chip:active { background: #f5f5f5; }
+
+    .chip.on {
+      background: #1a1a1a;
+      color: #fff;
+      border-color: #1a1a1a;
+    }
+
+    .chip-ico {
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .chip.on .chip-ico {
+      filter: grayscale(1) brightness(10);
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo"><em>CJ</em>더마켓</div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <div class="tab on">홈</div>
+    <div class="tab">실속장보기</div>
+    <div class="tab">신상발견</div>
+    <div class="tab">베스트</div>
+    <div class="tab">이벤트</div>
+    <div class="tab">매거진</div>
+    <div class="tab">선물하기</div>
+  </nav>
+
+  <!-- Banners -->
+  <section class="banners">
+    <div class="banner-track">
+      <!-- Card 1: YUMMY TIME -->
+      <div class="card card-1">
+        <div class="card-1-inner">
+          <div class="deco-plate">
+            <div class="plate-left">🥗</div>
+            <div class="magazine">
+              <span class="magazine-label">Magazine CJ</span>
+              <span class="magazine-title">Yummy<br>Time</span>
+              <div class="magazine-img">🏃‍♀️</div>
+            </div>
+            <div class="plate-right">🍽️</div>
+            <div class="fork">🍴</div>
+          </div>
+          <div class="pick-badge">
+            <span class="pick-badge-sub">더마켓</span>
+            <span class="pick-badge-main">PICK</span>
+          </div>
+          <div class="c-sub">Magazine CJ</div>
+          <div class="c-title">YUMMY TIME<br>그랜드 오픈</div>
+          <div class="c-desc">담을 때마다 2% 적립</div>
+        </div>
+      </div>
+
+      <!-- Card 2: 4월 -->
+      <div class="card card-2">
+        <div class="card-2-inner">
+          <div class="deco-neon">💚</div>
+          <div class="c-title">4월 미리보기<br>잘먹겠습니다</div>
+          <div class="c-desc">담을 때마다 2% 적립</div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="card" style="background:linear-gradient(170deg,#fff5ed,#ffe0c7);">
+        <div class="card-1-inner">
+          <div class="deco-plate">
+            <div class="plate-left">🎁</div>
+            <div class="plate-right">🧧</div>
+          </div>
+          <div class="c-title" style="color:#1a1a1a;">프리미엄<br>선물세트 특가</div>
+          <div class="c-desc" style="color:#aaa;">최대 40% 할인</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Menu -->
+  <section class="quicks">
+    <div class="quick-track">
+      <div class="qi">
+        <div class="qi-box q-shoot"><span>슈팅<br>배송</span></div>
+        <div class="qi-name">슈팅배송</div>
+      </div>
+      <div class="qi">
+        <div class="qi-box q-fresh"><span>신선<br>밥상</span></div>
+        <div class="qi-name">신선밥상</div>
+      </div>
+      <div class="qi">
+        <div class="qi-box q-emart"><span>emart</span></div>
+        <div class="qi-name">이마트</div>
+      </div>
+      <div class="qi">
+        <div class="qi-box q-smart"><span>스마트<br>장보기</span></div>
+        <div class="qi-name">스마트장보기</div>
+      </div>
+      <div class="qi">
+        <div class="qi-box q-best"><span>미트플러스<br><b>BEST</b></span></div>
+        <div class="qi-name">베스트</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Category Chips -->
+  <section class="cats">
+    <div class="cat-row">
+      <div class="chip on">
+        <span class="chip-ico">📋</span> 전체
+      </div>
+      <div class="chip">
+        <span class="chip-ico">🥬</span> 채소/두부
+      </div>
+      <div class="chip">
+        <span class="chip-ico">🍎</span> 과일
+      </div>
+      <div class="chip">
+        <span class="chip-ico">🍖</span> 축산
+      </div>
+    </div>
+    <div class="cat-row">
+      <div class="chip">
+        <span class="chip-ico">💧</span> 생수/음료
+      </div>
+      <div class="chip">
+        <span class="chip-ico">🥛</span> 우유/유제품
+      </div>
+      <div class="chip">
+        <span class="chip-ico">💊</span> 건강식품
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+      t.classList.add('on');
+    });
+  });
+  document.querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+      c.classList.add('on');
+    });
+  });
+</script>
+
+</body>
+</html>

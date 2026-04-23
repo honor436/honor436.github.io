@@ -343,7 +343,7 @@ function parseHighwayMode(dv, offset, size) {
   return segments;
 }
 
-function parseLaneGuidance(dv, offset, size) {
+export function parseLaneGuidance(dv, offset, size) {
   // Header: 20 bytes
   const count          = dv.getUint16(offset, true);
   const invalidBlobSize = dv.getInt32(offset + 8, true);
@@ -378,6 +378,10 @@ function parseLaneGuidance(dv, offset, size) {
         const ivOff = ivBase + j * 4;
         if (ivOff + 4 <= offset + size) {
           invalidLanes.push({
+            // TVAS v5.9 비유효차로 쌍 (4B × N):
+            //   +0 (Byte[2] = UShort LE)  레인정보: 차로 비트맵
+            //                              (bit n = 1 → (n+1)차로가 해당 방향으로 invalid)
+            //   +2 (UShort LE)            각도정보: 0/45/90/135/180/225/270/315
             lane:  dv.getUint16(ivOff, true),
             angle: dv.getUint16(ivOff + 2, true),
           });
@@ -500,21 +504,49 @@ function parseWaypoints(dv, offset, size, charset) {
   return items;
 }
 
-function parseRpLinks(dv, offset, size) {
-  // RD5: RPLINK 정보
-  const count = dv.getUint16(offset, true);
-  const dataStart = offset + 8;
+function parseRpLinks(dv, offset, size, charset) {
+  // RD5: RPLINK 정보 — 헤더 40byte + 데이터 24byte×n + 톨게이트ID blob
+  const count = dv.getUint16(offset, true);          // +0  UShort 2  RpLink 개수
+  const infoType = dv.getUint8(offset + 2);           // +2  Byte 1   정보인덱스 type
+  // offset+3: reserved 1byte
+  const infoId = readAscii(dv, offset + 4, 4);        // +4  Char 4   정보인덱스 ID
+  const initDistance = dv.getInt32(offset + 8, true);  // +8  Int 4    초기탐색 직선거리
+  const sessionId = readAscii(dv, offset + 12, 24);   // +12 Char 24  초기탐색 SessionID
+  const tollBlobSize = dv.getInt32(offset + 36, true); // +36 Int 4    톨게이트ID 데이터 전체 크기
+
+  const dataStart = offset + 40;
   const items = [];
   for (let i = 0; i < count; i++) {
-    const base = dataStart + i * 20;
-    if (base + 20 > offset + size) break;
+    const base = dataStart + i * 24;
+    if (base + 24 > offset + size) break;
     items.push({
-      vxIdx:  dv.getUint16(base, true),
-      linkId: dv.getInt32(base + 4, true),
-      meshCode: dv.getInt32(base + 8, true),
+      startVxIdx:   dv.getUint16(base, true),      // +0  UShort 2  시작 보간점 Idx
+      endVxIdx:     dv.getUint16(base + 2, true),   // +2  UShort 2  마지막 보간점 Idx
+      rid:          dv.getInt32(base + 4, true),     // +4  Int 4     RID
+      ridTime:      dv.getInt32(base + 8, true),     // +8  Int 4     RID 소요시간(sec)
+      meshCode:     dv.getUint16(base + 12, true),   // +12 UShort 2  Mesh Code
+      linkId:       dv.getInt32(base + 14, true),    // +14 Int 4     링크ID
+      direction:    dv.getUint8(base + 18),           // +18 Byte 1    방향 (0:정, 1:역)
+      compareTarget:dv.getUint8(base + 19),           // +19 Byte 1    경로비교대상
+      superCruise:  dv.getUint8(base + 20),           // +20 Byte 1    Super Cruise
+      // +21~23: reserved 3bytes
     });
   }
-  return items;
+
+  // 톨게이트ID blob 파싱
+  let tollgateIds = '';
+  if (tollBlobSize > 0) {
+    const tollStart = dataStart + count * 24;
+    if (tollStart + tollBlobSize <= offset + size) {
+      tollgateIds = readString(dv, tollStart, tollBlobSize, charset);
+    }
+  }
+
+  return {
+    header: { count, infoType, infoId, initDistance, sessionId, tollBlobSize },
+    items,
+    tollgateIds
+  };
 }
 
 function parseCongestion(dv, offset, size) {
@@ -557,9 +589,104 @@ function parseIncidents(dv, offset, size, charset) {
   return items;
 }
 
-function parseRouteSummary(dv, offset, size, charset) {
-  // RS7: 경로요약정보 - 간략 파싱
-  return { raw: true, offset, size };
+export function parseRouteSummary(dv, offset, size, charset) {
+  // RS7 header: 48 bytes
+  const count           = dv.getUint16(offset, true);       // +0  UShort 2  경로요약 정보 개수(n)
+  const infoType        = dv.getUint8(offset + 2);           // +2  Byte 1   정보 인덱스 type
+  const dataType        = dv.getUint8(offset + 3);           // +3  Byte 1   경로요약 데이터 제공 타입
+  const infoId          = readAscii(dv, offset + 4, 4);      // +4  Char 4   정보 인덱스 ID
+  const trafficTime     = readAscii(dv, offset + 8, 12);     // +8  Char 12  교통정보제공시간
+  const tollFare10      = dv.getUint16(offset + 20, true);   // +20 UShort 2 톨게이트 요금(단위:10원)
+  // offset+22: reserved 1byte
+  const predictType     = dv.getUint8(offset + 23);          // +23 Byte 1   예측구분코드
+  const predictTime     = readAscii(dv, offset + 24, 12);    // +24 Char 12  예측시간정보
+  const nameBlobSize    = dv.getInt32(offset + 36, true);     // +36 Int 4    경로요약 명칭 데이터 전체 크기
+  const roadNameBlobSize= dv.getInt32(offset + 40, true);     // +40 Int 4    주요 도로 명칭 데이터 전체 크기
+  const roadAttr        = dv.getUint8(offset + 44);           // +44 Byte 1   경로내 도로 속성
+  const roadNameCount   = dv.getUint16(offset + 45, true);    // +45 UShort 2 주요 도로 명칭 데이터 개수
+  const ecoSaving       = dv.getUint8(offset + 47);           // +47 Byte 1   Eco 에너지 저감 값(%)
+  // 헤더 합계: 2+1+1+4+12+2+1+1+12+4+4+1+2+1 = 48 bytes
+
+  // 배치: 헤더(48) → 경로요약DATA(32×n) → 주요도로DATA(16×m) → 경로요약명칭blob → 주요도로명칭blob
+  const dataStart = offset + 48;
+  const roadDataStart = dataStart + count * 32;                        // 주요도로 DATA
+  const nameBlobStart = roadDataStart + roadNameCount * 16;            // 경로요약 명칭 blob
+  const roadNameBlobStart = nameBlobStart + nameBlobSize;              // 주요도로 명칭 blob
+
+  // 경로요약 DATA: 32byte × count — 먼저 전체 읽기 (TVAS v5.9 p.45)
+  //  +0  Byte    구분 (1=Link, 2=Node)
+  //  +1  Byte    통제구분코드
+  //  +2  2B      reserved
+  //  +4  Int     명칭 Offset
+  //  +8  Int     구간거리(m)
+  //  +12 Int     구간시간(초)
+  //  +16 Byte    속도
+  //  +17 Char    혼잡도
+  //  +18 UShort  시작 보간점
+  //  +20 UShort  끝 보간점
+  //  +22 Byte    세도로 포함 여부
+  //  +23 Byte    회전코드
+  //  +24 Int     에너지(W)
+  //  +28 Byte    수동충전소
+  //  +29 3B      reserved
+  const items = [];
+  const nameOffsets = [];
+  for (let i = 0; i < count; i++) {
+    const base = dataStart + i * 32;
+    if (base + 32 > offset + size) break;
+    nameOffsets.push(dv.getInt32(base + 4, true));
+    items.push({
+      linkNodeType: dv.getUint8(base),
+      controlCode:  dv.getUint8(base + 1),
+      nameOffset: nameOffsets[i],
+      name: '',
+      distance:    dv.getInt32(base + 8, true),
+      time:        dv.getInt32(base + 12, true),
+      speed:       dv.getUint8(base + 16),
+      congestion:  String.fromCharCode(dv.getUint8(base + 17)),
+      startVxIdx:  dv.getUint16(base + 18, true),
+      endVxIdx:    dv.getUint16(base + 20, true),
+      narrowRoad:  dv.getUint8(base + 22),
+      turnCode:    dv.getUint8(base + 23),
+      energy:      dv.getInt32(base + 24, true),
+      manualStation: dv.getUint8(base + 28),
+    });
+  }
+
+  // 명칭 blob에서 이름 읽기: 현재 offset ~ 다음 offset 까지
+  for (let i = 0; i < items.length; i++) {
+    const curOff = nameOffsets[i];
+    const nextOff = (i + 1 < nameOffsets.length) ? nameOffsets[i + 1] : nameBlobSize;
+    const namePos = nameBlobStart + curOff;
+    const nameLen = nextOff - curOff;
+    if (curOff >= 0 && nameLen > 0 && namePos >= 0 && namePos + nameLen <= offset + size) {
+      try { items[i].name = readString(dv, namePos, nameLen, charset); } catch(e) { /* skip */ }
+    }
+  }
+
+  // 주요도로 명칭 DATA: 16byte × roadNameCount
+  const roadNames = [];
+  for (let i = 0; i < roadNameCount; i++) {
+    const base = roadDataStart + i * 16;
+    if (base + 16 > offset + size) break;
+    const rStartVxIdx   = dv.getUint16(base, true);          // +0  UShort 2 시작 보간점 Idx
+    const rEndVxIdx     = dv.getUint16(base + 2, true);       // +2  UShort 2 마지막 보간점 Idx
+    const rNameOffset   = dv.getInt32(base + 4, true);         // +4  Int 4    주요도로명칭 데이터 Offset
+    // +8~15: reserved 8bytes
+
+    let roadName = '';
+    const rnPos = roadNameBlobStart + rNameOffset;
+    const rnLen = offset + size - rnPos;
+    if (rNameOffset >= 0 && roadNameBlobStart < offset + size && rnPos < offset + size && rnLen > 0) {
+      try { roadName = readString(dv, rnPos, Math.min(200, rnLen), charset); } catch(e) { /* skip */ }
+    }
+    roadNames.push({ startVxIdx: rStartVxIdx, endVxIdx: rEndVxIdx, name: roadName });
+  }
+
+  return {
+    count, infoId, dataType, trafficTime, tollFare: tollFare10 * 10, predictType, predictTime,
+    nameBlobSize, roadNameBlobSize, ecoSaving, roadAttr, roadNameCount, roadNames, items,
+  };
 }
 
 function parseTruckRestriction(dv, offset, size, type) {
@@ -687,7 +814,7 @@ export function parseTvas(arrayBuffer) {
         result.waypoints = parseWaypoints(dv, absOffset, idx.size, charset);
         break;
       case 'RD5':
-        result.rpLinks = parseRpLinks(dv, absOffset, idx.size);
+        result.rpLinks = parseRpLinks(dv, absOffset, idx.size, charset);
         break;
       case 'TC':
         result.congestion = parseCongestion(dv, absOffset, idx.size);

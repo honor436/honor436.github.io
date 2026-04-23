@@ -1,0 +1,2551 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DLT GPS + SHP Network Viewer (v3)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      /* TDS Color System (Dark Mode adapted) */
+      --bg: #191f28;           /* grey900 */
+      --panel: #333d4b;        /* grey800 */
+      --border: #4e5968;       /* grey700 */
+      --text: #f9fafb;         /* grey50 */
+      --muted: #8b95a1;        /* grey500 */
+      --accent: #3182f6;       /* blue500 */
+      --accent-hover: #2272eb; /* blue600 */
+      --surface: #252d3a;      /* between grey800-900 */
+      --gps: #3182f6;          /* blue500 */
+      --drgps: #6b7684;        /* grey600 */
+      --mmgps: #06b6d4;
+      --mmmatch: #22c55e;
+      --route: #0f766e;
+      --tts: #f97316;
+      --danger: #f04452;       /* red500 */
+      --success: #22c55e;
+      --warning: #f59e0b;
+      /* TDS Radius */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Toss Product Sans', 'SF Pro KR', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Roboto, 'Noto Sans KR', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---- Sidebar (TDS) ---- */
+    #sidebar {
+      width: 320px;
+      min-width: 280px;
+      max-width: 360px;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    #sidebar h1 {
+      font-size: 17px;    /* TDS f17 */
+      font-weight: 700;
+      color: var(--text);
+      line-height: 25.5px;
+    }
+
+    #sidebar p.subtitle {
+      font-size: 13px;    /* TDS f13 */
+      color: var(--muted);
+      line-height: 19.5px;
+    }
+
+    /* ---- Drop zone (TDS) ---- */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.1s ease-in-out, background 0.1s ease-in-out;
+      background: var(--surface);
+    }
+    #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(49,130,246,0.08);
+    }
+    #drop-zone p { font-size: 13px; color: var(--muted); line-height: 19.5px; }
+    #browse-btn {
+      margin-top: 12px;
+      padding: 8px 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #browse-btn:hover { background: var(--accent-hover); }
+
+    /* ---- Coordinate panel (TDS) ---- */
+    #coord-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #coord-panel h2 { font-size: 15px; font-weight: 700; color: var(--text); line-height: 22.5px; }
+    .coord-type-row { display: flex; gap: 6px; }
+    .coord-type-btn {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.1s ease-in-out;
+    }
+    .coord-type-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .coord-input-row { display: flex; flex-direction: column; gap: 3px; }
+    .coord-input-row label { font-size: 12px; color: var(--muted); line-height: 18px; }
+    .coord-input-row input[type="number"],
+    .coord-input-row input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      padding: 8px 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.1s ease-in-out;
+      line-height: 21px;
+    }
+    .coord-input-row input:focus { border-color: var(--accent); }
+    .coord-actions { display: flex; gap: 6px; }
+    #coord-show-btn {
+      flex: 1;
+      padding: 8px 0;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+    }
+    #coord-show-btn:hover { background: var(--accent-hover); }
+    #coord-clear-btn {
+      padding: 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+    }
+    #coord-clear-btn:hover { background: var(--bg); }
+    #coord-result {
+      font-size: 11px;
+      min-height: 14px;
+      word-break: break-all;
+    }
+
+    /* ---- Ruler panel (TDS) ---- */
+    #ruler-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #ruler-panel h2 { font-size: 15px; font-weight: 700; color: var(--text); line-height: 22.5px; }
+    .ruler-actions { display: flex; gap: 6px; }
+    #ruler-toggle-btn {
+      flex: 1;
+      padding: 6px 0;
+      background: rgba(148,163,184,0.1);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    #ruler-toggle-btn.active {
+      background: #f59e0b;
+      border-color: #f59e0b;
+      color: #0b1220;
+    }
+    #ruler-clear-btn {
+      padding: 6px 10px;
+      background: rgba(148,163,184,0.1);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    #ruler-clear-btn:hover { opacity: 0.7; }
+    #ruler-status {
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 14px;
+    }
+    #ruler-status.active { color: #f59e0b; }
+
+    /* ---- Progress ---- */
+    #progress-section { display: flex; flex-direction: column; gap: 6px; }
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(148, 163, 184, 0.15);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      border-radius: 99px;
+      transition: width 0.15s ease;
+    }
+    #folder-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      word-break: break-all;
+      padding: 4px 8px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 6px;
+    }
+    #folder-name:empty { display: none; }
+    #progress-label { font-size: 12px; font-weight: 600; color: var(--text); word-break: break-all; }
+    #progress-detail { font-size: 11px; color: var(--muted); word-break: break-all; min-height: 14px; }
+
+    /* ---- File list in progress ---- */
+    #progress-files {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 160px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    #progress-files:empty { display: none; }
+    .pf-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.4;
+      overflow: hidden;
+    }
+    .pf-row.done   { color: #4ade80; }
+    .pf-row.active { color: var(--accent); font-weight: 600; }
+    .pf-row.pending{ color: var(--muted); }
+    .pf-icon { flex-shrink: 0; width: 14px; text-align: center; }
+    .pf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ---- Stats (TDS) ---- */
+    #stats-section { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+    }
+    .stat-card.wide { grid-column: span 2; }
+    .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .stat-value { font-size: 20px; font-weight: 700; }
+    .stat-value.small { font-size: 12px; white-space: pre-line; }
+
+    /* ---- Layer panel (TDS) ---- */
+    #layer-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+    }
+    #layer-panel h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text); line-height: 22.5px; }
+    .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .layer-row:last-child { margin-bottom: 0; }
+    .layer-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ---- Map ---- */
+    #map-wrap { flex: 1; position: relative; }
+    #map { width: 100%; height: 100vh; }
+
+    /* ---- Ruler cursor override (beat Leaflet grab cursor) ---- */
+    #map.ruler-mode,
+    #map.ruler-mode .leaflet-container,
+    #map.ruler-mode .leaflet-grab,
+    #map.ruler-mode .leaflet-interactive,
+    #map.ruler-mode canvas { cursor: crosshair !important; }
+
+    /* ---- Ruler badge on map ---- */
+    #ruler-badge {
+      display: none;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(245,158,11,0.92);
+      color: #0b1220;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 20px;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    #ruler-badge.visible { display: block; }
+
+    /* ---- Ruler tooltips ---- */
+    .ruler-tooltip,
+    .ruler-dist-label {
+      background: rgba(15,23,42,0.88) !important;
+      border: 1px solid #f59e0b !important;
+      color: #f59e0b !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      padding: 2px 7px !important;
+      border-radius: 4px !important;
+      box-shadow: none !important;
+      white-space: nowrap !important;
+    }
+    .ruler-tooltip::before,
+    .ruler-dist-label::before { display: none !important; }
+
+    /* ---- SHP panel (TDS) ---- */
+    #shp-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #shp-panel h2 { font-size: 15px; font-weight: 700; color: var(--text); line-height: 22.5px; }
+    .shp-actions { display: flex; gap: 6px; align-items: center; }
+    .shp-file-btn {
+      flex: 1;
+      padding: 8px 0;
+      text-align: center;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+    }
+    .shp-file-btn:hover { background: var(--accent-hover); }
+    #shp-clear-btn {
+      padding: 6px 10px;
+      background: rgba(148,163,184,0.1);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    #shp-clear-btn:hover { opacity: 0.7; }
+    #shp-status {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: pre-line;
+      min-height: 14px;
+    }
+    #shp-progress {
+      margin-top: 6px;
+    }
+    .shp-progress-wrap {
+      height: 6px;
+      background: rgba(148,163,184,0.15);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .shp-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.25s ease;
+    }
+    #shp-progress-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    #shp-layer-toggles {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    #shp-link-select-btn {
+      width: 100%;
+      padding: 6px 0;
+      text-align: center;
+      background: rgba(148,163,184,0.1);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 6px;
+    }
+    #shp-link-select-btn:hover { opacity: 0.85; }
+    #shp-link-select-btn.active {
+      background: rgba(245,158,11,0.15);
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+    #shp-link-info {
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .shp-info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .shp-info-header span {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    #shp-link-info-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    #shp-link-info-close:hover { color: #f87171; }
+    #shp-link-info-body {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .shp-info-row {
+      display: flex;
+      gap: 6px;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(148,163,184,0.08);
+      font-size: 11px;
+    }
+    .shp-info-key {
+      color: var(--muted);
+      white-space: nowrap;
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+    .shp-info-val {
+      color: #e2e8f0;
+      word-break: break-all;
+    }
+
+    /* ---- Popup styles ---- */
+    .leaflet-popup-content { max-width: 340px; }
+    .route-popup {
+      max-height: 420px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.5;
+      padding-right: 4px;
+    }
+    .route-popup div { margin-bottom: 2px; }
+    .route-banner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(15, 118, 110, 0.14);
+      border: 1px solid rgba(45, 212, 191, 0.22);
+    }
+    .route-popup pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 10px;
+      background: rgba(0,0,0,0.06);
+      padding: 6px;
+      border-radius: 6px;
+    }
+    details summary { cursor: pointer; font-weight: 600; margin-top: 6px; }
+    .coord-help {
+      background: rgba(15,23,42,0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .coord-help summary {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .coord-help summary::before { content: '\25B8'; font-size: 10px; }
+    .coord-help[open] summary::before { content: '\25BE'; }
+    .coord-help ul {
+      margin: 8px 0 2px;
+      padding-left: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      line-height: 1.5;
+    }
+
+    /* ---- Sidebar bottom (count + logo) ---- */
+    #sidebar-bottom {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    #analysis-count-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+    }
+    .ac-label { font-size: 12px; color: var(--muted); }
+    .ac-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    /* ---- Version ---- */
+    #version-label {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0.6;
+      letter-spacing: 0.04em;
+    }
+    /* ---- Company logo ---- */
+    #company-logo {
+      text-align: center;
+      padding: 12px 0 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 8px;
+    }
+    #company-logo img {
+      max-width: 160px;
+      height: auto;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.92);
+      padding: 8px 14px;
+      opacity: 0.85;
+    }
+    #logo-fallback {
+      align-items: baseline;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px 0;
+    }
+    .logo-sk  { font-size: 24px; font-weight: 900; color: #e31c1e; letter-spacing: -1px; }
+    .logo-ms  { font-size: 16px; font-weight: 700; color: #f4791e; }
+
+    @media (max-width: 800px) {
+      body { flex-direction: column; overflow: auto; }
+      #sidebar { width: 100%; max-width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      #map-wrap { flex: none; height: 60vh; }
+      #map { height: 60vh; }
+    }
+    /* ---- Error popup ---- */
+    #error-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    #error-overlay.visible { display: flex; }
+    #error-box {
+      background: var(--panel);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+    #error-box h3 {
+      margin: 0 0 12px;
+      color: #f87171;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #error-box pre {
+      margin: 0 0 20px;
+      font-size: 12px;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 10px;
+    }
+    #error-close {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: var(--danger);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+    }
+    #error-close:hover { background: #e42939; }
+
+    /* ======== TVAS Sidebar Button ======== */
+    .tvas-sidebar-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #tvas-menu-btn {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #tvas-menu-btn:hover {
+      background: var(--accent-hover);
+    }
+    #tvas-clear-route-btn {
+      width: 100%;
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.1s ease-in-out;
+    }
+    #tvas-clear-route-btn:hover {
+      background: rgba(240,68,82,0.08);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* ======== TVAS Right Panel ======== */
+    /* ---- Right sliding panels (shared) ---- */
+    .right-slide-panel {
+      position: fixed;
+      right: -440px;
+      top: 0;
+      width: 420px;
+      height: 100vh;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+      z-index: 5000;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    .right-slide-panel.open { right: 0; }
+
+    /* ---- Bookmark tabs ---- */
+    .bookmark-tab {
+      position: fixed;
+      right: 0;
+      width: 28px;
+      padding: 12px 4px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: 8px 0 0 8px;
+      cursor: pointer;
+      z-index: 5001;
+      transition: right 0.3s cubic-bezier(.4,0,.2,1), box-shadow 0.15s ease;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.3);
+      border: 1px solid;
+      border-right: none;
+      user-select: none;
+      text-align: center;
+      line-height: 1;
+    }
+    .bookmark-tab:hover { box-shadow: -3px 0 12px rgba(0,0,0,0.5); }
+    .bookmark-tab.active { right: 420px; }
+
+    #tab-tvas {
+      top: 80px;
+      background: #1e3a5f;
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
+    #tab-dlt {
+      top: 200px;
+      background: #1a3a2a;
+      border-color: #22c55e;
+      color: #4ade80;
+    }
+
+    /* Panel headers (shared) */
+    .right-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .right-panel-header h2 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; }
+
+    /* DLT Analysis result panel */
+    #dlt-right-panel .dlt-panel-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #dlt-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #dlt-stats-grid .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+    }
+    #dlt-stats-grid .stat-card.wide { grid-column: span 2; }
+
+    #tvas-panel-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ---- Waypoint badges ---- */
+    #tvas-waypoints-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-height: 28px;
+      align-items: center;
+    }
+    .wp-badge {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .wp-badge.depart { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .wp-badge.dest { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .wp-badge .wp-remove { cursor: pointer; font-size: 10px; opacity: 0.7; }
+    .wp-badge .wp-remove:hover { opacity: 1; }
+
+    /* ---- TVAS layer toggles ---- */
+    #tvas-layer-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .tvas-ltog {
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,0.6);
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .tvas-ltog.on { background: rgba(56,189,248,0.15); color: var(--accent); border-color: rgba(56,189,248,0.3); }
+
+    /* ---- VX clickable links ---- */
+    .vx-link {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+    }
+    .vx-link:hover { color: #7dd3fc; }
+
+    /* EV charger pulse animation */
+    @keyframes evPulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.4); opacity: 0; }
+    }
+
+    /* ---- Panel inner styles ---- */
+    .tvas-field-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    #tvas-url {
+      background: rgba(15,23,42,0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 7px 10px;
+      width: 100%;
+      outline: none;
+    }
+    #tvas-url:focus { border-color: var(--accent); }
+
+    .tvas-section-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .tvas-section-label label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .tvas-section-label button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .tvas-header-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .tvas-header-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .tvas-header-row input {
+      background: rgba(15,23,42,0.8);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 8px;
+      outline: none;
+    }
+    .tvas-header-row input:focus { border-color: var(--accent); }
+    .tvas-header-row input:first-child { width: 35%; }
+    .tvas-header-row input:nth-child(2) { flex: 1; }
+    .tvas-hdr-del {
+      background: none;
+      border: none;
+      color: #f87171;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .tvas-hdr-del:hover { color: #ef4444; }
+
+    #tvas-body {
+      background: rgba(15,23,42,0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: "Cascadia Code", "Fira Code", monospace;
+      padding: 8px 10px;
+      width: 100%;
+      min-height: 200px;
+      max-height: 400px;
+      resize: vertical;
+      outline: none;
+      white-space: pre;
+      tab-size: 2;
+    }
+    #tvas-body:focus { border-color: var(--accent); }
+
+    .tvas-actions {
+      display: flex;
+      gap: 8px;
+    }
+    #tvas-send-btn {
+      flex: 1;
+      padding: 10px 0;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.252;
+      cursor: pointer;
+      transition: background 0.1s ease-in-out;
+    }
+    #tvas-send-btn:hover { background: var(--accent-hover); }
+    #tvas-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .tvas-sub-btn {
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.1s ease-in-out;
+    }
+    .tvas-sub-btn:hover { background: var(--bg); color: var(--text); }
+
+    #tvas-status {
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 16px;
+      white-space: pre-line;
+      word-break: break-all;
+    }
+    #tvas-status.error { color: #f87171; }
+    #tvas-status.ok    { color: #4ade80; }
+
+    #tvas-result-summary {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 19.5px;
+    }
+    #tvas-result-summary:empty { display: none; }
+    .tvas-summary-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    .tvas-summary-row .tvas-sk { color: var(--muted); }
+    .tvas-summary-row .tvas-sv { color: var(--text); font-weight: 600; }
+
+    #tvas-response-raw {
+      font-size: 12px;
+    }
+    #tvas-response-raw pre {
+      max-height: 200px;
+      overflow: auto;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="company-logo">
+    <img src="images/skms-logo.png" alt="SK m&amp;service" draggable="false"
+         onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'">
+    <div id="logo-fallback" style="display:none">
+      <span class="logo-sk">SK</span><span class="logo-ms">m&amp;service</span>
+    </div>
+  </div>
+  <div>
+    <h1>DLT GPS + SHP Network Viewer</h1>
+    <p class="subtitle">.dlt 파일 분석 + SHP 링크/노드 + TVAS 경로 요청 테스트</p>
+  </div>
+
+  <!-- drop-zone, progress, stats moved to DLT right panel -->
+  <div id="stats-section" hidden></div>
+
+  <!-- Coordinate search -->
+  <div id="coord-panel">
+    <h2>좌표 검색</h2>
+    <details class="coord-help">
+      <summary>사용 방법</summary>
+      <ul>
+        <li><b>SK 좌표</b>: TMAP 내부 좌표계. X는 경도 방향(예: 4571910), Y는 위도 방향(예: 1347000).</li>
+        <li><b>WGS84</b>: 일반 GPS 좌표. X는 경도(예: 127.0276), Y는 위도(예: 37.4979).</li>
+        <li>값 입력 후 <b>지도에 표시</b>를 누르면 해당 위치에 마커가 표시됩니다.</li>
+        <li>DLT 로그의 팝업에서 좌표를 복사해 붙여넣어 사용할 수 있습니다.</li>
+      </ul>
+    </details>
+    <div class="coord-type-row">
+      <button class="coord-type-btn active" data-ctype="sk">SK 좌표</button>
+      <button class="coord-type-btn" data-ctype="wgs84">WGS84</button>
+    </div>
+    <div class="coord-input-row">
+      <label id="coord-label-x">X (경도 방향)</label>
+      <input type="number" id="coord-x" placeholder="예: 4571910">
+    </div>
+    <div class="coord-input-row">
+      <label id="coord-label-y">Y (위도 방향)</label>
+      <input type="number" id="coord-y" placeholder="예: 1347000">
+    </div>
+    <div class="coord-actions">
+      <button id="coord-show-btn">지도에 표시</button>
+      <button id="coord-clear-btn">삭제</button>
+    </div>
+    <div id="coord-result"></div>
+  </div>
+
+  <!-- Ruler / distance measurement -->
+  <div id="ruler-panel">
+    <h2>줄자</h2>
+    <div class="ruler-actions">
+      <button id="ruler-toggle-btn">줄자 모드 OFF</button>
+      <button id="ruler-clear-btn">지우기</button>
+    </div>
+    <div id="ruler-status">모드를 켜고 지도를 클릭하세요.</div>
+  </div>
+
+  <!-- TVAS Route Request (sidebar buttons) -->
+  <div class="tvas-sidebar-btns">
+    <button id="tvas-menu-btn">경로 요청</button>
+    <button id="tvas-clear-route-btn">경로 데이터 지우기</button>
+  </div>
+
+  <!-- SHP Link/Node Layer -->
+  <div id="shp-panel">
+    <h2>링크/노드 레이어</h2>
+    <div class="shp-actions">
+      <button class="shp-file-btn" id="shp-folder-btn">SHP 폴더 선택</button>
+      <button id="shp-clear-btn">지우기</button>
+    </div>
+    <div id="shp-status">SHP 폴더를 선택하면 .shp/.dbf 파일을 자동 로드합니다 (GCS_Tokyo 자동 변환)</div>
+    <div id="shp-progress" hidden>
+      <div class="shp-progress-wrap"><div class="shp-progress-fill" id="shp-progress-fill"></div></div>
+      <div id="shp-progress-label"></div>
+    </div>
+    <div id="shp-layer-toggles" hidden>
+      <label class="layer-row">
+        <input type="checkbox" id="shp-link-toggle" checked>
+        <span class="layer-dot" style="background:#22c55e"></span>링크
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" id="shp-node-toggle" checked>
+        <span class="layer-dot" style="background:#f59e0b"></span>노드
+      </label>
+    </div>
+    <button id="shp-link-select-btn" hidden>링크 선택 모드 OFF</button>
+    <div id="shp-link-info" hidden>
+      <div class="shp-info-header">
+        <span>선택된 링크 속성</span>
+        <button id="shp-link-info-close">&times;</button>
+      </div>
+      <div id="shp-link-info-body"></div>
+    </div>
+  </div>
+
+  <!-- Layer toggle -->
+  <div id="layer-panel" hidden></div>
+  <!-- Bottom: analysis count + logo -->
+  <div id="sidebar-bottom">
+    <div id="analysis-count-bar">
+      <span class="ac-label">DLT 분석 횟수</span>
+      <span id="bottom-analysis-count" class="ac-value">0</span>
+    </div>
+    <div id="version-label">v2026.04.12 · build 28 (v3-TVAS)</div>
+  </div>
+</aside>
+
+<!-- ======== Bookmark Tabs ======== -->
+<div id="tab-tvas" class="bookmark-tab" title="경로 요청">경로 요청</div>
+<div id="tab-dlt" class="bookmark-tab" title="DLT GPS Log">DLT GPS Log</div>
+
+<!-- ======== TVAS Right Panel ======== -->
+<div id="tvas-right-panel" class="right-slide-panel">
+  <div class="right-panel-header" style="border-left:3px solid #3b82f6">
+    <h2>경로 요청</h2>
+  </div>
+  <div id="tvas-panel-body">
+    <!-- CORS Unblock 확장 프로그램 설치 안내 -->
+    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.6;color:#78350f">
+      <div style="font-weight:700;margin-bottom:4px">⚠️ 설치 필수 — CORS Unblock 확장</div>
+      <div>경로 서버(<code style="background:#fde68a;padding:1px 4px;border-radius:3px">ntmapstg.tmap.co.kr</code>)는 브라우저의 <b>교차 출처(CORS)</b> 요청을 허용하지 않습니다. 확장 프로그램이 없으면 요청 전송 시 브라우저가 즉시 차단하여 응답을 받을 수 없습니다.</div>
+      <div style="margin-top:4px">설치 후 브라우저 툴바의 방패 아이콘을 클릭해 <b>ON</b> 상태로 켜주세요.</div>
+    </div>
+    <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;background:#3182f6;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">
+      🛡️ CORS Unblock 확장 프로그램 설치
+    </a>
+    <!-- Waypoints from map -->
+    <div>
+      <div class="tvas-field-label">출발지/목적지 (지도 우클릭으로 설정)</div>
+      <div id="tvas-waypoints-bar">
+        <span style="color:var(--muted);font-size:11px">설정된 지점이 없습니다</span>
+      </div>
+    </div>
+    <!-- URL -->
+    <div>
+      <div class="tvas-field-label">URL</div>
+      <input type="text" id="tvas-url" value="https://ntmapstg.tmap.co.kr:9443/tmap-channel/rsd/ev/route" placeholder="https://경로서버주소/path">
+    </div>
+    <!-- Headers -->
+    <details>
+      <summary class="tvas-field-label" style="cursor:pointer;font-weight:600">Headers</summary>
+      <div style="margin-top:4px">
+        <div style="text-align:right;margin-bottom:4px"><button id="tvas-add-header" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer">+ 추가</button></div>
+        <div id="tvas-headers" class="tvas-header-list"></div>
+      </div>
+    </details>
+    <!-- Body -->
+    <details open>
+      <summary class="tvas-field-label" style="cursor:pointer;font-weight:600">Body (JSON) <button id="tvas-prettify-btn" class="tvas-sub-btn" style="padding:1px 8px;font-size:10px;border-radius:4px;margin-left:8px">정렬</button></summary>
+      <textarea id="tvas-body" spellcheck="false" style="margin-top:4px"></textarea>
+    </details>
+    <!-- Actions -->
+    <div class="tvas-actions">
+      <button id="tvas-send-btn">요청 전송</button>
+      <button id="tvas-clear-btn" class="tvas-sub-btn">지우기</button>
+      <button id="tvas-save-resp-btn" class="tvas-sub-btn" style="display:none">응답 저장</button>
+    </div>
+    <div id="tvas-status"></div>
+    <!-- Layer toggles -->
+    <div id="tvas-layer-toggles" style="display:none">
+      <span class="tvas-ltog on" data-tl="route">경로</span>
+      <span class="tvas-ltog on" data-tl="guidance">안내점</span>
+      <span class="tvas-ltog on" data-tl="danger">위험지역</span>
+      <span class="tvas-ltog on" data-tl="tollgate">톨게이트</span>
+      <span class="tvas-ltog on" data-tl="restArea">휴게소</span>
+      <span class="tvas-ltog on" data-tl="lane">차로</span>
+      <span class="tvas-ltog on" data-tl="evCharger">충전소</span>
+      <span class="tvas-ltog on" data-tl="direction">방면</span>
+      <span class="tvas-ltog on" data-tl="roadName">도로명</span>
+      <span class="tvas-ltog on" data-tl="waypoint">경유지</span>
+      <span class="tvas-ltog on" data-tl="incident">돌발</span>
+      <span class="tvas-ltog on" data-tl="congestion">정체</span>
+      <span class="tvas-ltog on" data-tl="intersection">교차로</span>
+      <span class="tvas-ltog on" data-tl="reroute">강제재탐색</span>
+      <span class="tvas-ltog on" data-tl="trafficInfo">LT2</span>
+      <span class="tvas-ltog on" data-tl="cityBoundary">시도경계</span>
+      <span class="tvas-ltog on" data-tl="highwayMode">고속</span>
+      <span class="tvas-ltog on" data-tl="rpLink">RP링크</span>
+      <span class="tvas-ltog on" data-tl="truck">화물차</span>
+    </div>
+    <!-- Result -->
+    <div id="tvas-result-summary"></div>
+    <details id="tvas-response-raw" style="display:none">
+      <summary>응답 원문</summary>
+      <pre id="tvas-response-pre"></pre>
+    </details>
+  </div>
+</div>
+
+<!-- ======== CORS Error Modal ======== -->
+<div id="cors-error-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:18px;font-weight:700;color:#dc2626;margin-bottom:12px">🚫 CORS 차단 — 요청이 실패했습니다</div>
+    <div style="font-size:13px;line-height:1.7;color:#374151;margin-bottom:16px">
+      브라우저가 교차 출처(CORS) 정책에 따라 경로 서버 요청을 차단했습니다.<br>
+      <b>CORS Unblock</b> 확장 프로그램을 설치하고 <b>ON</b> 상태로 켜야 요청이 서버에 도달합니다.
+    </div>
+    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;color:#78350f;margin-bottom:16px">
+      <b>이미 설치되어 있다면:</b><br>
+      브라우저 툴바의 🛡️ 방패 아이콘을 클릭해 토글을 <b>ON</b>으로 바꾸고 다시 시도하세요.
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="cors-modal-close" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">닫기</button>
+      <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="padding:8px 16px;background:#3182f6;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">확장 프로그램 설치</a>
+    </div>
+  </div>
+</div>
+
+<!-- ======== DLT Analysis Right Panel ======== -->
+<div id="dlt-right-panel" class="right-slide-panel">
+  <div class="right-panel-header" style="border-left:3px solid #22c55e">
+    <h2>DLT GPS Log</h2>
+  </div>
+  <div class="dlt-panel-body">
+    <!-- File drop zone -->
+    <div id="drop-zone">
+      <p>DLT 파일이 있는 <b>폴더</b>를 드래그 &amp; 드롭하거나<br>아래 버튼으로 선택하세요.<br><span style="font-size:11px">하위 디렉토리까지 자동으로 탐색합니다.</span></p>
+      <button id="browse-btn">폴더 선택</button>
+      <p id="browser-warn" style="font-size:11px;color:#f97316;margin-top:6px;display:none">
+        Chrome 또는 Edge 브라우저에서만 지원됩니다.
+      </p>
+    </div>
+    <!-- Progress -->
+    <div id="progress-section" hidden>
+      <div id="folder-name"></div>
+      <div class="progress-track">
+        <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      </div>
+      <div id="progress-label">준비 중...</div>
+      <div id="progress-detail"></div>
+      <div id="progress-files"></div>
+    </div>
+    <!-- Stats -->
+    <div id="dlt-panel-folder" style="font-size:12px;font-weight:600;color:var(--accent);word-break:break-all;padding:4px 8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:6px;display:none"></div>
+    <div id="dlt-stats-grid">
+      <div class="stat-card wide">
+        <div class="stat-label">총 위치 포인트</div>
+        <div class="stat-value" id="dlt-stat-points">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#2563eb">GPS</div>
+        <div class="stat-value" id="dlt-stat-gps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#64748b">DR_GPS</div>
+        <div class="stat-value" id="dlt-stat-drgps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#06b6d4">MM GPS Pos</div>
+        <div class="stat-value" id="dlt-stat-mmgps">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#22c55e">MM Match Pos</div>
+        <div class="stat-value" id="dlt-stat-mmmatch">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#0f766e">경로 요청</div>
+        <div class="stat-value" id="dlt-stat-route">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" style="color:#f97316">음성안내</div>
+        <div class="stat-value" id="dlt-stat-tts">-</div>
+      </div>
+      <div class="stat-card wide">
+        <div class="stat-label">시간 범위</div>
+        <div class="stat-value small" id="dlt-stat-timerange">-</div>
+      </div>
+    </div>
+    <!-- Layer toggles -->
+    <div id="dlt-layer-panel" style="display:none">
+      <h2 style="font-size:14px;font-weight:700;margin:12px 0 8px;color:var(--text)">레이어 토글</h2>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="gps" checked>
+        <span class="layer-dot" style="background:var(--gps)"></span>GPS
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="drGps" checked>
+        <span class="layer-dot" style="background:var(--drgps)"></span>DR_GPS
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="mmGps" checked>
+        <span class="layer-dot" style="background:var(--mmgps)"></span>MM GPS Pos
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="mmMatch" checked>
+        <span class="layer-dot" style="background:var(--mmmatch)"></span>MM Match Pos
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="routeRequest" checked>
+        <span class="layer-dot" style="background:var(--route)"></span>경로 요청
+      </label>
+      <label class="layer-row">
+        <input type="checkbox" data-layer="tts" checked>
+        <span class="layer-dot" style="background:var(--tts)"></span>음성안내
+      </label>
+    </div>
+    <div id="dlt-panel-empty" style="text-align:center;padding:40px 0;color:var(--muted);font-size:12px">
+      DLT 로그 파일을 드래그&드롭하면<br>분석 결과가 여기에 표시됩니다.
+    </div>
+  </div>
+</div>
+
+<!-- Error popup -->
+<div id="error-overlay">
+  <div id="error-box">
+    <h3>오류 발생</h3>
+    <pre id="error-message"></pre>
+    <button id="error-close">확인</button>
+  </div>
+</div>
+
+<div id="map-wrap">
+  <div id="ruler-badge">줄자 모드 켜짐 - 지도를 클릭하세요</div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
+<script type="module" src="js/shp-app.js?v=20260413"></script>
+
+<!-- TVAS Route Request Test Module -->
+<script type="module">
+import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
+import { getMap } from './js/map-viewer.js';
+import { wgs84ToSkCoord } from './js/coordinate.js';
+
+// ---- Right panel open/close ---- //
+const tvasPanel      = document.getElementById('tvas-right-panel');
+const dltPanel       = document.getElementById('dlt-right-panel');
+const tabTvas        = document.getElementById('tab-tvas');
+const tabDlt         = document.getElementById('tab-dlt');
+const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
+
+const tvasClearRouteBtn = document.getElementById('tvas-clear-route-btn');
+
+// ---- Bookmark tab toggle logic ---- //
+function togglePanel(panel, tab, otherPanel, otherTab) {
+  const isOpen = panel.classList.contains('open');
+  // Close other panel first
+  otherPanel.classList.remove('open');
+  otherTab.classList.remove('active');
+  if (isOpen) {
+    panel.classList.remove('open');
+    tab.classList.remove('active');
+  } else {
+    panel.classList.add('open');
+    tab.classList.add('active');
+    if (panel === tvasPanel) applyWaypointsToBody();
+  }
+}
+tabTvas.addEventListener('click', () => togglePanel(tvasPanel, tabTvas, dltPanel, tabDlt));
+tabDlt.addEventListener('click', () => togglePanel(dltPanel, tabDlt, tvasPanel, tabTvas));
+// Sidebar button also opens TVAS panel
+tvasMenuBtn.addEventListener('click', () => {
+  dltPanel.classList.remove('open'); tabDlt.classList.remove('active');
+  applyWaypointsToBody();
+  tvasPanel.classList.add('open'); tabTvas.classList.add('active');
+});
+
+// ---- Clear ALL route data from map ---- //
+tvasClearRouteBtn.addEventListener('click', () => {
+  const map = getMap();
+  if (map) clearTvasRoute(map);
+  // Remove all waypoint markers
+  ['depart','dest'].forEach(k => { if (wpMarkers[k]) { map.removeLayer(wpMarkers[k]); wpMarkers[k] = null; } routeWaypoints[k] = null; });
+  wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
+  wpMarkers.vias = [];
+  routeWaypoints.vias = [];
+  updateWpBar();
+  // Reset panel state
+  tvasSummary.innerHTML = '';
+  tvasRespRaw.style.display = 'none';
+  tvasRespPre.textContent = '';
+  tvasSaveRespBtn.style.display = 'none';
+  tvasLayerToggles.style.display = 'none';
+  lastResponseJson = null;
+  lastBinaryResponse = null;
+  lastCoords = null;
+  setStatus('');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (tvasPanel.classList.contains('open')) { tvasPanel.classList.remove('open'); tabTvas.classList.remove('active'); }
+    if (dltPanel.classList.contains('open')) { dltPanel.classList.remove('open'); tabDlt.classList.remove('active'); }
+  }
+});
+
+// ---- DOM refs ---- //
+const tvasUrl        = document.getElementById('tvas-url');
+const tvasHeaders    = document.getElementById('tvas-headers');
+const tvasBody       = document.getElementById('tvas-body');
+const tvasSendBtn    = document.getElementById('tvas-send-btn');
+const tvasClearBtn   = document.getElementById('tvas-clear-btn');
+const tvasPrettify   = document.getElementById('tvas-prettify-btn');
+const tvasAddHdr     = document.getElementById('tvas-add-header');
+const tvasStatus     = document.getElementById('tvas-status');
+const tvasSummary    = document.getElementById('tvas-result-summary');
+const tvasRespRaw    = document.getElementById('tvas-response-raw');
+const tvasRespPre    = document.getElementById('tvas-response-pre');
+const tvasSaveRespBtn = document.getElementById('tvas-save-resp-btn');
+const tvasWpBar      = document.getElementById('tvas-waypoints-bar');
+const tvasLayerToggles = document.getElementById('tvas-layer-toggles');
+
+let lastResponseJson = null;
+let lastCoords = null;  // 마지막 파싱된 좌표 (VX 클릭 이동용)
+
+// ---- Waypoint state (from map long-click) ---- //
+const routeWaypoints = { depart: null, dest: null, vias: [] };  // vias = 경유지 배열
+let wpMarkers = { depart: null, dest: null, vias: [] };
+
+function wpIconHtml(label, color, sub) {
+  return '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="width:36px;height:36px;line-height:36px;text-align:center;background:'+color+';color:#fff;border-radius:50%;font-size:16px;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.5);border:3px solid #fff">'+label+'</div>' +
+    (sub ? '<div style="margin-top:2px;padding:1px 6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:600;border-radius:8px;white-space:nowrap">'+sub+'</div>' : '') +
+    '</div>';
+}
+
+function updateWpBar() {
+  let html = '';
+  if (routeWaypoints.depart) {
+    const d = routeWaypoints.depart;
+    html += '<span class="wp-badge depart">S ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
+  }
+  routeWaypoints.vias.forEach((v, i) => {
+    html += '<span class="wp-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + v.lat.toFixed(5) + ',' + v.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
+  });
+  if (routeWaypoints.dest) {
+    const d = routeWaypoints.dest;
+    html += '<span class="wp-badge dest">E ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
+  }
+  if (!html) html = '<span style="color:var(--muted);font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
+  tvasWpBar.innerHTML = html;
+}
+
+window._removeWp = function(type, idx) {
+  const map = getMap();
+  if (type === 'via') {
+    routeWaypoints.vias.splice(idx, 1);
+    if (map && wpMarkers.vias[idx]) map.removeLayer(wpMarkers.vias[idx]);
+    wpMarkers.vias.splice(idx, 1);
+    // Re-label remaining via markers
+    wpMarkers.vias.forEach((m, i) => {
+      if (m) { map.removeLayer(m); }
+    });
+    wpMarkers.vias = [];
+    routeWaypoints.vias.forEach((v, i) => addViaMarker(v.lat, v.lon, i));
+  } else {
+    routeWaypoints[type] = null;
+    if (map && wpMarkers[type]) { map.removeLayer(wpMarkers[type]); wpMarkers[type] = null; }
+  }
+  updateWpBar();
+};
+
+function addViaMarker(lat, lon, idx) {
+  const map = getMap();
+  if (!map) return;
+  const marker = L.marker([lat, lon], {
+    icon: L.divIcon({ className: '', html: wpIconHtml('W'+(idx+1), '#f59e0b', '경유'+(idx+1)), iconSize: [36, 52], iconAnchor: [18, 26] }),
+    zIndexOffset: 1500,
+  }).bindPopup(`<b>경유지 ${idx+1}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  wpMarkers.vias[idx] = marker;
+}
+
+function setWaypoint(type, lat, lon) {
+  if (type === 'via') {
+    if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
+    routeWaypoints.vias.push({ lat, lon });
+    addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
+  } else {
+    routeWaypoints[type] = { lat, lon };
+    const map = getMap();
+    if (!map) return;
+    if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
+    const label = type === 'depart' ? 'S' : 'E';
+    const color = type === 'depart' ? '#22c55e' : '#ef4444';
+    const subLabel = type === 'depart' ? '출발' : '도착';
+    wpMarkers[type] = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
+      zIndexOffset: 2000,
+    }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  }
+  updateWpBar();
+  // Auto-open route request panel when waypoint set
+  if (!tvasPanel.classList.contains('open')) {
+    dltPanel.classList.remove('open'); tabDlt.classList.remove('active');
+    applyWaypointsToBody();
+    tvasPanel.classList.add('open'); tabTvas.classList.add('active');
+  } else {
+    applyWaypointsToBody();
+  }
+}
+
+function applyWaypointsToBody() {
+  try {
+    const body = JSON.parse(tvasBody.value);
+    if (routeWaypoints.depart) {
+      const sk = wgs84ToSkCoord(routeWaypoints.depart.lat, routeWaypoints.depart.lon);
+      body.departXPos = sk[0];
+      body.departYPos = sk[1];
+    }
+    if (routeWaypoints.dest) {
+      const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);
+      body.destXPos = sk[0];
+      body.destYPos = sk[1];
+    }
+    // 경유지 반영
+    if (routeWaypoints.vias.length > 0) {
+      body.wayPoints = routeWaypoints.vias.map((v, i) => {
+        const sk = wgs84ToSkCoord(v.lat, v.lon);
+        return {
+          x: sk[0],
+          y: sk[1],
+          wayPointName: '경유지' + (i + 1),
+          wayPointSearchFlag: 'WaypointSearch',
+          rpFlag: 99,
+        };
+      });
+    } else {
+      delete body.wayPoints;
+    }
+    tvasBody.value = JSON.stringify(body, null, 2);
+  } catch (e) { /* body not valid JSON, skip */ }
+}
+
+// ---- Map long-click / right-click: set departure/destination/via ---- //
+function setupMapContextMenu() {
+  const map = getMap();
+  if (!map) return;
+  map.off('contextmenu');
+  map.on('contextmenu', e => {
+    L.DomEvent.preventDefault(e.originalEvent);
+    const { lat, lng } = e.latlng;
+    const sk = wgs84ToSkCoord(lat, lng);
+    const content = document.createElement('div');
+    content.style.cssText = 'font-size:12px;line-height:1.8';
+    content.innerHTML = '<b>좌표 정보</b><br>' +
+      'WGS84: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
+      'SK: ' + sk[0] + ', ' + sk[1] + '<br>' +
+      '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">' +
+      '<button id="_wp_dep" style="flex:1;padding:5px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">출발지</button>' +
+      '<button id="_wp_via" style="flex:1;padding:5px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">경유지</button>' +
+      '<button id="_wp_dst" style="flex:1;padding:5px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">목적지</button>' +
+      '</div>';
+    const popup = L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(content).openOn(map);
+    content.querySelector('#_wp_dep').addEventListener('click', () => { setWaypoint('depart', lat, lng); map.closePopup(popup); });
+    content.querySelector('#_wp_via').addEventListener('click', () => { setWaypoint('via', lat, lng); map.closePopup(popup); });
+    content.querySelector('#_wp_dst').addEventListener('click', () => { setWaypoint('dest', lat, lng); map.closePopup(popup); });
+  });
+}
+// Setup on initial map load + re-setup whenever map is recreated (e.g. after DLT analysis)
+const _cmInterval = setInterval(() => { if (getMap()) { setupMapContextMenu(); clearInterval(_cmInterval); } }, 500);
+window.addEventListener('map-init', () => setupMapContextMenu());
+
+// ---- Layer toggles ---- //
+tvasLayerToggles.querySelectorAll('.tvas-ltog').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.tl;
+    const isOn = btn.classList.toggle('on');
+    const map = getMap();
+    if (map) toggleTvasLayer(map, key, isOn);
+  });
+});
+
+// ---- VX click → map fly ---- //
+window._flyToVx = function(idx) {
+  if (!lastCoords || !lastCoords[idx]) return;
+  const map = getMap();
+  if (!map) return;
+  const c = lastCoords[idx];
+  map.setView([c.lat, c.lon], 17, { animate: true });
+};
+
+// Show EV charger on map from list click
+window._showEvCharger = function(idx) {
+  const map = getMap();
+  if (!map) return;
+  showEvChargerOnMap(map, idx);
+};
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setStatus(msg, type = '') {
+  tvasStatus.textContent = msg;
+  tvasStatus.className = type;
+}
+
+// ---- Default headers ---- //
+function nowReqTime() {
+  const d = new Date();
+  return d.getFullYear().toString() +
+    String(d.getMonth()+1).padStart(2,'0') +
+    String(d.getDate()).padStart(2,'0') +
+    String(d.getHours()).padStart(2,'0') +
+    String(d.getMinutes()).padStart(2,'0') +
+    String(d.getSeconds()).padStart(2,'0');
+}
+
+const DEFAULT_HEADERS = [
+  ['Accept', 'application/octet-stream'],
+  ['CIH', '582079726'],
+  ['Client_ReqTime', () => nowReqTime()],
+  ['Connection', 'close'],
+  ['Content-Type', 'application/json; charset=UTF-8'],
+  ['Network-Type', 'WIFI'],
+  ['Nonce', '858416984'],
+  ['Requester', 'CLIENT_SSL'],
+];
+
+function addHeaderRow(key = '', value = '') {
+  const row = document.createElement('div');
+  row.className = 'tvas-header-row';
+  const ki = document.createElement('input');
+  ki.type = 'text'; ki.value = key; ki.placeholder = 'Key';
+  const vi = document.createElement('input');
+  vi.type = 'text'; vi.value = value; vi.placeholder = 'Value';
+  const del = document.createElement('button');
+  del.className = 'tvas-hdr-del'; del.textContent = '\u2715';
+  del.addEventListener('click', () => row.remove());
+  row.append(ki, vi, del);
+  tvasHeaders.appendChild(row);
+}
+
+function initHeaders() {
+  tvasHeaders.innerHTML = '';
+  DEFAULT_HEADERS.forEach(([k, v]) => addHeaderRow(k, typeof v === 'function' ? v() : v));
+}
+
+initHeaders();
+tvasAddHdr.addEventListener('click', () => addHeaderRow());
+
+// ---- Default body (sample) ---- //
+const defaultBody = {
+  "autoAddingYn": "Y",
+  "auxiliaryPower": 2760,
+  "chargedEnergy": 51200,
+  "chargedRange": 320000,
+  "currentEnergy": 51200,
+  "currentRange": 300000,
+  "evSocHistory": [
+    {
+      "altitude": -1.0, "angle": -1, "auxiliaryPower": 2760,
+      "currentEnergy": 51200, "eventTime": 7207, "gpsTime": 633697652,
+      "hdop": 20, "maMethod": 0, "rpLinkId": 0, "satelliteCnt": 0,
+      "speed": -1, "vehicleMass": 2216, "vertexMatch": 2,
+      "verticalAngle": 0.0, "xpos": 45722726, "ypos": 13522115
+    }
+  ],
+  "minEnergy": 12800,
+  "myEvStations": [],
+  "slopeFlag": 0,
+  "socketType": ["DcCombo"],
+  "vehicleId": "volvo_XC40",
+  "vehicleMass": 2216,
+  "version": "1.1",
+  "addCameraTypes": ["Bus","SignalSpeeding","Moving","ShoulderControl","Traffic"],
+  "angle": 252,
+  "controlRouteReqFlag": 0,
+  "dangerAreaOptions": ["OccurFrequently","SharpCurveSection","MistArea","SchoolZone","TrainCrossing"],
+  "departDirPriority": 1,
+  "departName": "",
+  "departRoadType": "None",
+  "departSrchFlag": 0,
+  "departXPos": 4576961,
+  "departYPos": 1353134,
+  "destName": "",
+  "destPkey": "",
+  "destPoiId": "",
+  "destRpFlag": 16,
+  "destSearchDetailFlag": "None",
+  "destSearchFlag": "RecentRouteGuide",
+  "destXPos": 4577011,
+  "destYPos": 1353227,
+  "detailLocFlag": "NotApplied",
+  "gpsTraceData": "",
+  "guideImgResolutionCode": "R480x540",
+  "hipassFlag": 1,
+  "initSrchDepartXPos": 0,
+  "initSrchDepartYPos": 0,
+  "initSrchLength": 0,
+  "lastRid": 0,
+  "lastTollgateId": 0,
+  "navSeq": "1",
+  "pastArrivalTime": "",
+  "pastSessionId": "",
+  "pastXpos": 0,
+  "pastYpos": 0,
+  "radiusEntryTurnType": 0,
+  "radiusInfoType": 2,
+  "radiusLeaveTurnType": 0,
+  "radiusLinkDirection": 0,
+  "radiusLinkId": 0,
+  "radiusMeshCode": 0,
+  "radiusXPos": 0,
+  "radiusYPos": 0,
+  "resFlag": 1,
+  "routePlanAroundRange": 0,
+  "routePlanTypes": ["Traffic_MinTime"],
+  "serviceFlag": "Realtime",
+  "speed": 3,
+  "tcRid": 0,
+  "tollCarType": "Car",
+  "totalDistanceInKm": 0,
+  "truckHeight": 0,
+  "truckLength": 0,
+  "truckTotalWeight": 0,
+  "truckWeight": 0,
+  "truckWidth": 0,
+  "tvas": "5.9",
+  "header": {
+    "appLaunchCount": 0,
+    "pushDeviceKey": "",
+    "screenHeight": 976,
+    "screenWidth": 878,
+    "svcType": 116,
+    "using": "MAIN",
+    "appVersion": "2.0.0",
+    "buildNo": "100000",
+    "carrier": "",
+    "deviceId": "",
+    "modelNo": "sdk_gphone_arm64",
+    "osType": "AND",
+    "osVersion": "11",
+    "reqTime": "",
+    "resolution": "HD"
+  }
+};
+tvasBody.value = JSON.stringify(defaultBody, null, 2);
+
+// ---- Prettify ---- //
+tvasPrettify.addEventListener('click', () => {
+  try {
+    const obj = JSON.parse(tvasBody.value);
+    tvasBody.value = JSON.stringify(obj, null, 2);
+    setStatus('');
+  } catch (e) {
+    setStatus('JSON 형식 오류: ' + e.message, 'error');
+  }
+});
+
+// ---- Clear ---- //
+tvasClearBtn.addEventListener('click', () => {
+  const map = getMap();
+  if (map) clearTvasRoute(map);
+  tvasSummary.innerHTML = '';
+  tvasRespRaw.style.display = 'none';
+  tvasRespPre.textContent = '';
+  tvasSaveRespBtn.style.display = 'none';
+  tvasLayerToggles.style.display = 'none';
+  lastResponseJson = null;
+  lastBinaryResponse = null;
+  lastCoords = null;
+  setStatus('');
+});
+
+// ---- Save response ---- //
+let lastBinaryResponse = null;  // 바이너리 응답 저장용
+
+tvasSaveRespBtn.addEventListener('click', () => {
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  let blob, filename;
+  if (lastBinaryResponse) {
+    blob = new Blob([lastBinaryResponse], { type: 'application/octet-stream' });
+    filename = `tvas-response-${ts}.bin`;
+  } else if (lastResponseJson) {
+    blob = new Blob([JSON.stringify(lastResponseJson, null, 2)], { type: 'application/json' });
+    filename = `tvas-response-${ts}.json`;
+  } else {
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---- Send request ---- //
+tvasSendBtn.addEventListener('click', async () => {
+  const url = tvasUrl.value.trim();
+  if (!url) { setStatus('URL을 입력하세요.', 'error'); return; }
+
+  // Auto-refresh Client_ReqTime to current time
+  tvasHeaders.querySelectorAll('.tvas-header-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs[0].value.trim() === 'Client_ReqTime') {
+      inputs[1].value = nowReqTime();
+    }
+  });
+
+  // Collect headers
+  const headers = {};
+  tvasHeaders.querySelectorAll('.tvas-header-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const k = inputs[0].value.trim();
+    const v = inputs[1].value.trim();
+    if (k && v) headers[k] = v;
+  });
+
+  // Parse body
+  let body;
+  try {
+    body = JSON.parse(tvasBody.value);
+  } catch (e) {
+    setStatus('Body JSON 파싱 오류: ' + e.message, 'error');
+    return;
+  }
+
+  // Auto-fill reqTime
+  if (body.header && !body.header.reqTime) {
+    const now = new Date();
+    body.header.reqTime = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+  }
+
+  const bodyStr = JSON.stringify(body);
+
+  tvasSendBtn.disabled = true;
+  setStatus('요청 전송 중...');
+  const t0 = performance.now();
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: bodyStr,
+    });
+
+    const elapsed = Math.round(performance.now() - t0);
+
+    if (!resp.ok) {
+      setStatus(`HTTP ${resp.status} ${resp.statusText} (${elapsed}ms)`, 'error');
+      tvasSendBtn.disabled = false;
+      return;
+    }
+
+    // Read raw response as ArrayBuffer first, then auto-detect format
+    const rawBuf = await resp.arrayBuffer();
+    const rawBytes = new Uint8Array(rawBuf);
+    let tvasBuffer;
+    let json = null;
+    let respInfo = {};
+
+    // Auto-detect: if first byte is '{' (0x7B) it's JSON, otherwise binary
+    const isJson = rawBytes.length > 0 && rawBytes[0] === 0x7B;
+
+    if (isJson) {
+      // JSON response — parse and extract tvases
+      const text = new TextDecoder('utf-8').decode(rawBytes);
+      json = JSON.parse(text);
+      lastResponseJson = json;
+      lastBinaryResponse = null;
+      tvasSaveRespBtn.style.display = '';
+
+      tvasRespRaw.style.display = '';
+      const displayJson = { ...json };
+      if (displayJson.tvases && typeof displayJson.tvases === 'string' && displayJson.tvases.length > 200) {
+        displayJson.tvases = displayJson.tvases.substring(0, 200) + '... (truncated)';
+      }
+      tvasRespPre.textContent = JSON.stringify(displayJson, null, 2);
+
+      respInfo = {
+        sessionId: json.header?.sessionId,
+        errorCode: json.header?.errorCode,
+        errorMessage: json.header?.errorMessage,
+        routeCount: json.routeCount,
+        tvasSize: json.tvasSize,
+        routePlanTypes: json.routePlanTypes,
+      };
+
+      if (json.header?.errorCode !== '000000') {
+        let errDetail = `서버 오류 [${json.header?.errorCode}]: ${json.header?.errorMessage || 'Unknown'}`;
+        if (json.header?.errorDetailCode) errDetail += `\n상세코드: ${json.header.errorDetailCode}`;
+        if (json.header?.errorDetailMessage) errDetail += `\n상세메시지: ${json.header.errorDetailMessage}`;
+        if (json.header?.sessionId) errDetail += `\nSession: ${json.header.sessionId}`;
+        errDetail += ` (${elapsed}ms)`;
+        setStatus(errDetail, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      const b64 = json.tvases;
+      if (!b64) {
+        setStatus('응답에 tvases 데이터가 없습니다.', 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      // Decode base64 tvases
+      let bytes;
+      try {
+        const binaryStr = atob(b64);
+        bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+      } catch (decErr) {
+        setStatus(`Base64 디코딩 실패: ${decErr.message}`, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      tvasBuffer = bytes.buffer;
+      if (json.tvasSize && json.tvasSize[0] && json.tvasSize[0] < bytes.length) {
+        tvasBuffer = bytes.buffer.slice(0, json.tvasSize[0]);
+      }
+
+    } else {
+      // Binary response — parse wrapper then extract TVAS
+      lastBinaryResponse = rawBuf;
+      lastResponseJson = null;
+      tvasSaveRespBtn.style.display = '';
+
+      const dv = new DataView(rawBuf);
+      const decUtf = new TextDecoder('utf-8');
+      const decEuc = new TextDecoder('euc-kr');
+      // Try UTF-8 first, fallback to EUC-KR for Korean text
+      function decStr(bytes) {
+        const s = decUtf.decode(bytes).replace(/\0+$/g, '');
+        if (s.includes('\ufffd')) return decEuc.decode(bytes).replace(/\0+$/g, '');
+        return s;
+      }
+
+      // Parse binary response wrapper
+      const errCode    = decStr(rawBytes.slice(0, 6));
+      const errMsg     = decStr(rawBytes.slice(6, 106));
+      const detailCode = decStr(rawBytes.slice(106, 116));
+      const detailMsg  = decStr(rawBytes.slice(116, 216));
+      const sessionId  = decStr(rawBytes.slice(216, 240));
+      const routeCount = rawBytes[240];
+
+      // tvasSize[] — big-endian int32 × routeCount
+      const tvasSizes = [];
+      for (let i = 0; i < routeCount; i++) {
+        tvasSizes.push(dv.getInt32(241 + i * 4, false)); // big-endian
+      }
+      const tvasStart = 241 + routeCount * 4;
+
+      respInfo = {
+        sessionId, errorCode: errCode, errorMessage: errMsg,
+        errorDetailCode: detailCode, errorDetailMessage: detailMsg,
+        routeCount, tvasSize: tvasSizes,
+      };
+
+      // Show wrapper info
+      tvasRespRaw.style.display = '';
+      tvasRespPre.textContent =
+        `[바이너리 응답] ${rawBuf.byteLength} bytes\n` +
+        `errorCode: ${errCode}\n` +
+        `errorMessage: ${errMsg}\n` +
+        (detailCode ? `errorDetailCode: ${detailCode}\n` : '') +
+        (detailMsg ? `errorDetailMessage: ${detailMsg}\n` : '') +
+        `sessionId: ${sessionId}\n` +
+        `routeCount: ${routeCount}\n` +
+        `tvasSize: [${tvasSizes.join(', ')}]\n` +
+        `TVAS offset: ${tvasStart}`;
+
+      if (errCode !== '000000') {
+        let errDetail = `서버 오류 [${errCode}]: ${errMsg || 'Unknown'}`;
+        if (detailCode) errDetail += `\n상세코드: ${detailCode}`;
+        if (detailMsg) errDetail += `\n상세메시지: ${detailMsg}`;
+        errDetail += `\nSession: ${sessionId} (${elapsed}ms)`;
+        setStatus(errDetail, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      if (routeCount === 0 || tvasSizes[0] === 0) {
+        setStatus('경로 데이터가 없습니다 (routeCount=0).', 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      // Extract first TVAS
+      tvasBuffer = rawBuf.slice(tvasStart, tvasStart + tvasSizes[0]);
+      setStatus(`바이너리 응답 파싱: ${rawBuf.byteLength} bytes, TVAS ${tvasSizes[0]} bytes (${elapsed}ms)`);
+    }
+
+    setStatus(`TVAS 파싱 중... (${tvasBuffer.byteLength} bytes)`);
+
+    let tvasResult, coords;
+    try {
+      tvasResult = parseTvas(tvasBuffer);
+      coords = resolveVertexCoordinates(tvasResult);
+    } catch (parseErr) {
+      const bufSize = tvasBuffer.byteLength;
+      const hexDump = Array.from(new Uint8Array(tvasBuffer, 0, Math.min(64, bufSize)))
+        .map(b => b.toString(16).padStart(2, '0')).join(' ');
+      setStatus(
+        `TVAS 파싱 오류: ${parseErr.message}\n` +
+        `버퍼 크기: ${bufSize} bytes\n` +
+        `tvasSize: ${JSON.stringify(respInfo.tvasSize)}\nrouteCount: ${respInfo.routeCount}\n` +
+        `처음 64 bytes: ${hexDump}`,
+        'error'
+      );
+      console.error('TVAS parse error:', parseErr);
+      console.log('TVAS buffer (first 256 bytes):', new Uint8Array(tvasBuffer, 0, Math.min(256, bufSize)));
+      tvasSendBtn.disabled = false;
+      return;
+    }
+
+    // Render on map
+    const map = getMap();
+    if (!map) {
+      setStatus('지도가 초기화되지 않았습니다. DLT 파일을 먼저 로드하거나 페이지를 새로고침하세요.', 'error');
+      tvasSendBtn.disabled = false;
+      return;
+    }
+
+    const { summary } = renderTvasRoute(map, tvasResult, coords, 0);
+
+    // Save coords for VX click navigation
+    lastCoords = coords;
+
+    // Show layer toggles
+    tvasLayerToggles.style.display = 'flex';
+    tvasLayerToggles.querySelectorAll('.tvas-ltog').forEach(b => b.classList.add('on'));
+
+    // Summary + section details
+    tvasSummary.innerHTML = buildSummaryHtml(summary, elapsed, tvasResult, coords, respInfo);
+
+    setStatus(`파싱 완료: ${coords.length}개 보간점, ${tvasResult.roads.length}개 도로구간 (${elapsed}ms)`, 'ok');
+
+    // Fit bounds
+    if (coords.length > 0) {
+      const bounds = L.latLngBounds(coords.map(c => [c.lat, c.lon]));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+  } catch (e) {
+    let detail = e.message || String(e);
+    const isCorsLike = e instanceof TypeError && /fetch|network|load failed/i.test(detail);
+    if (isCorsLike) {
+      detail += '\n\n가능한 원인:\n- CORS 정책으로 차단됨 (가장 흔함)\n- 서버 연결 불가 (URL/포트 확인)\n- 네트워크 연결 끊김\n- HTTPS 인증서 오류';
+      showCorsErrorModal();
+    }
+    setStatus('요청 실패: ' + detail, 'error');
+    console.error('TVAS request error:', e);
+  } finally {
+    tvasSendBtn.disabled = false;
+  }
+});
+
+function showCorsErrorModal() {
+  const modal = document.getElementById('cors-error-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+}
+document.getElementById('cors-modal-close')?.addEventListener('click', () => {
+  const modal = document.getElementById('cors-error-modal');
+  if (modal) modal.style.display = 'none';
+});
+document.getElementById('cors-error-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'cors-error-modal') e.currentTarget.style.display = 'none';
+});
+
+function sr(k, v) {
+  return `<div class="tvas-summary-row"><span class="tvas-sk">${esc(k)}</span><span class="tvas-sv">${esc(String(v))}</span></div>`;
+}
+
+function sectionDetail(title, id, count, contentHtml) {
+  if (!count) return '';
+  return `<details style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+    <summary style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer">
+      ${title} (${id}) — ${count}건
+    </summary>
+    <div style="max-height:300px;overflow-y:auto;margin-top:6px;font-size:11px;line-height:1.6">${contentHtml}</div>
+  </details>`;
+}
+
+function vx(idx, coords) {
+  const c = coords[idx];
+  if (!c) return `VX${idx}`;
+  return `<span class="vx-link" onclick="window._flyToVx(${idx})">VX${idx}(${c.lat.toFixed(5)},${c.lon.toFixed(5)})</span>`;
+}
+function vxRange(start, end, coords) {
+  const s = coords[start], e = coords[Math.min(end, coords.length-1)];
+  const sp = s ? `(${s.lat.toFixed(5)},${s.lon.toFixed(5)})` : '';
+  const ep = e ? `(${e.lat.toFixed(5)},${e.lon.toFixed(5)})` : '';
+  return `<span class="vx-link" onclick="window._flyToVx(${start})">VX${start}${sp}</span>~<span class="vx-link" onclick="window._flyToVx(${end})">VX${end}${ep}</span>`;
+}
+
+function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
+  const fmt = s.formatDistFn, fmtT = s.formatTimeFn;
+
+  // ---- Header summary ---- //
+  // Departure/Destination highlight bar
+  const depCoord = coords.length > 0 ? coords[0] : null;
+  const dstCoord = coords.length > 0 ? coords[coords.length - 1] : null;
+  let wpHtml = '<div style="display:flex;gap:6px;margin-bottom:8px">';
+  wpHtml += '<div style="flex:1;padding:6px 8px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);font-size:11px">';
+  wpHtml += '<b style="color:#4ade80">S 출발</b><br>';
+  wpHtml += '<span style="color:var(--text)">' + esc(s.departureName || '-') + '</span>';
+  if (depCoord) wpHtml += '<br><span class="vx-link" onclick="window._flyToVx(0)" style="font-size:10px">' + depCoord.lat.toFixed(5) + ', ' + depCoord.lon.toFixed(5) + '</span>';
+  wpHtml += '</div>';
+  wpHtml += '<div style="flex:1;padding:6px 8px;border-radius:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);font-size:11px">';
+  wpHtml += '<b style="color:#f87171">E 도착</b><br>';
+  wpHtml += '<span style="color:var(--text)">' + esc(s.destinationName || '-') + '</span>';
+  if (dstCoord) wpHtml += '<br><span class="vx-link" onclick="window._flyToVx(' + (coords.length-1) + ')" style="font-size:10px">' + dstCoord.lat.toFixed(5) + ', ' + dstCoord.lon.toFixed(5) + '</span>';
+  wpHtml += '</div></div>';
+
+  let html = wpHtml +
+    sr('Session ID', respInfo?.sessionId || '-') +
+    sr('경로 옵션', s.routeOption) +
+    sr('경로 타입', s.routeType) +
+    sr('총 거리', fmt(s.totalDistance)) +
+    sr('총 시간', fmtT(s.totalTime)) +
+    sr('택시 요금', s.taxiFare > 0 ? s.taxiFare.toLocaleString() + '원' : '-') +
+    sr('TVAS 버전', s.version) +
+    sr('맵 버전', s.mapVersion) +
+    sr('EV 도달', s.evReachable === 1 ? '가능' : s.evReachable === 0 ? '불가능' : '-') +
+    sr('응답 시간', elapsed + 'ms');
+
+  // ---- RS7: 경로요약 ---- //
+  if (tvasResult.routeSummary && tvasResult.routeSummary.items) {
+    const rs = tvasResult.routeSummary;
+    const congName = (c) => ({'0':'정보없음','1':'원활','2':'서행','4':'정체'}[c] || c);
+    const predictName = (t) => ({1:'도착시간예측',2:'출발시간예측'}[t] || t);
+    const narrowName = (n) => ({0:'정보없음',1:'세도로',2:'비포장',3:'세도로+비포장'}[n] || n);
+
+    let rs7Html = '';
+    // 헤더 요약
+    rs7Html += `<div style="padding:4px 0;margin-bottom:6px;border-bottom:1px solid rgba(148,163,184,0.15);font-size:10px;color:var(--muted);line-height:1.6">
+      InfoID: <b>${esc(rs.infoId)}</b> | 데이터타입: ${rs.dataType}<br>
+      교통정보시간: <b>${rs.trafficTime || '-'}</b> | 톨게이트: ${rs.tollFare ? rs.tollFare.toLocaleString() + '원' : '-'}<br>
+      ${predictName(rs.predictType)}: ${rs.predictTime || '-'}
+      ${rs.ecoSaving ? ' | Eco저감: ' + rs.ecoSaving + '%' : ''}
+      ${rs.roadAttr ? ' | 도로속성: ' + rs.roadAttr : ''}
+      <br>명칭blob: ${rs.nameBlobSize}B | 도로명blob: ${rs.roadNameBlobSize}B | 도로명수: ${rs.roadNameCount}
+    </div>`;
+
+    // 구간별 상세 — 모든 항목 표시
+    const gpName = (c) => ({1:'도곽점',2:'타일점',11:'직진',12:'좌회전',13:'우회전',14:'U턴',15:'P턴',16:'8시좌회전',17:'10시좌회전',18:'2시우회전',19:'4시우회전',43:'오른쪽',44:'왼쪽',51:'직진방향',77:'왼쪽출구',78:'오른쪽출구',101:'우측고속입구',102:'좌측고속입구',104:'우측고속출구',105:'좌측고속출구',150:'졸음쉼터',151:'휴게소',160:'EV충전소',170:'Ferry진입',171:'Ferry진출',200:'출발지',201:'목적지',204:'톨게이트'}[c] || '코드'+c);
+    rs7Html += rs.items.map((item, i) => {
+      const dist = (item.distance / 1000).toFixed(1) + 'km (' + item.distance.toLocaleString() + 'm)';
+      const timeSec = item.time;
+      const timeStr = timeSec >= 60 ? Math.floor(timeSec / 60) + '분 ' + (timeSec % 60) + '초' : timeSec + '초';
+      const timeStr2 = '(' + timeSec.toLocaleString() + '초)';
+      const cong = congName(item.congestion);
+      const congColor = {'원활':'#4ade80','서행':'#fbbf24','정체':'#f87171'}[cong] || 'var(--muted)';
+      return `<div style="padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.1)">
+        <div style="display:flex;align-items:center;gap:6px">
+          <b style="color:var(--accent)">[${i}]</b>
+          <span style="flex:1;color:var(--text);font-weight:600">${esc(item.name || '-')}</span>
+          <span style="color:${congColor};font-weight:600">${cong}</span>
+        </div>
+        <table style="font-size:10px;color:var(--muted);margin-top:3px;border-collapse:collapse;width:100%">
+          <tr><td style="padding:1px 6px 1px 0;white-space:nowrap">명칭 Offset</td><td style="color:var(--text)">${item.nameOffset}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">구간거리(m)</td><td style="color:var(--text)">${dist}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">구간시간(초)</td><td style="color:var(--text)">${timeStr} ${timeStr2}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">교통수집 속도</td><td style="color:var(--text)">${item.speed} km/h</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">교통수집 혼잡도</td><td><span style="color:${congColor};font-weight:600">${cong}</span> (${item.congestion})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">시작 보간점 Idx</td><td style="color:var(--text)">${item.startVxIdx} ${coords[item.startVxIdx] ? '→ (' + coords[item.startVxIdx].lat.toFixed(5) + ', ' + coords[item.startVxIdx].lon.toFixed(5) + ')' : ''}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">마지막 보간점 Idx</td><td style="color:var(--text)">${item.endVxIdx} ${coords[item.endVxIdx] ? '→ (' + coords[item.endVxIdx].lat.toFixed(5) + ', ' + coords[item.endVxIdx].lon.toFixed(5) + ')' : ''}</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">세도로 포함 여부</td><td style="color:var(--text)">${narrowName(item.narrowRoad)} (${item.narrowRoad})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">RSD회전코드</td><td style="color:var(--text)">${gpName(item.turnCode)} (${item.turnCode})</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">에너지 소모량(W)</td><td style="color:#a78bfa;font-weight:600">${item.energy.toLocaleString()} W</td></tr>
+          <tr><td style="padding:1px 6px 1px 0">수동 충전소 여부</td><td style="color:var(--text)">${item.turnCode === 160 ? (item.manualStation ? '<span style="color:#f04452">수동(1)</span>' : '자동(0)') : '-'}</td></tr>
+        </table>
+      </div>`;
+    }).join('');
+
+    // 주요도로 명칭
+    if (rs.roadNames && rs.roadNames.length > 0) {
+      rs7Html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,0.15)">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:3px">주요도로 명칭</div>`;
+      rs.roadNames.forEach((rn, i) => {
+        rs7Html += `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08);font-size:10px">
+          [${i}] <span style="color:var(--accent)">${esc(rn.name || '-')}</span>
+          <span style="color:var(--muted)">${vxRange(rn.startVxIdx, rn.endVxIdx, coords)}</span>
+        </div>`;
+      });
+      rs7Html += `</div>`;
+    }
+
+    html += sectionDetail('경로요약', 'RS7', rs.items.length, rs7Html);
+  }
+
+  // ---- Info Index overview ---- //
+  if (tvasResult.header.infoIndices.length > 0) {
+    const idxHtml = tvasResult.header.infoIndices.map((idx, i) =>
+      `<div style="display:flex;gap:8px;padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        <span style="color:var(--accent);min-width:40px;font-weight:600">${esc(idx.id)}</span>
+        <span style="color:var(--muted)">offset=${idx.offset} size=${idx.size}</span>
+      </div>`
+    ).join('');
+    html += sectionDetail('정보 인덱스', 'IDX', tvasResult.header.infoIndices.length, idxHtml);
+  }
+
+  // ---- TI: 타일 정보 ---- //
+  if (tvasResult.tiles.length > 0) {
+    const rows = tvasResult.tiles.map((t, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] 타일코드: ${t.xCode}×${t.yCode} (mesh ${t.xCode*100+t.yCode}), 마지막VX: ${t.lastVxIdx}
+      </div>`
+    ).join('');
+    html += sectionDetail('타일 정보', 'TI', tvasResult.tiles.length, rows);
+  }
+
+  // ---- VX: 보간점 ---- //
+  if (coords.length > 0) {
+    const rows = coords.map((c, i) =>
+      `<div style="padding:1px 0;border-bottom:1px solid rgba(148,163,184,0.06)">
+        [${i}] (${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}) SK(${c.skX}, ${c.skY}) d=${c.distToNext}m t=${c.timeToNext}s
+      </div>`
+    ).join('');
+    html += sectionDetail('보간점', 'VX', coords.length, rows);
+  }
+
+  // ---- RO4: 도로 정보 ---- //
+  if (tvasResult.roads.length > 0) {
+    const rtName = (c) => ({0:'고속국도',1:'도시고속',2:'국도',3:'국가지원지방도',4:'지방도',5:'주요도로1',6:'주요도로2',7:'주요도로3',8:'기타도로1',9:'이면도로',10:'페리항로',11:'단지내',12:'단지내2',16:'일반도로',20:'번화가'}[c] || c);
+    const ltName = (c) => ({0:'미조사',1:'본선(비분리)',2:'본선(분리)',3:'연결로(JC)',4:'교차점내',5:'연결로(IC)',7:'SA',8:'로터리',9:'유턴',10:'P턴',12:'졸음쉼터',13:'회전교차로',14:'교차로내'}[c] || c);
+    const fcName = (c) => ({0:'일반',1:'교량',2:'터널',3:'고가',4:'지하도로',5:'교차로통과',6:'철도건널목',7:'댐/방파제',90:'한강교량'}[c] || c);
+    const rows = tvasResult.roads.map((r, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ~${vx(r.lastVxIdx, coords)} | ${rtName(r.roadType)} | 링크:${ltName(r.linkType)} | 시설:${fcName(r.facilityCode)} | ${r.roadLength}m | ${r.laneCount}차선 | ${r.speedLimit}km/h | ${r.energyConsumption}Wh
+      </div>`
+    ).join('');
+    html += sectionDetail('도로 정보', 'RO4', tvasResult.roads.length, rows);
+  }
+
+  // ---- GP: 안내점 ---- //
+  if (tvasResult.guidancePoints.length > 0) {
+    const gpName = (c) => ({1:'도곽점',2:'타일점',3:'고속안내없음',4:'일반안내없음',11:'직진',12:'좌회전',13:'우회전',14:'U턴',15:'P턴',16:'8시좌회전',17:'10시좌회전',18:'2시우회전',19:'4시우회전',43:'오른쪽',44:'왼쪽',51:'직진방향',77:'왼쪽출구',78:'오른쪽출구',101:'우측고속입구',102:'좌측고속입구',104:'우측고속출구',105:'좌측고속출구',150:'졸음쉼터',151:'휴게소',160:'EV충전소',170:'Ferry진입',171:'Ferry진출',200:'출발지',201:'목적지',203:'목적지건너편',204:'톨게이트',211:'횡단보도',218:'엘리베이터',233:'직진임시'}[c] || '코드'+c);
+    const rows = tvasResult.guidancePoints.map((gp, i) => {
+      const c = coords[gp.vxIndex];
+      const pos = c ? `(${c.lat.toFixed(6)}, ${c.lon.toFixed(6)})` : '';
+      return `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(gp.vxIndex, coords)} ${gpName(gp.guidanceCode)} ${gp.continuousTurnCode > 0 ? '연속:' + (gp.continuousTurnCode===1?'고속':'일반') : ''}
+      </div>`;
+    }).join('');
+    html += sectionDetail('안내점', 'GP', tvasResult.guidancePoints.length, rows);
+  }
+
+  // ---- DRG3: 강제재탐색 ---- //
+  if (tvasResult.forcedReroute && tvasResult.forcedReroute.length > 0) {
+    const drType = (t) => ({1:'강제재탐색',2:'경유지점',3:'교통정보수집',4:'갈림길대안',5:'정체회피대안',6:'목적지방향성'}[t] || t);
+    const rows = tvasResult.forcedReroute.map((d, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(d.vxIdx, coords)} ${drType(d.type)} 전방${d.distance}m RID:${d.rid}
+      </div>`
+    ).join('');
+    html += sectionDetail('강제재탐색', 'DRG3', tvasResult.forcedReroute.length, rows);
+  }
+
+  // ---- RN2: 도로명칭 ---- //
+  if (tvasResult.roadNames && tvasResult.roadNames.length > 0) {
+    const rows = tvasResult.roadNames.map((rn, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ~${vx(rn.lastVxIdx, coords)} "${esc(rn.name)}" ${rn.display ? '표출' : '미표출'}
+      </div>`
+    ).join('');
+    html += sectionDetail('도로명칭', 'RN2', tvasResult.roadNames.length, rows);
+  }
+
+  // ---- DN5: 방면명칭 ---- //
+  if (tvasResult.directionNames && tvasResult.directionNames.length > 0) {
+    const dnType = (t) => ({1:'교차로명칭',2:'방면명칭',3:'서버가공',4:'목적지명칭'}[t] || t);
+    const rows = tvasResult.directionNames.map((dn, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ~${vx(dn.lastVxIdx, coords)} ${dnType(dn.typeCode)} "${esc(dn.name)}"
+      </div>`
+    ).join('');
+    html += sectionDetail('방면명칭', 'DN5', tvasResult.directionNames.length, rows);
+  }
+
+  // ---- CN: 교차로명칭 ---- //
+  if (tvasResult.intersectionNames && tvasResult.intersectionNames.length > 0) {
+    const rows = tvasResult.intersectionNames.map((cn, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ~${vx(cn.lastVxIdx, coords)} "${esc(cn.name)}"
+      </div>`
+    ).join('');
+    html += sectionDetail('교차로명칭', 'CN', tvasResult.intersectionNames.length, rows);
+  }
+
+  // ---- DA5: 위험지역 ---- //
+  if (tvasResult.dangerAreas.length > 0) {
+    const daType = (t) => ({0:'없음',1:'고정식과속',2:'이동식과속',3:'사고다발',4:'급커브',5:'안개',6:'신호과속단속',7:'버스전용',8:'갓길금지',9:'낙석',10:'교통수집',11:'구간단속시점',12:'구간단속종점',13:'끼어들기',14:'신호단속',15:'철도건널목',16:'어린이보호시점',17:'어린이보호종점',18:'야생동물',19:'과속방지턱',20:'주차단속',21:'고정식(박스)',22:'사고다발(보행)',23:'결빙주의',24:'노후경유차',25:'터널차로변경',26:'가변구간시점',27:'가변구간종점',28:'기상청결빙',29:'어린이보호시점',30:'어린이보호종점',31:'장애인보호시점',32:'장애인보호종점',33:'노인보호시점',34:'노인보호종점',35:'마을주민시점',36:'마을주민종점',37:'후면과속',38:'후면신호과속',39:'화물높이',40:'화물중량',41:'화물폭',43:'C-ITS',44:'홍수예보',45:'댐방류',46:'보행자우선시작',47:'보행자우선종료'}[t] || '타입'+t);
+    const rows = tvasResult.dangerAreas.map((da, i) => {
+      const c = coords[da.startVxIdx];
+      const pos = c ? `(${c.lat.toFixed(5)}, ${c.lon.toFixed(5)})` : '';
+      return `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(da.startVxIdx, da.endVxIdx, coords)} ${daType(da.type)} ${da.speedLimit}km/h ${da.sectionLength > 0 ? da.sectionLength+'m' : ''} ${da.variableSpeed ? '가변' : ''} ${da.schoolZoneCamera ? '스쿨존카메라' : ''}
+      </div>`;
+    }).join('');
+    html += sectionDetail('위험지역', 'DA5', tvasResult.dangerAreas.length, rows);
+  }
+
+  // ---- TG4: 톨게이트 ---- //
+  if (tvasResult.tollGates && tvasResult.tollGates.length > 0) {
+    const tgType = (t) => ({1:'개방형',2:'폐쇄형',3:'IC',4:'JC',5:'진출IC',6:'휴게소'}[t] || t);
+    const congLabel = (c) => ({'1':'원활','2':'서행','4':'정체','0':'정보없음'}[c] || c);
+    const rows = tvasResult.tollGates.map((tg, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(tg.vxIdx, coords)} "${esc(tg.name)}" ${tgType(tg.guideType)} ${tg.fare > 0 ? tg.fare.toLocaleString()+'원' : ''} ${tg.hipassOnly ? 'HI-PASS전용' : ''} ${tg.avgSpeed}km/h ${congLabel(tg.congestion)} TG-ID:${tg.tgId}
+      </div>`
+    ).join('');
+    html += sectionDetail('톨게이트', 'TG4', tvasResult.tollGates.length, rows);
+  }
+
+  // ---- SA3: 휴게소 ---- //
+  if (tvasResult.restAreas && tvasResult.restAreas.length > 0) {
+    const rows = tvasResult.restAreas.map((ra, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(ra.entryVxIdx, ra.exitVxIdx, coords)} "${esc(ra.name)}" POI:${ra.poiId}
+      </div>`
+    ).join('');
+    html += sectionDetail('휴게소', 'SA3', tvasResult.restAreas.length, rows);
+  }
+
+  // ---- TL5: 차로안내 ---- //
+  if (tvasResult.laneGuidance && tvasResult.laneGuidance.length > 0) {
+    const busCode = (c) => ({0:'없음',1:'우측(전일)',2:'우측(시간제)',3:'중앙(전일)',4:'중앙(시간제)'}[c] || c);
+    // 차로 시각화: 각 차로를 권장/유효/포켓 상태로 표시
+    const laneVisual = (tl) => {
+      const n = tl.totalLanes;
+      if (n === 0) return '<span style="color:var(--muted)">차로 없음</span>';
+      let html = '<div style="display:flex;gap:2px;margin:3px 0">';
+      for (let b = 0; b < n; b++) {
+        const isRecommend = (tl.recommendLane >> b) & 1;
+        const isValid = (tl.validLane >> b) & 1;
+        const isLeftPocket = b < tl.leftPocket;
+        const isRightPocket = b >= (n - tl.rightPocket);
+        const isPocket = isLeftPocket || isRightPocket;
+        // 색상: 권장=초록, 유효만=파랑, 무효=회색
+        let bg, border, label;
+        if (isRecommend) {
+          bg = '#166534'; border = '#22c55e'; // 초록 (권장)
+        } else if (isValid) {
+          bg = '#1e3a5f'; border = '#3b82f6'; // 파랑 (유효)
+        } else {
+          bg = '#1e293b'; border = '#475569'; // 회색 (무효)
+        }
+        // 포켓 차로 표시
+        let pocketLabel = '';
+        if (isLeftPocket) pocketLabel = '<div style="font-size:7px;color:#fbbf24">P좌</div>';
+        if (isRightPocket) pocketLabel = '<div style="font-size:7px;color:#fbbf24">P우</div>';
+        html += `<div style="width:28px;text-align:center;padding:2px 0;border-radius:3px;background:${bg};border:1.5px solid ${border};font-size:9px;color:#e2e8f0;line-height:1.3">
+          ${b+1}
+          ${pocketLabel}
+        </div>`;
+      }
+      html += '</div>';
+      // 범례
+      html += '<div style="font-size:9px;color:var(--muted);display:flex;gap:8px;margin-top:1px">';
+      html += '<span><span style="color:#22c55e">■</span>권장</span>';
+      html += '<span><span style="color:#3b82f6">■</span>유효</span>';
+      html += '<span><span style="color:#475569">■</span>무효</span>';
+      if (tl.leftPocket || tl.rightPocket) html += '<span><span style="color:#fbbf24">P</span>포켓</span>';
+      html += '</div>';
+      return html;
+    };
+    const rows = tvasResult.laneGuidance.map((tl, i) =>
+      `<div style="padding:4px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(tl.vxIdx, coords)} <span style="color:var(--muted)">${tl.totalLanes}차로</span>
+        ${laneVisual(tl)}
+        ${tl.overpassLane ? '<span style="color:var(--muted);font-size:9px">고가:0x'+tl.overpassLane.toString(16).padStart(4,'0')+'</span> ' : ''}
+        ${tl.underpassLane ? '<span style="color:var(--muted);font-size:9px">지하:0x'+tl.underpassLane.toString(16).padStart(4,'0')+'</span> ' : ''}
+        ${tl.busLaneCode ? '<span style="color:var(--muted);font-size:9px">버스:'+busCode(tl.busLaneCode)+'</span>' : ''}
+      </div>`
+    ).join('');
+    html += sectionDetail('차로안내', 'TL5', tvasResult.laneGuidance.length, rows);
+  }
+
+  // ---- HW: 고속모드 ---- //
+  if (tvasResult.highwayMode && tvasResult.highwayMode.length > 0) {
+    const rows = tvasResult.highwayMode.map((hw, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(hw.startVxIdx, hw.endVxIdx, coords)}
+      </div>`
+    ).join('');
+    html += sectionDetail('고속모드', 'HW', tvasResult.highwayMode.length, rows);
+  }
+
+  // ---- CB: 시도경계 ---- //
+  if (tvasResult.cityBoundary && tvasResult.cityBoundary.length > 0) {
+    const rows = tvasResult.cityBoundary.map((cb, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(cb.vxIdx, coords)} 시도코드:${cb.cityCode}
+      </div>`
+    ).join('');
+    html += sectionDetail('시도경계', 'CB', tvasResult.cityBoundary.length, rows);
+  }
+
+  // ---- ES3: 전기차 충전소 ---- //
+  if (tvasResult.evChargers && tvasResult.evChargers.length > 0) {
+    const speedName = (s) => ({0:'정보없음',1:'완속',2:'급속',3:'초급속'}[s] || s);
+    const mustCount = tvasResult.evChargers.filter(e => e.mustCharge).length;
+    const normalCount = tvasResult.evChargers.length - mustCount;
+    const rows = tvasResult.evChargers.map((ev, i) => {
+      let sockets = [];
+      if (ev.dcCha) sockets.push('DC차데모');
+      if (ev.ac3) sockets.push('AC3상');
+      if (ev.dcCombo) sockets.push('DC콤보');
+      if (ev.slow) sockets.push('완속');
+      if (ev.tesla) sockets.push('테슬라');
+      const isMust = ev.mustCharge === 1;
+      const rowBg = isMust ? 'background:rgba(240,68,82,0.08);border-left:3px solid #f04452;padding-left:8px;margin-left:-4px;' : 'cursor:pointer;';
+      const clickAction = isMust ? '' : `onclick="window._showEvCharger(${i})"`;
+      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);${rowBg}" ${clickAction}>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:${isMust?18:14}px;${isMust?'':'color:var(--accent)'}">⚡</span>
+          <b style="${isMust?'color:#f04452;font-size:14px':'font-size:12px;color:var(--text)'}">${esc(ev.name)}</b>
+          ${isMust ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">필수충전</span>' : '<span style="color:var(--muted);font-size:10px">(클릭하면 지도 표시)</span>'}
+        </div>
+        ${vx(ev.vxIdx, coords)} | ${ev.onRoute===0?'경로상':'경로주변'} | POI:${ev.poiId}<br>
+        소켓: ${sockets.join(', ') || '-'} | 충전기: <b>${ev.availChargers}</b>/${ev.totalChargers} | ${speedName(ev.chargeSpeed)}
+        ${ev.chargeTime ? '<br>충전: '+Math.floor(ev.chargeTime/60)+'분 | '+ev.chargePower+'kW | SoC '+ev.arrivalSoc+'%→'+ev.expectedSoc+'%' : ''}
+        ${ev.manualStation ? ' | <span style="color:#fbbf24">수동</span>' : ''}${ev.isSelf ? ' | 셀프' : ''}
+      </div>`;
+    }).join('');
+    const titleExtra = mustCount > 0 ? ` <span style="color:#f04452;font-weight:700">필수 ${mustCount}개</span>` : '';
+    html += sectionDetail('전기차 충전소' + titleExtra, 'ES3', tvasResult.evChargers.length, rows);
+  }
+
+  // ---- LT2: TSD링크교통정보 ---- //
+  if (tvasResult.trafficInfo && tvasResult.trafficInfo.length > 0) {
+    const congName = (c) => ({1:'원활',2:'서행',3:'지체',4:'정체'}[c] || c);
+    const rows = tvasResult.trafficInfo.map((lt, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(lt.startVxIdx, lt.endVxIdx, coords)} 속도:${lt.speed}km/h 혼잡:${congName(lt.congestion)}
+      </div>`
+    ).join('');
+    html += sectionDetail('교통정보', 'LT2', tvasResult.trafficInfo.length, rows);
+  }
+
+  // ---- WP2: 경유지 ---- //
+  if (tvasResult.waypoints && tvasResult.waypoints.length > 0) {
+    const rows = tvasResult.waypoints.map((wp, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(wp.vxIdx, coords)} 타입:${wp.type} SK(${wp.x},${wp.y}) POI:${wp.poiId}
+      </div>`
+    ).join('');
+    html += sectionDetail('경유지', 'WP2', tvasResult.waypoints.length, rows);
+  }
+
+  // ---- RD5: RPLINK ---- //
+  if (tvasResult.rpLinks && tvasResult.rpLinks.items && tvasResult.rpLinks.items.length > 0) {
+    const rd5 = tvasResult.rpLinks;
+    const hdr = rd5.header;
+    let rd5Html = `<div style="padding:4px 0;margin-bottom:4px;border-bottom:1px solid rgba(148,163,184,0.15);font-size:10px;color:var(--muted)">
+      InfoID: <b>${esc(hdr.infoId)}</b> | 초기탐색거리: ${hdr.initDistance}m | SessionID: ${esc(hdr.sessionId)}
+      ${hdr.tollBlobSize > 0 ? `<br>톨게이트ID: <span style="color:#fbbf24">${esc(rd5.tollgateIds)}</span>` : ''}
+    </div>`;
+    rd5Html += rd5.items.map((rd, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(rd.startVxIdx, rd.endVxIdx, coords)}
+        RID:${rd.rid} ${rd.ridTime}초
+        mesh:${rd.meshCode} link:${rd.linkId}
+        <span style="color:var(--muted)">${rd.direction===0?'정방향':'역방향'}${rd.compareTarget?' 비교대상':''}${rd.superCruise?' SC':''}</span>
+      </div>`
+    ).join('');
+    html += sectionDetail('RPLINK', 'RD5', rd5.items.length, rd5Html);
+  }
+
+  // ---- TC: 정체구간 ---- //
+  if (tvasResult.congestion && tvasResult.congestion.length > 0) {
+    const rows = tvasResult.congestion.map((tc, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vxRange(tc.startVxIdx, tc.endVxIdx, coords)} ${tc.distance}m ${tc.time}초
+      </div>`
+    ).join('');
+    html += sectionDetail('정체구간', 'TC', tvasResult.congestion.length, rows);
+  }
+
+  // ---- UA: 돌발정보 ---- //
+  if (tvasResult.incidents && tvasResult.incidents.length > 0) {
+    const typeName = (t) => ({A:'사고',B:'공사',C:'행사',D:'재해',E:'통제'}[t] || t);
+    const rows = tvasResult.incidents.map((ua, i) =>
+      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+        [${i}] ${vx(ua.startVxIdx, coords)} ${typeName(ua.typeCode)} "${esc(ua.content)}"
+      </div>`
+    ).join('');
+    html += sectionDetail('돌발정보', 'UA', tvasResult.incidents.length, rows);
+  }
+
+  // ---- WHR/HTR/WTR: 화물차 제한 ---- //
+  const truckSections = [
+    ['화물차 폭 제한', 'WHR', tvasResult.truckWidth, 'cm'],
+    ['화물차 높이 제한', 'HTR', tvasResult.truckHeight, 'cm'],
+    ['화물차 중량 제한', 'WTR', tvasResult.truckWeight, 'kg'],
+  ];
+  for (const [title, id, data, unit] of truckSections) {
+    if (data && data.length > 0) {
+      const rows = data.map((tr, i) =>
+        `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
+          [${i}] ${vxRange(tr.startVxIdx, tr.endVxIdx, coords)} 제한:${tr.limit}${unit} ${tr.overFlag?'<span style="color:#f87171">초과</span>':''}
+        </div>`
+      ).join('');
+      html += sectionDetail(title, id, data.length, rows);
+    }
+  }
+
+
+  return html;
+}
+</script>
+</body>
+</html>

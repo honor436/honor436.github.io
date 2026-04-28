@@ -352,10 +352,20 @@ function parseRestAreas(dv, offset, size, charset) {
 
 function parseComplexIntersections(dv, offset, size, charset) {
   // MC4: 복잡교차로 정보
-  // 구성: 헤더 20byte + 복잡교차로 데이터 20byte×n + 이미지 Main Domain URL(가변) + 이미지 Main URI(n개, 가변)
-  const count    = dv.getUint16(offset, true);          // +0  UShort 2  복잡교차로 데이터 개수(n)
-  const urlSize  = dv.getInt32(offset + 8, true);       // +8  Int 4    이미지 서버 Main Domain URL 크기
-  // 2~7, 12~19 byte: reserved (추후 사양 확인 필요)
+  // 구성: 헤더 20byte + 복잡교차로 데이터 20byte×n + 이미지 서버 Main Domain URL + 이미지 URI Blob
+  // 헤더 20byte
+  const count       = dv.getUint16(offset, true);            // +0  UShort 2  복잡교차로 데이터 총 개수(n)
+  const infoType    = dv.getUint8(offset + 2);                // +2  Byte 1   정보 인덱스 type (0x01)
+  const provideType = dv.getUint8(offset + 3);                // +3  Byte 1   복잡교차로 제공 타입
+  const infoId      = readAscii(dv, offset + 4, 4);           // +4  Char 4   정보 인덱스 ID
+  const resolution  = [
+    dv.getUint8(offset + 8),
+    dv.getUint8(offset + 9),
+    dv.getUint8(offset + 10),
+    dv.getUint8(offset + 11),
+  ];                                                            // +8  Byte 4   해상도
+  const urlSize     = dv.getInt32(offset + 12, true);         // +12 Int 4    이미지 서버 Main Domain URL 크기
+  const uriBlobSize = dv.getInt32(offset + 16, true);         // +16 Int 4    이미지 URI 전체 크기
 
   const headerSize = 20;
   const recordSize = 20;
@@ -369,36 +379,51 @@ function parseComplexIntersections(dv, offset, size, charset) {
     mainDomainUrl = readString(dv, urlStart, urlSize, charset);
   }
 
+  // URI Blob 영역 안전한 끝 위치
+  const uriEnd = Math.min(uriStart + Math.max(uriBlobSize, 0), offset + size);
+
+  // null-terminated 또는 blob 끝까지 문자열 읽기
+  const readUriAt = (relOff) => {
+    if (relOff < 0) return '';
+    const start = uriStart + relOff;
+    if (start < uriStart || start >= uriEnd) return '';
+    let end = start;
+    while (end < uriEnd && dv.getUint8(end) !== 0) end++;
+    if (end <= start) return '';
+    return readString(dv, start, end - start, charset);
+  };
+
   const items = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * recordSize;
     if (base + recordSize > offset + size) break;
-    const vxIdx     = dv.getUint16(base, true);         // +0  UShort 2  보간점 Idx
-    const uriOffset = dv.getUint16(base + 2, true);     // +2  UShort 2  이미지 Main URI 오프셋(uriStart 기준)
-    const uriLength = dv.getUint16(base + 4, true);     // +4  UShort 2  이미지 Main URI 길이(가정)
-    // +6~19: reserved (intersectionId/type 등 추후 사양 확인)
+    const vxIdx        = dv.getUint16(base, true);          // +0  UShort 2  해당 보간점 Idx
+    const voiceCode    = dv.getUint8(base + 2);              // +2  Byte 1   복잡교차로 음성 코드
+    const hasImage     = dv.getUint8(base + 3);              // +3  Byte 1   복잡교차로 이미지 존재여부 (0:없음, 1:있음)
+    const dayUriOff    = dv.getInt32(base + 4, true);        // +4  Int 4    주간 이미지 URI Offset
+    const nightUriOff  = dv.getInt32(base + 8, true);        // +8  Int 4    야간 이미지 URI Offset
+    const imageId      = dv.getUint16(base + 12, true);      // +12 UShort 2 복잡교차로 이미지 ID
+    // +14 Byte 6 Reserved
 
-    let mainUri = '';
-    if (uriStart + uriOffset < offset + size) {
-      const maxLen = uriLength > 0
-        ? Math.min(uriLength, offset + size - uriStart - uriOffset)
-        : Math.min(256, offset + size - uriStart - uriOffset);
-      if (maxLen > 0) {
-        mainUri = readString(dv, uriStart + uriOffset, maxLen, charset);
-      }
-    }
+    const dayUri    = hasImage ? readUriAt(dayUriOff)   : '';
+    const nightUri  = hasImage ? readUriAt(nightUriOff) : '';
 
     items.push({
       vxIdx,
-      uriOffset,
-      uriLength,
-      mainUri,
-      imageUrl: mainDomainUrl ? (mainDomainUrl + mainUri) : mainUri,
+      voiceCode,
+      hasImage,
+      dayUriOffset:   dayUriOff,
+      nightUriOffset: nightUriOff,
+      imageId,
+      dayUri,
+      nightUri,
+      dayImageUrl:    (hasImage && mainDomainUrl) ? (mainDomainUrl + dayUri)   : '',
+      nightImageUrl:  (hasImage && mainDomainUrl) ? (mainDomainUrl + nightUri) : '',
     });
   }
 
   return {
-    header: { count, urlSize },
+    header: { count, infoType, provideType, infoId, resolution, urlSize, uriBlobSize },
     mainDomainUrl,
     items,
   };

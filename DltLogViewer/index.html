@@ -2575,8 +2575,8 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
         ${itemKv('해당 보간점 Idx', '<b>' + mi.vxIdx + '</b>')}
         ${itemKv('복잡교차로 음성 코드', '<b>' + mi.voiceCode + '</b>')}
         ${itemKv('이미지 존재여부', mi.hasImage ? '<span style="color:#4ade80;font-weight:700">1 (있음)</span>' : '<span style="color:#94a3b8">0 (없음)</span>')}
-        ${itemKv('주간 이미지 URI Offset', '<b>' + mi.dayUriOffset + '</b>')}
-        ${itemKv('야간 이미지 URI Offset', '<b>' + mi.nightUriOffset + '</b>')}
+        ${itemKv('주간 이미지 URI Offset', '<b>' + mi.dayUriOffset + '</b> <span style="color:var(--muted)">→</span> <span style="color:#fbbf24">' + (esc(mi.dayUri) || '(없음)') + '</span>')}
+        ${itemKv('야간 이미지 URI Offset', '<b>' + mi.nightUriOffset + '</b> <span style="color:var(--muted)">→</span> <span style="color:#3b82f6">' + (esc(mi.nightUri) || '(없음)') + '</span>')}
         ${itemKv('복잡교차로 이미지 ID', '<b>' + mi.imageId + '</b>')}
         <div style="margin-top:4px;padding-left:8px;border-left:2px solid #fbbf24;font-size:10px;line-height:1.5">
           <div style="color:#fbbf24;font-weight:700">☀ 주간 (Offset: ${mi.dayUriOffset})</div>

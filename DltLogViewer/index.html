@@ -974,7 +974,9 @@
       border-radius: 4px;
       overflow: hidden;
       margin: 6px 0;
+      cursor: pointer;
     }
+    .mg-progress-track.disabled { cursor: default; opacity: 0.6; }
     .mg-progress-bar {
       height: 100%;
       width: 0%;
@@ -1858,7 +1860,7 @@
         <button id="mg-pause" class="mg-btn warn" disabled>⏸ 일시정지</button>
         <button id="mg-stop" class="mg-btn danger" disabled>■ 정지</button>
       </div>
-      <div class="mg-progress-track"><div id="mg-progress-bar" class="mg-progress-bar"></div></div>
+      <div class="mg-progress-track" id="mg-progress-track" title="클릭으로 해당 위치로 이동"><div id="mg-progress-bar" class="mg-progress-bar"></div></div>
       <div class="mg-stat-line">진행: <b id="mg-progress-text">0 / 0</b></div>
       <div class="mg-stat-line">현재 좌표: <b id="mg-current-coord">-</b></div>
       <div class="mg-stat-line" id="mg-send-status" style="color:var(--muted)"></div>
@@ -1969,6 +1971,12 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
+import {
+  haversineM as mgHaversineMImpl,
+  interpolatePath as mgInterpolatePathImpl,
+  reinterpolateFromCurrent as mgReinterpolateImpl,
+  indexFromProgress as mgIndexFromProgress,
+} from './js/mock-gps-playback.js';
 
 // ---- Right panel open/close ---- //
 const tvasPanel      = document.getElementById('tvas-right-panel');
@@ -2076,14 +2084,7 @@ let mgCarMarker = null;
 let mgDltPlayMode = false;      // true면 setTimeout(타임스탬프) 재생, false면 1초 setInterval
 
 // ---- haversine 거리 (m) ---- //
-function mgHaversineM(a, b) {
-  const R = 6371000;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const s = Math.sin(dLat/2)**2 +
-            Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.asin(Math.sqrt(s));
-}
+const mgHaversineM = mgHaversineMImpl;
 
 // ---- 방위각 (정북 기준 시계방향, 도) ---- //
 function mgBearingDeg(a, b) {
@@ -2398,7 +2399,18 @@ function mgSyncSatFromAcc() {
   mgSatellitesVal.textContent = `${sat} 개`;
 }
 
-mgSpeed.addEventListener('input', () => { mgSpeedVal.textContent = `${mgSpeed.value} km/h`; });
+function mgFmtSpeedLabel() {
+  const v = mgSpeed.value;
+  if (mgMode === 'dlt') {
+    const x = (Number(v) / 40).toFixed(2);
+    return `${v} km/h (×${x})`;
+  }
+  return `${v} km/h`;
+}
+mgSpeed.addEventListener('input', () => {
+  mgSpeedVal.textContent = mgFmtSpeedLabel();
+  mgOnSpeedChangedDuringPlayback();
+});
 mgAccuracy.addEventListener('input', () => {
   mgAccuracyVal.textContent = mgFmtAcc(mgAccuracy.value);
   mgSyncSatFromAcc();
@@ -2551,28 +2563,12 @@ mgModeTabs.forEach(tab => {
     // 모드 전환 시 이전 궤적 정리 + 드로잉 핸들러 상태 갱신
     mgClearTrajectory();
     mgUpdateDrawHandlerState();
+    mgSpeedVal.textContent = mgFmtSpeedLabel();
   });
 });
 
 // ---- 속도 기반 좌표 보간 (1초 간격) ---- //
-function mgInterpolatePath(points, speedKmh) {
-  const stepM = Math.max(1, speedKmh * 1000 / 3600); // m/s = 1초당 이동거리
-  const coords = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i], b = points[i+1];
-    const dist = mgHaversineM(a, b);
-    const steps = Math.max(1, Math.round(dist / stepM));
-    for (let s = 0; s < steps; s++) {
-      const t = s / steps;
-      coords.push({
-        lat: a.lat + (b.lat - a.lat) * t,
-        lng: a.lng + (b.lng - a.lng) * t,
-      });
-    }
-  }
-  coords.push(points[points.length - 1]);
-  return coords;
-}
+const mgInterpolatePath = mgInterpolatePathImpl;
 
 // ---- Mock GPS 1좌표 전송 (→ 릴레이 → MnsMockGps 앱) ---- //
 async function mgSendCoord(lat, lng, bearing) {
@@ -2610,6 +2606,19 @@ function mgUpdatePlaybackUI() {
   mgPause.disabled = mgPlaybackState !== 'playing';
   mgStop.disabled  = mgPlaybackState === 'idle';
   mgPlay.textContent = mgPlaybackState === 'paused' ? '▶ 계속' : '▶ 시작';
+  const track = document.getElementById('mg-progress-track');
+  if (track) track.classList.toggle('disabled', mgPlaybackState === 'idle' || total === 0);
+}
+
+// 진행바 클릭 → 점프
+const mgProgressTrack = document.getElementById('mg-progress-track');
+if (mgProgressTrack) {
+  mgProgressTrack.addEventListener('click', (e) => {
+    if (mgPlaybackState === 'idle' || mgPlaybackCoords.length === 0) return;
+    const rect = mgProgressTrack.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    mgJumpToIndex(mgIndexFromProgress(mgPlaybackCoords.length, pct));
+  });
 }
 
 // ---- 재생 틱 (모드 공통) ---- //
@@ -2654,17 +2663,73 @@ function mgPlaybackTick() {
   mgUpdatePlaybackUI();
   mgSendCoord(lat, lng, bearing);
 
-  // DLT 모드: 다음 좌표까지의 타임스탬프 간격으로 setTimeout 예약 (1x 실시간)
+  // DLT 모드: 다음 좌표까지의 타임스탬프 간격으로 setTimeout 예약. 속도 슬라이더를 배속으로 사용.
   if (mgDltPlayMode && mgPlaybackState === 'playing') {
     const next = mgPlaybackCoords[mgPlaybackIdx];
+    const rate = mgGetDltPlaybackRate();
     if (next && cur.timestamp && next.timestamp) {
       const diffMs = next.timestamp.getTime() - cur.timestamp.getTime();
-      const delay = Math.max(20, Math.min(60000, diffMs));
+      const delay = Math.max(20, Math.min(60000, diffMs / rate));
       mgPlaybackTimer = setTimeout(mgPlaybackTick, delay);
     } else if (next) {
-      mgPlaybackTimer = setTimeout(mgPlaybackTick, 1000);
+      mgPlaybackTimer = setTimeout(mgPlaybackTick, 1000 / rate);
     }
   }
+}
+
+// DLT 모드 배속: 속도 슬라이더(km/h) ÷ 40 = 배속 (40 → 1.0x)
+function mgGetDltPlaybackRate() {
+  return Math.max(0.05, Number(mgSpeed.value) / 40);
+}
+
+// 진행바 클릭 → 해당 인덱스로 점프 (재생 중이면 mock GPS 좌표도 즉시 송신)
+function mgJumpToIndex(newIdx) {
+  if (mgPlaybackCoords.length === 0 || mgPlaybackState === 'idle') return;
+  newIdx = Math.max(0, Math.min(mgPlaybackCoords.length - 1, newIdx));
+  // 기존 타이머 취소
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
+  mgPlaybackIdx = newIdx;
+  // 즉시 한 tick → 새 좌표를 차량 마커/mock GPS 로 송신
+  mgPlaybackTick();
+  // 재생 중이면 스케줄 복원 (DLT 는 tick 내부에서 setTimeout 예약함)
+  if (mgPlaybackState === 'playing' && !mgDltPlayMode) {
+    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  }
+}
+
+// 속도 슬라이더 변경 시: draw/tvas 재생 중이면 현재 위치 기준 재보간, DLT 는 다음 tick 에서 새 배속 자동 적용
+function mgOnSpeedChangedDuringPlayback() {
+  if (mgPlaybackState === 'idle') return;
+  if (mgDltPlayMode) return;   // DLT 는 별도 처리 없이 다음 tick 에서 mgGetDltPlaybackRate() 가 새 값 사용
+  if (mgPlaybackCoords.length === 0) return;
+  // 마지막으로 송신된 좌표 (= tick 직후 mgPlaybackIdx 는 다음 좌표를 가리킴)
+  const lastEmittedIdx = Math.max(0, mgPlaybackIdx - 1);
+  const cur = mgPlaybackCoords[lastEmittedIdx];
+  if (!cur) return;
+  const srcNextIdx = (cur.srcNextIdx != null) ? cur.srcNextIdx : 0;
+  if (srcNextIdx >= mgDrawPoints.length) return; // 이미 종점
+  const wasPlaying = mgPlaybackState === 'playing';
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
+  const newCoords = mgReinterpolateImpl(
+    { lat: cur.lat, lng: cur.lng != null ? cur.lng : cur.lon },
+    mgDrawPoints,
+    srcNextIdx,
+    Number(mgSpeed.value),
+  );
+  mgPlaybackCoords = newCoords;
+  mgPlaybackIdx = 0;
+  if (wasPlaying) {
+    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  }
+  mgUpdatePlaybackUI();
 }
 
 // ---- 시작 / 일시정지 / 정지 ---- //

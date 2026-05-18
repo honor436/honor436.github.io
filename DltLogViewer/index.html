@@ -1771,12 +1771,6 @@
         <input type="range" id="mg-accuracy" min="0.5" max="100" step="0.5" value="5">
         <span class="mg-val" id="mg-accuracy-val">5.0 m</span>
       </div>
-      <div class="mg-btn-group" style="margin-top:4px;gap:4px">
-        <button class="mg-btn mg-acc-preset" data-acc="1" style="padding:3px 6px;font-size:10px">1m (정밀)</button>
-        <button class="mg-btn mg-acc-preset" data-acc="5" style="padding:3px 6px;font-size:10px">5m (도심)</button>
-        <button class="mg-btn mg-acc-preset" data-acc="15" style="padding:3px 6px;font-size:10px">15m (실내)</button>
-        <button class="mg-btn mg-acc-preset" data-acc="50" style="padding:3px 6px;font-size:10px">50m (저조)</button>
-      </div>
       <div class="mg-row" style="margin-top:8px">
         <label title="Location.extras Bundle의 'satellites' 키로 전송 (구식 LocationListener 호환)">위성 수</label>
         <input type="range" id="mg-satellites" min="0" max="12" step="1" value="11">
@@ -2416,14 +2410,6 @@ mgAccuracy.addEventListener('input', () => {
   mgSyncSatFromAcc();
 });
 mgSatellites.addEventListener('input', () => { mgSatellitesVal.textContent = `${mgSatellites.value} 개`; });
-// 정확도 프리셋
-document.querySelectorAll('.mg-acc-preset').forEach(btn => {
-  btn.addEventListener('click', () => {
-    mgAccuracy.value = btn.dataset.acc;
-    mgAccuracyVal.textContent = mgFmtAcc(mgAccuracy.value);
-    mgSyncSatFromAcc();
-  });
-});
 // 연동 체크박스 토글 시 즉시 sync
 document.getElementById('mg-sat-link').addEventListener('change', mgSyncSatFromAcc);
 // 초기 sync (기본 정확도 5m → 위성 약 11개)

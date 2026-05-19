@@ -1786,9 +1786,9 @@
         <div class="mg-wiz-step-dot" data-step="3"><div class="dot">3</div><div class="label">앱 설치</div></div>
       </div>
 
-      <!-- Step 1: PC 부트스트랩 -->
+      <!-- Step 1: PC 설치 -->
       <div class="mg-wiz-card" id="mg-wiz-step1" style="margin-top:12px">
-        <div class="head"><span class="num">1</span><span class="title">🖥 PC 부트스트랩 설치</span><span class="check" style="display:none">✓</span></div>
+        <div class="head"><span class="num">1</span><span class="title">🖥 PC 설치</span><span class="check" style="display:none">✓</span></div>
         <ul class="checklist">
           <li>릴레이 서버 자동 설치</li>
           <li>MnsMockGps APK 자동 다운로드</li>
@@ -1834,9 +1834,9 @@
         <button id="mg-adb-refresh" class="mg-btn">새로고침</button>
         <button id="mg-adb-setup" class="mg-btn primary">🔌 단말 연결</button>
       </div>
-      <!-- PC 부트스트랩 설치 (항상 노출) -->
+      <!-- PC 설치 (항상 노출) -->
       <details style="margin-top:8px" id="mg-pc-install-details">
-        <summary class="mg-hint" style="cursor:pointer;font-weight:600;color:#c084fc">💻 PC 부트스트랩 설치 (처음이거나 다른 PC에 설치 시)</summary>
+        <summary class="mg-hint" style="cursor:pointer;font-weight:600;color:#c084fc">💻 PC 설치 (처음이거나 다른 PC에 설치 시)</summary>
         <div class="mg-hint" style="margin:6px 0 8px;line-height:1.6">
           한 번 설치하면 PC 부팅 시 릴레이가 자동 시작됩니다.<br>
           (Python3 + ADB 필요)
@@ -2237,7 +2237,7 @@ function mgBearingDeg(a, b) {
 // ---- 릴레이 미실행 안내 박스 토글 (자동 설치 버튼만 노출) ---- //
 const mgRelayCmdBox = document.getElementById('mg-relay-cmd-box');
 
-// ---- 자동 설치 부트스트랩 ---- //
+// ---- 자동 설치 ---- //
 const mgInstallMac      = document.getElementById('mg-install-mac');
 const mgInstallWin      = document.getElementById('mg-install-win');
 const mgInstallDialog   = document.getElementById('mg-install-dialog');

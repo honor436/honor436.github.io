@@ -853,6 +853,119 @@
       flex-direction: column;
       gap: 12px;
     }
+
+    /* ====== Mock GPS Wizard (첫 사용자용) ====== */
+    .mg-wiz-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .mg-wiz-step-dot {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .mg-wiz-step-dot .dot {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: rgba(148,163,184,0.2);
+      border: 2px solid rgba(148,163,184,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: var(--muted);
+      transition: all 0.25s;
+    }
+    .mg-wiz-step-dot .label {
+      font-size: 9px; color: var(--muted); font-weight: 600;
+    }
+    .mg-wiz-step-dot.current .dot {
+      background: #a855f7;
+      border-color: #a855f7;
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.25);
+      transform: scale(1.1);
+    }
+    .mg-wiz-step-dot.current .label { color: #c084fc; }
+    .mg-wiz-step-dot.done .dot {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: #fff;
+    }
+    .mg-wiz-step-dot.done .label { color: #4ade80; }
+    .mg-wiz-bar {
+      flex: 1;
+      height: 2px;
+      background: rgba(148,163,184,0.3);
+      border-radius: 1px;
+    }
+    .mg-wiz-bar.done { background: #22c55e; }
+
+    .mg-wiz-card {
+      background: linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(124,58,237,0.08) 100%);
+      border: 1px solid rgba(168,85,247,0.35);
+      border-radius: 14px;
+      padding: 18px 16px;
+      box-shadow: 0 4px 14px rgba(168,85,247,0.15);
+    }
+    .mg-wiz-card.waiting {
+      background: rgba(148,163,184,0.05);
+      border: 1px dashed rgba(148,163,184,0.3);
+      box-shadow: none;
+      opacity: 0.7;
+    }
+    .mg-wiz-card.done {
+      background: rgba(34,197,94,0.05);
+      border-color: rgba(34,197,94,0.3);
+      box-shadow: none;
+      padding: 10px 14px;
+    }
+    .mg-wiz-card .head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .mg-wiz-card .head .num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #a855f7; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .mg-wiz-card.done .head .num { background: #22c55e; }
+    .mg-wiz-card.waiting .head .num { background: rgba(148,163,184,0.4); color: var(--muted); }
+    .mg-wiz-card .head .title {
+      font-size: 15px; font-weight: 800; color: var(--text);
+    }
+    .mg-wiz-card.waiting .head .title { color: var(--muted); font-weight: 600; }
+    .mg-wiz-card .head .check {
+      margin-left: auto;
+      font-size: 16px; color: #4ade80;
+    }
+    .mg-wiz-card .checklist {
+      list-style: none; padding: 0; margin: 0 0 12px 0;
+      font-size: 11px; color: var(--muted); line-height: 1.7;
+    }
+    .mg-wiz-card .checklist li::before { content: '✓ '; color: #4ade80; font-weight: 700; }
+
+    #mg-wiz-refresh {
+      margin-top: 6px;
+      align-self: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .mg-main-ready-badge {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.4);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #4ade80;
+      font-weight: 700;
+      text-align: center;
+    }
     .mg-section {
       background: rgba(168,85,247,0.06);
       border: 1px solid rgba(168,85,247,0.2);
@@ -1662,23 +1775,53 @@
   </div>
   <div class="mockgps-panel-body">
 
-    <!-- ★ 첫 사용자 히어로 카드 (릴레이 미실행 시에만 노출) -->
-    <div id="mg-first-hero" style="display:none">
-      <div style="background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);border-radius:12px;padding:18px 16px;color:#fff;box-shadow:0 4px 14px rgba(168,85,247,0.3)">
-        <div style="font-size:13px;font-weight:700;opacity:0.85;margin-bottom:4px">처음이세요?</div>
-        <div style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:10px">PC에 자동 설치하면<br>모든 게 바로 동작합니다</div>
-        <div style="font-size:11px;opacity:0.9;line-height:1.5;margin-bottom:14px">
-          ✓ 릴레이 서버 자동 설치<br>
-          ✓ MnsMockGps APK 자동 설치<br>
-          ✓ PC 부팅 시 자동 시작 등록
-        </div>
-        <div class="mg-btn-group">
-          <button id="mg-hero-mac" class="mg-btn" style="background:#fff;color:#7c3aed;border:none;font-weight:800;font-size:13px;padding:10px 14px">🍎 macOS / Linux</button>
-          <button id="mg-hero-win" class="mg-btn" style="background:#fff;color:#1e293b;border:none;font-weight:800;font-size:13px;padding:10px 14px">🪟 Windows</button>
-        </div>
-        <div style="font-size:10px;opacity:0.7;margin-top:8px;text-align:center">Python3 + ADB 필요</div>
+    <!-- ★★★ 위저드 (모두 준비되지 않았을 때만 노출) ★★★ -->
+    <div id="mg-wizard" style="display:none">
+      <!-- 진행 인디케이터 -->
+      <div class="mg-wiz-indicator">
+        <div class="mg-wiz-step-dot" data-step="1"><div class="dot">1</div><div class="label">PC 설치</div></div>
+        <div class="mg-wiz-bar" data-bar="1"></div>
+        <div class="mg-wiz-step-dot" data-step="2"><div class="dot">2</div><div class="label">단말 연결</div></div>
+        <div class="mg-wiz-bar" data-bar="2"></div>
+        <div class="mg-wiz-step-dot" data-step="3"><div class="dot">3</div><div class="label">앱 설치</div></div>
       </div>
+
+      <!-- Step 1: PC 부트스트랩 -->
+      <div class="mg-wiz-card" id="mg-wiz-step1" style="margin-top:12px">
+        <div class="head"><span class="num">1</span><span class="title">🖥 PC 부트스트랩 설치</span><span class="check" style="display:none">✓</span></div>
+        <ul class="checklist">
+          <li>릴레이 서버 자동 설치</li>
+          <li>MnsMockGps APK 자동 다운로드</li>
+          <li>PC 부팅 시 자동 시작 등록</li>
+        </ul>
+        <div class="mg-btn-group">
+          <button id="mg-hero-mac" class="mg-btn primary" style="font-size:13px;padding:10px 12px">🍎 macOS / Linux</button>
+          <button id="mg-hero-win" class="mg-btn primary" style="font-size:13px;padding:10px 12px;background:#0078d4;border-color:#0078d4">🪟 Windows</button>
+        </div>
+        <div class="mg-hint" style="margin-top:6px;text-align:center">Python3 + ADB 필요</div>
+      </div>
+
+      <!-- Step 2: 단말 연결 -->
+      <div class="mg-wiz-card waiting" id="mg-wiz-step2" style="margin-top:10px">
+        <div class="head"><span class="num">2</span><span class="title">📱 단말 연결</span><span class="check" style="display:none">✓</span></div>
+        <div class="mg-hint" id="mg-wiz-step2-body" style="line-height:1.7">
+          USB 케이블로 단말 연결 또는 Android 에뮬레이터 실행 후 대기 중...
+        </div>
+      </div>
+
+      <!-- Step 3: 앱 설치 -->
+      <div class="mg-wiz-card waiting" id="mg-wiz-step3" style="margin-top:10px">
+        <div class="head"><span class="num">3</span><span class="title">📲 MnsMockGps 앱 설치</span><span class="check" style="display:none">✓</span></div>
+        <div id="mg-wiz-step3-body">
+          <div class="mg-hint" style="line-height:1.7">앞 단계 완료 후 자동 설치 진행</div>
+        </div>
+      </div>
+
+      <button id="mg-wiz-refresh" class="mg-btn" style="margin-top:10px">🔄 Step 상태 확인</button>
     </div>
+
+    <!-- ★★★ 메인 UI (모두 준비된 경우에만 노출) ★★★ -->
+    <div id="mg-main-ui" style="display:none;flex-direction:column;gap:12px">
 
     <!-- ADB 연결 상태 -->
     <div class="mg-section">
@@ -1860,6 +2003,7 @@
       <div class="mg-stat-line" id="mg-send-status" style="color:var(--muted)"></div>
     </div>
 
+    </div><!-- /#mg-main-ui -->
   </div>
 </div>
 
@@ -2245,43 +2389,193 @@ function mgSetGated(locked) {
 // 초기: 잠금
 mgSetGated(true);
 
-// ---- ADB 상태 새로고침 ---- //
-const mgFirstHero = document.getElementById('mg-first-hero');
+// ---- 위저드 / 메인 UI 토글 + 상태 폴링 ---- //
+const mgWizard       = document.getElementById('mg-wizard');
+const mgMainUi       = document.getElementById('mg-main-ui');
+const mgWizStep1     = document.getElementById('mg-wiz-step1');
+const mgWizStep2     = document.getElementById('mg-wiz-step2');
+const mgWizStep3     = document.getElementById('mg-wiz-step3');
+const mgWizStep2Body = document.getElementById('mg-wiz-step2-body');
+const mgWizStep3Body = document.getElementById('mg-wiz-step3-body');
+const mgWizRefresh   = document.getElementById('mg-wiz-refresh');
 
-async function refreshAdbStatus() {
-  mgAdbDot.className = 'mg-adb-dot';
-  mgAdbText.textContent = '확인 중...';
-  mgAppBox.style.display = 'none';
-  let adbConnected = false;
-  let relayReachable = false;
-  try {
-    const res = await fetch(`${MG_RELAY}/devices`, { signal: AbortSignal.timeout(4000) });
-    const data = await res.json();
-    relayReachable = true;
-    if (data.ok && data.devices && data.devices.length > 0) {
-      mgAdbDot.className = 'mg-adb-dot connected';
-      mgAdbText.textContent = `연결됨: ${data.devices.join(', ')}`;
-      adbConnected = true;
-    } else {
-      mgAdbDot.className = 'mg-adb-dot error';
-      mgAdbText.textContent = data.error || '연결된 에뮬레이터 없음';
-    }
-    mgRelayCmdBox.style.display = 'none';
-  } catch (e) {
-    mgAdbDot.className = 'mg-adb-dot error';
-    mgAdbText.textContent = '릴레이 서버 응답 없음 (adb-relay.py 실행 필요)';
-    mgRelayCmdBox.style.display = 'block';
+function mgWizSetStep(num, state) {
+  // num: 1|2|3, state: 'waiting' | 'current' | 'done'
+  const card = num === 1 ? mgWizStep1 : num === 2 ? mgWizStep2 : mgWizStep3;
+  card.classList.remove('waiting', 'done');
+  if (state !== 'current') card.classList.add(state);
+  card.querySelector('.check').style.display = state === 'done' ? '' : 'none';
+
+  // 인디케이터 dot
+  const dot = document.querySelector(`.mg-wiz-step-dot[data-step="${num}"]`);
+  dot.classList.remove('current', 'done');
+  if (state === 'done') {
+    dot.classList.add('done');
+    dot.querySelector('.dot').textContent = '✓';
+  } else if (state === 'current') {
+    dot.classList.add('current');
+    dot.querySelector('.dot').textContent = String(num);
+  } else {
+    dot.querySelector('.dot').textContent = String(num);
   }
-  // 히어로 카드: 릴레이 미실행 시에만 노출 (첫 사용자가 가장 먼저 보도록)
-  mgFirstHero.style.display = relayReachable ? 'none' : 'block';
-  // ADB 연결 시 다른 메뉴 잠금 해제 + 앱 상태 체크
-  mgSetGated(!adbConnected);
-  if (adbConnected) {
-    mgAppBox.style.display = 'block';
-    await refreshAppStatus();
+  // 인디케이터 bar (이전 step 의 완료 여부에 따라)
+  if (num <= 2) {
+    const bar = document.querySelector(`.mg-wiz-bar[data-bar="${num}"]`);
+    bar.classList.toggle('done', state === 'done');
   }
 }
+
+async function mgPollState() {
+  // 1) 릴레이 ping
+  let relayUp = false, devices = [], appInstalled = false, appRunning = false;
+  try {
+    const res = await fetch(`${MG_RELAY}/ping`, { signal: AbortSignal.timeout(3000) });
+    const d = await res.json();
+    relayUp = !!d.status;
+  } catch (_) {}
+
+  if (relayUp) {
+    // 2) devices
+    try {
+      const res = await fetch(`${MG_RELAY}/devices`, { signal: AbortSignal.timeout(3000) });
+      const d = await res.json();
+      if (d.ok) devices = d.devices || [];
+    } catch (_) {}
+    // 3) app status
+    if (devices.length > 0) {
+      try {
+        const res = await fetch(`${MG_RELAY}/app-status`, { signal: AbortSignal.timeout(3000) });
+        const d = await res.json();
+        if (d.ok) { appInstalled = !!d.installed; appRunning = !!d.serviceRunning; }
+      } catch (_) {}
+    }
+  }
+
+  const adbConnected = devices.length > 0;
+  const allReady = relayUp && adbConnected && appInstalled;
+
+  // === 위저드 ↔ 메인 토글 ===
+  if (allReady) {
+    mgWizard.style.display = 'none';
+    mgMainUi.style.display = 'flex';
+    // 메인 UI 안의 ADB 상태 영역 동기화
+    await refreshAdbStatusFull(devices, appInstalled, appRunning);
+  } else {
+    mgWizard.style.display = '';
+    mgMainUi.style.display = 'none';
+    // Step 상태 갱신
+    mgWizSetStep(1, relayUp ? 'done' : 'current');
+    if (!relayUp) {
+      mgWizSetStep(2, 'waiting');
+      mgWizSetStep(3, 'waiting');
+    } else if (!adbConnected) {
+      mgWizSetStep(2, 'current');
+      mgWizSetStep(3, 'waiting');
+      mgWizStep2Body.innerHTML =
+        'USB 케이블로 단말 연결 또는 Android 에뮬레이터 실행 후 대기 중...<br>' +
+        '<span style="color:var(--muted)">감지되면 자동으로 다음 단계로 진행됩니다.</span>';
+    } else if (!appInstalled) {
+      mgWizSetStep(2, 'done');
+      mgWizStep2Body.innerHTML = `<b style="color:#4ade80">연결됨:</b> ${devices.join(', ')}`;
+      mgWizSetStep(3, 'current');
+      // 자동 설치 시도 안내 + 버튼
+      if (!mgWizStep3Body.dataset.rendered) {
+        mgWizStep3Body.innerHTML = `
+          <div class="mg-hint" style="line-height:1.7;margin-bottom:8px">APK 자동 다운로드 + adb install + 권한 설정</div>
+          <button id="mg-wiz-install" class="mg-btn primary" style="width:100%">📥 자동 설치 시작</button>
+          <div id="mg-wiz-install-msg" class="mg-hint" style="margin-top:6px"></div>
+        `;
+        mgWizStep3Body.dataset.rendered = '1';
+        document.getElementById('mg-wiz-install').addEventListener('click', mgWizInstallApp);
+      }
+    }
+  }
+}
+
+async function mgWizInstallApp() {
+  const btn = document.getElementById('mg-wiz-install');
+  const msg = document.getElementById('mg-wiz-install-msg');
+  btn.disabled = true;
+  btn.textContent = '⏳ 설치 중...';
+  msg.innerHTML = 'APK 다운로드 + adb install + 권한 설정 진행 중...';
+  try {
+    const url = `${MG_RELAY}/install-app?url=${encodeURIComponent(mgApkUrl())}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    const data = await res.json();
+    if (data.ok) {
+      msg.innerHTML = `<span style="color:#4ade80">✓ 설치 완료 (${Math.round((data.apkSize||0)/1024)}KB)</span>`;
+      // 자동으로 다음 폴링이 메인 UI 로 전환해줌
+      setTimeout(mgPollState, 500);
+    } else {
+      msg.innerHTML = `
+        <div style="color:#f87171;margin-bottom:6px">✗ 자동 설치 실패: ${data.error || 'unknown'}</div>
+        <div style="background:rgba(15,23,42,0.6);border-radius:6px;padding:8px;font-size:10px;line-height:1.6">
+          <div style="color:var(--muted);margin-bottom:4px">수동 설치:</div>
+          <code style="color:#c084fc;word-break:break-all">adb install -r ~/.mockgps/MnsMockGps.apk</code>
+          <button onclick="navigator.clipboard.writeText('adb install -r ~/.mockgps/MnsMockGps.apk')" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:1px 6px;font-size:9px;margin-left:4px;cursor:pointer">복사</button>
+          <br>
+          <code style="color:#c084fc;word-break:break-all">adb shell appops set com.mns.mockgps android:mock_location allow</code>
+          <button onclick="navigator.clipboard.writeText('adb shell appops set com.mns.mockgps android:mock_location allow')" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:1px 6px;font-size:9px;margin-left:4px;cursor:pointer">복사</button>
+        </div>
+        <button id="mg-wiz-install" class="mg-btn primary" style="width:100%;margin-top:6px">🔄 다시 시도</button>
+      `;
+      document.getElementById('mg-wiz-install').addEventListener('click', mgWizInstallApp);
+    }
+  } catch (e) {
+    msg.innerHTML = `<span style="color:#f87171">통신 실패: ${e.message}</span>`;
+  } finally {
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.textContent = '📥 자동 설치 시작';
+    }
+  }
+}
+
+mgWizRefresh.addEventListener('click', mgPollState);
+
+// 메인 UI 안의 ADB 상태 영역 채우기 (allReady 시)
+async function refreshAdbStatusFull(devices, appInstalled, appRunning) {
+  mgAdbDot.className = 'mg-adb-dot connected';
+  mgAdbText.textContent = `연결됨: ${devices.join(', ')}`;
+  mgRelayCmdBox.style.display = 'none';
+  mgSetGated(false);
+  mgAppBox.style.display = 'block';
+  if (appInstalled && appRunning) {
+    mgAppDot.className = 'mg-adb-dot connected';
+    mgAppText.innerHTML = '<b style="color:#4ade80">MnsMockGps 실행 중</b>';
+    mgAppInstall.style.display = 'none';
+    mgAppLaunch.style.display = 'none';
+  } else if (appInstalled) {
+    mgAppDot.className = 'mg-adb-dot';
+    mgAppDot.style.background = '#fbbf24';
+    mgAppText.innerHTML = '앱 설치됨 · 서비스 중지 상태';
+    mgAppLaunch.style.display = '';
+    mgAppInstall.style.display = 'none';
+  }
+}
+
+// 기존 ADB 새로고침 — 메인 UI 의 새로고침 버튼 호환
+async function refreshAdbStatus() { return mgPollState(); }
 mgAdbRefresh.addEventListener('click', refreshAdbStatus);
+
+// ---- 자동 폴링 (10초마다) — 패널 열려있을 때만 ---- //
+let mgPollTimer = null;
+function mgStartPolling() {
+  if (mgPollTimer) return;
+  mgPollState();
+  mgPollTimer = setInterval(() => {
+    if (mockgpsPanel.classList.contains('open')) mgPollState();
+  }, 10000);
+}
+function mgStopPolling() {
+  if (mgPollTimer) { clearInterval(mgPollTimer); mgPollTimer = null; }
+}
+// 패널 열릴 때 즉시 + 폴링 시작
+const _origMockgpsObserver = new MutationObserver(() => {
+  if (mockgpsPanel.classList.contains('open')) mgStartPolling();
+  else mgStopPolling();
+});
+_origMockgpsObserver.observe(mockgpsPanel, { attributes: true, attributeFilter: ['class'] });
 
 // ---- MnsMockGps 앱 상태 ---- //
 function mgApkUrl() {

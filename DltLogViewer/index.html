@@ -1775,6 +1775,24 @@
   </div>
   <div class="mockgps-panel-body">
 
+    <!-- 설치 안내 다이얼로그 (위저드/메인 양쪽에서 공유, 항상 DOM 노출) -->
+    <div id="mg-install-dialog" style="display:none;padding:10px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:6px">
+      <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px" id="mg-install-title">설치</div>
+      <div id="mg-install-step1" style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);padding:8px;border-radius:6px;margin-bottom:8px">
+        <div style="font-size:11px;color:#4ade80;font-weight:700">✓ 명령이 클립보드에 복사되었습니다</div>
+      </div>
+      <div class="mg-hint" id="mg-install-steps" style="line-height:1.7;font-size:11px"></div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(56,189,248,0.2)">
+        <div class="mg-hint" style="margin-bottom:6px">또는 더블클릭으로 실행:</div>
+        <button id="mg-install-download" class="mg-btn">📥 설치 스크립트 다운로드</button>
+        <div id="mg-install-download-hint" class="mg-hint" style="margin-top:4px;display:none"></div>
+      </div>
+      <details style="margin-top:8px">
+        <summary class="mg-hint" style="cursor:pointer">실행될 명령 보기</summary>
+        <code id="mg-install-cmd" style="display:block;margin-top:4px;font-size:10px;padding:6px 8px;background:#0f172a;border-radius:4px;color:#c084fc;word-break:break-all;border:1px solid #334155"></code>
+      </details>
+    </div>
+
     <!-- ★★★ 위저드 (모두 준비되지 않았을 때만 노출) ★★★ -->
     <div id="mg-wizard" style="display:none">
       <!-- 진행 인디케이터 -->
@@ -1870,31 +1888,6 @@
       </div>
 
       <!-- 자동 설치 안내 다이얼로그 -->
-      <div id="mg-install-dialog" style="display:none;margin-top:8px;padding:10px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:6px">
-        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px" id="mg-install-title">설치</div>
-
-        <!-- Step 1: 복사됨 안내 -->
-        <div id="mg-install-step1" style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);padding:8px;border-radius:6px;margin-bottom:8px">
-          <div style="font-size:11px;color:#4ade80;font-weight:700">✓ 명령이 클립보드에 복사되었습니다</div>
-        </div>
-
-        <!-- Step 2: 터미널 안내 -->
-        <div class="mg-hint" id="mg-install-steps" style="line-height:1.7;font-size:11px">
-        </div>
-
-        <!-- 다운로드 대안 -->
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(56,189,248,0.2)">
-          <div class="mg-hint" style="margin-bottom:6px">또는 더블클릭으로 실행:</div>
-          <button id="mg-install-download" class="mg-btn">📥 설치 스크립트 다운로드</button>
-          <div id="mg-install-download-hint" class="mg-hint" style="margin-top:4px;display:none"></div>
-        </div>
-
-        <!-- 명령 보기 (펼침) -->
-        <details style="margin-top:8px">
-          <summary class="mg-hint" style="cursor:pointer">실행될 명령 보기</summary>
-          <code id="mg-install-cmd" style="display:block;margin-top:4px;font-size:10px;padding:6px 8px;background:#0f172a;border-radius:4px;color:#c084fc;word-break:break-all;border:1px solid #334155"></code>
-        </details>
-      </div>
       <div class="mg-hint" style="margin-top:6px" id="mg-setup-hint">
         릴레이 서버: <code>python3 adb-relay.py</code> (포트 21234)<br>
         <b>🔌 단말 연결</b> = adb forward(27042) + MnsMockGps 모의위치 앱 지정

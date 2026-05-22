@@ -118,11 +118,13 @@ function extractFirstJsonObject(text) {
   return null;
 }
 
-// Parse "RP-218-Traffic_MinTime" → { rpId: 218, rpOption: "Traffic_MinTime" }
-function parseRpLabel(label) {
-  const m = /^RP-(\d+)-(.+)$/.exec(label);
+// Parse RP 라벨 → { rpPrefix, rpId, rpOption, rawLabel }
+//  기존:  "RP-218-Traffic_MinTime"        → prefix=null,  id=218, option=Traffic_MinTime
+//  변경:  "RP-ROUTE-132-Traffic_Recommend" → prefix=ROUTE, id=132, option=Traffic_Recommend
+export function parseRpLabel(label) {
+  const m = /^RP-(?:([A-Za-z][A-Za-z0-9_]*)-)?(\d+)-(.+)$/.exec(label);
   if (!m) return null;
-  return { rpId: parseInt(m[1], 10), rpOption: m[2] };
+  return { rpPrefix: m[1] || null, rpId: parseInt(m[2], 10), rpOption: m[3], rawLabel: label };
 }
 
 // ---- Partial route payload extraction ------------------------------------ //
@@ -524,7 +526,7 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
         entry.timestamp, entry.endpoint || '', cleaned, payload);
       rr.rpId      = entry.rpId;
       rr.rpOption  = entry.rpOption;
-      rr.rpLabel   = `RP-${entry.rpId}-${entry.rpOption}`;
+      rr.rpLabel   = entry.rawLabel || `RP-${entry.rpId}-${entry.rpOption}`;
       rr.sessionId = entry.sessionId || null;
       rr.responseTimeMs = entry.responseTimeMs;
       rr.responseSize   = entry.responseSize;

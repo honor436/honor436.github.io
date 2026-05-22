@@ -920,8 +920,14 @@
       background: rgba(34,197,94,0.05);
       border-color: rgba(34,197,94,0.3);
       box-shadow: none;
-      padding: 10px 14px;
+      padding: 8px 14px;
     }
+    /* 완료된 카드는 헤더(체크 표시)만 남기고 본문 접기 */
+    .mg-wiz-card.done > *:not(.head) { display: none !important; }
+    .mg-wiz-card.done .head { margin-bottom: 0; }
+    /* 대기 카드도 헤더만 (현재 step 만 본문 노출) */
+    .mg-wiz-card.waiting > *:not(.head) { display: none !important; }
+    .mg-wiz-card.waiting .head { margin-bottom: 0; }
     .mg-wiz-card .head {
       display: flex;
       align-items: center;
@@ -1818,7 +1824,7 @@
       <div class="mg-wiz-card waiting" id="mg-wiz-step2" style="margin-top:10px">
         <div class="head"><span class="num">2</span><span class="title">📱 단말 연결</span><span class="check" style="display:none">✓</span></div>
         <div class="mg-hint" id="mg-wiz-step2-body" style="line-height:1.7">
-          USB 케이블로 단말 연결 또는 Android 에뮬레이터 실행 후 대기 중...
+          Android 에뮬레이터 실행 또는 실기기 USB 연결 대기 중...
         </div>
       </div>
 
@@ -2408,8 +2414,16 @@ async function mgPollState() {
       mgWizSetStep(2, 'current');
       mgWizSetStep(3, 'waiting');
       mgWizStep2Body.innerHTML =
-        'USB 케이블로 단말 연결 또는 Android 에뮬레이터 실행 후 대기 중...<br>' +
-        '<span style="color:var(--muted)">감지되면 자동으로 다음 단계로 진행됩니다.</span>';
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;animation:evPulse 1.2s infinite"></span>' +
+          '<b style="color:#fbbf24">단말 연결을 기다리는 중...</b>' +
+        '</div>' +
+        '<div style="line-height:1.8">' +
+          '아래 중 하나를 실행하세요:<br>' +
+          '<b>① Android 에뮬레이터 실행</b> (Android Studio → Device Manager → ▶)<br>' +
+          '<b>② 실기기를 USB 케이블로 연결</b> (USB 디버깅 허용)' +
+        '</div>' +
+        '<div style="color:var(--muted);margin-top:8px;font-size:10px">연결되면 자동으로 다음 단계로 넘어갑니다 (10초마다 자동 확인).</div>';
     } else if (!appInstalled) {
       mgWizSetStep(2, 'done');
       mgWizStep2Body.innerHTML = `<b style="color:#4ade80">연결됨:</b> ${devices.join(', ')}`;

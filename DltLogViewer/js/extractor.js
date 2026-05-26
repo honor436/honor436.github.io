@@ -485,7 +485,9 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
     : ALL_INTERESTING_STRINGS;
   // route 처리 시 멀티-청크 JSON 의 연속 라인(#RpLog 접두사 없는 조각)도 모두 봐야 하므로
   // 마커 필터를 비활성화한다. 약간 느려지지만 REQ JSON 누락을 방지한다.
-  const interestingMarkers = doRoute ? null : encodeMarkers(markerStrings);
+  // 마커 필터는 항상 켠다(대용량 성능). route 처리 시 멀티-청크 REQ JSON 의
+  // 마커 없는 연속 라인은 iterator 의 routeCapture 상태머신이 따로 yield 한다.
+  const interestingMarkers = encodeMarkers(markerStrings);
 
   // Track per-file progress for concurrent reporting
   const fileBytesDone = new Array(fileCount).fill(0);
@@ -554,7 +556,8 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
     for await (const record of iterateDltRecords(
       file,
       (fb, ft) => reportProgress(fileIndex, fb, ft),
-      interestingMarkers
+      interestingMarkers,
+      doRoute   // routeCapture: route 모드일 때 REQ 멀티-청크 연속 라인 캡처
     )) {
       const { text: line, timestamp } = record;
 
@@ -971,10 +974,19 @@ export function cleanAndParseRpReqBuffer(rawBuffer) {
   if (!rawBuffer) return { cleaned: '', parsed: null, parseError: 'empty buffer' };
   // 실제 LF/CR 만 제거 (JSON 문자열 안의 `\\n` escape 는 백슬래시+n 이므로 영향 없음)
   const cleaned = String(rawBuffer).replace(/[\r\n]/g, '');
+  // 1차: 버퍼 전체 파싱
   try {
     const parsed = JSON.parse(cleaned);
     return { cleaned, parsed, parseError: null };
-  } catch (e) {
-    return { cleaned, parsed: null, parseError: e.message };
+  } catch (e1) {
+    // 2차: 첫 번째 균형 잡힌 {...} 만 추출해서 파싱 (뒤에 바이너리 잡음이 붙은 경우 대응)
+    const firstObj = extractFirstJsonObject(cleaned);
+    if (firstObj) {
+      try {
+        const parsed = JSON.parse(firstObj);
+        return { cleaned: firstObj, parsed, parseError: null };
+      } catch (e2) { /* fall through */ }
+    }
+    return { cleaned, parsed: null, parseError: e1.message };
   }
 }

@@ -853,11 +853,152 @@
       flex-direction: column;
       gap: 12px;
     }
+
+    /* ====== Mock GPS Wizard (첫 사용자용) ====== */
+    .mg-wiz-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .mg-wiz-step-dot {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .mg-wiz-step-dot .dot {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: rgba(148,163,184,0.2);
+      border: 2px solid rgba(148,163,184,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: var(--muted);
+      transition: all 0.25s;
+    }
+    .mg-wiz-step-dot .label {
+      font-size: 9px; color: var(--muted); font-weight: 600;
+    }
+    .mg-wiz-step-dot.current .dot {
+      background: #a855f7;
+      border-color: #a855f7;
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.25);
+      transform: scale(1.1);
+    }
+    .mg-wiz-step-dot.current .label { color: #c084fc; }
+    .mg-wiz-step-dot.done .dot {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: #fff;
+    }
+    .mg-wiz-step-dot.done .label { color: #4ade80; }
+    .mg-wiz-bar {
+      flex: 1;
+      height: 2px;
+      background: rgba(148,163,184,0.3);
+      border-radius: 1px;
+    }
+    .mg-wiz-bar.done { background: #22c55e; }
+
+    .mg-wiz-card {
+      background: linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(124,58,237,0.08) 100%);
+      border: 1px solid rgba(168,85,247,0.35);
+      border-radius: 14px;
+      padding: 18px 16px;
+      box-shadow: 0 4px 14px rgba(168,85,247,0.15);
+    }
+    .mg-wiz-card.waiting {
+      background: rgba(148,163,184,0.05);
+      border: 1px dashed rgba(148,163,184,0.3);
+      box-shadow: none;
+      opacity: 0.7;
+    }
+    .mg-wiz-card.done {
+      background: rgba(34,197,94,0.05);
+      border-color: rgba(34,197,94,0.3);
+      box-shadow: none;
+      padding: 8px 14px;
+    }
+    /* 완료된 카드는 헤더(체크 표시)만 남기고 본문 접기 */
+    .mg-wiz-card.done > *:not(.head) { display: none !important; }
+    .mg-wiz-card.done .head { margin-bottom: 0; }
+    /* 대기 카드도 헤더만 (현재 step 만 본문 노출) */
+    .mg-wiz-card.waiting > *:not(.head) { display: none !important; }
+    .mg-wiz-card.waiting .head { margin-bottom: 0; }
+    .mg-wiz-card .head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .mg-wiz-card .head .num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #a855f7; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .mg-wiz-card.done .head .num { background: #22c55e; }
+    .mg-wiz-card.waiting .head .num { background: rgba(148,163,184,0.4); color: var(--muted); }
+    .mg-wiz-card .head .title {
+      font-size: 15px; font-weight: 800; color: var(--text);
+    }
+    .mg-wiz-card.waiting .head .title { color: var(--muted); font-weight: 600; }
+    .mg-wiz-card .head .check {
+      margin-left: auto;
+      font-size: 16px; color: #4ade80;
+    }
+    .mg-wiz-card .checklist {
+      list-style: none; padding: 0; margin: 0 0 12px 0;
+      font-size: 11px; color: var(--muted); line-height: 1.7;
+    }
+    .mg-wiz-card .checklist li::before { content: '✓ '; color: #4ade80; font-weight: 700; }
+
+    #mg-wiz-refresh {
+      margin-top: 6px;
+      align-self: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .mg-main-ready-badge {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.4);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #4ade80;
+      font-weight: 700;
+      text-align: center;
+    }
     .mg-section {
       background: rgba(168,85,247,0.06);
       border: 1px solid rgba(168,85,247,0.2);
       border-radius: 8px;
       padding: 10px 12px;
+      position: relative;
+      transition: opacity 0.2s;
+    }
+    /* ADB 미연결 시 ADB 외 섹션은 비활성화 (회색 + 점선 + 클릭 차단) */
+    .mg-section.mg-gated.mg-locked {
+      opacity: 0.4;
+      pointer-events: none;
+      border-style: dashed;
+      border-color: rgba(148,163,184,0.4);
+      background: rgba(148,163,184,0.04);
+    }
+    .mg-section.mg-gated.mg-locked::after {
+      content: '🔒 ADB 연결 후 사용 가능';
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      font-size: 9px;
+      color: var(--muted);
+      font-weight: 600;
+      background: rgba(15,23,42,0.7);
+      padding: 2px 6px;
+      border-radius: 4px;
     }
     .mg-section-title {
       font-size: 12px;
@@ -952,7 +1093,9 @@
       border-radius: 4px;
       overflow: hidden;
       margin: 6px 0;
+      cursor: pointer;
     }
+    .mg-progress-track.disabled { cursor: default; opacity: 0.6; }
     .mg-progress-bar {
       height: 100%;
       width: 0%;
@@ -962,6 +1105,34 @@
     .mg-hint { font-size: 10px; color: var(--muted); line-height: 1.5; }
     .mg-stat-line { font-size: 11px; color: var(--text); margin: 3px 0; }
     .mg-stat-line b { color: #c084fc; }
+    .mg-mode-tabs { display: flex; gap: 4px; }
+    .mg-mode-tab {
+      flex: 1;
+      padding: 6px 4px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,0.6);
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .mg-mode-tab:hover { border-color: #a855f7; color: #c084fc; }
+    .mg-mode-tab.active {
+      background: rgba(168,85,247,0.2);
+      color: #c084fc;
+      border-color: #a855f7;
+    }
+    .mg-select {
+      flex: 1;
+      padding: 4px 6px;
+      background: rgba(15,23,42,0.6);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 11px;
+    }
 
     /* Panel headers (shared) */
     .right-panel-header {
@@ -973,6 +1144,42 @@
       flex-shrink: 0;
     }
     .right-panel-header h2 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; }
+    /* ---- 도움말 아이콘 공통 ---- */
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: rgba(56,189,248,0.15);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      font-family: serif;
+      text-decoration: none;
+      cursor: pointer;
+      margin-left: 6px;
+      vertical-align: middle;
+      transition: all 0.15s;
+      border: 1px solid rgba(56,189,248,0.3);
+    }
+    .help-icon:hover {
+      background: var(--accent);
+      color: #fff;
+      transform: scale(1.1);
+    }
+    .help-icon.purple {
+      background: rgba(168,85,247,0.15);
+      color: #c084fc;
+      border-color: rgba(168,85,247,0.3);
+    }
+    .help-icon.purple:hover { background: #a855f7; color:#fff; }
+    .help-icon.green {
+      background: rgba(34,197,94,0.15);
+      color: #4ade80;
+      border-color: rgba(34,197,94,0.3);
+    }
+    .help-icon.green:hover { background: #22c55e; color:#fff; }
 
     /* DLT Analysis result panel */
     #dlt-right-panel .dlt-panel-body {
@@ -1254,7 +1461,7 @@
 
   <!-- Coordinate search -->
   <div id="coord-panel">
-    <h2>좌표 검색</h2>
+    <h2>좌표 검색<a href="help.html#coord" target="_blank" class="help-icon" title="좌표 검색 도움말 열기" rel="noopener">?</a></h2>
     <details class="coord-help">
       <summary>사용 방법</summary>
       <ul>
@@ -1285,7 +1492,7 @@
 
   <!-- Ruler / distance measurement -->
   <div id="ruler-panel">
-    <h2>줄자</h2>
+    <h2>줄자<a href="help.html#ruler" target="_blank" class="help-icon" title="줄자 도움말 열기" rel="noopener">?</a></h2>
     <div class="ruler-actions">
       <button id="ruler-toggle-btn">줄자 모드 OFF</button>
       <button id="ruler-clear-btn">지우기</button>
@@ -1301,7 +1508,7 @@
 
   <!-- SHP Link/Node Layer -->
   <div id="shp-panel">
-    <h2>링크/노드 레이어</h2>
+    <h2>링크/노드 레이어<a href="help.html#shp" target="_blank" class="help-icon" title="SHP 링크/노드 도움말 열기" rel="noopener">?</a></h2>
     <div class="shp-actions">
       <button class="shp-file-btn" id="shp-folder-btn">SHP 폴더 선택</button>
       <button id="shp-clear-btn">지우기</button>
@@ -1333,7 +1540,7 @@
 
   <!-- Traffic incidents (TMAP top-open) -->
   <div id="traffic-panel">
-    <h2>RTM</h2>
+    <h2>RTM<a href="help.html#traffic" target="_blank" class="help-icon" title="교통정보(RTM) 도움말 열기" rel="noopener">?</a></h2>
     <div class="traffic-actions">
       <button id="traffic-load-btn" class="traffic-main-btn">현재 영역 불러오기</button>
       <button id="traffic-load-all-btn" class="traffic-main-btn">전국 영역 불러오기</button>
@@ -1376,7 +1583,7 @@
 <!-- ======== TVAS Right Panel ======== -->
 <div id="tvas-right-panel" class="right-slide-panel">
   <div class="right-panel-header" style="border-left:3px solid #3b82f6">
-    <h2>경로 요청</h2>
+    <h2>경로 요청<a href="help.html#tvas" target="_blank" class="help-icon" title="경로 요청(TVAS) 도움말 열기" rel="noopener">?</a></h2>
   </div>
   <div id="tvas-panel-body">
     <!-- CORS Unblock 확장 프로그램 설치 안내 -->
@@ -1476,7 +1683,7 @@
 <!-- ======== DLT Analysis Right Panel ======== -->
 <div id="dlt-right-panel" class="right-slide-panel">
   <div class="right-panel-header" style="border-left:3px solid #22c55e">
-    <h2>DLT GPS Log</h2>
+    <h2>DLT GPS Log<a href="help.html#dlt" target="_blank" class="help-icon green" title="DLT GPS Log 도움말 열기" rel="noopener">?</a></h2>
   </div>
   <div class="dlt-panel-body">
     <!-- File drop zone -->
@@ -1570,20 +1777,70 @@
 <!-- ======== Mock GPS Right Panel ======== -->
 <div id="mockgps-right-panel" class="right-slide-panel">
   <div class="right-panel-header" style="border-left:3px solid #a855f7">
-    <h2>🛰️ Mock GPS</h2>
+    <h2>🛰️ Mock GPS<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="Mock GPS 도움말 열기" rel="noopener">?</a></h2>
   </div>
   <div class="mockgps-panel-body">
 
-    <!-- ON/OFF -->
-    <div class="mg-section">
-      <div class="mg-toggle">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--text)">Mock GPS 모드</div>
-          <div class="mg-hint" id="mg-mode-hint">OFF — 켜면 지도를 클릭해 주행 궤적을 그립니다.</div>
-        </div>
-        <div id="mg-switch" class="mg-switch"></div>
+    <!-- 설치 안내 다이얼로그 (위저드/메인 양쪽에서 공유, 항상 DOM 노출) -->
+    <div id="mg-install-dialog" style="display:none;padding:10px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.3);border-radius:6px">
+      <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px" id="mg-install-title">설치</div>
+      <div id="mg-install-step1" style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);padding:8px;border-radius:6px;margin-bottom:8px">
+        <div style="font-size:11px;color:#4ade80;font-weight:700">✓ 명령이 클립보드에 복사되었습니다</div>
+      </div>
+      <div class="mg-hint" id="mg-install-steps" style="line-height:1.7;font-size:11px"></div>
+      <div style="margin-top:8px;display:flex;gap:4px;align-items:stretch">
+        <code id="mg-install-cmd" style="flex:1;font-size:10px;padding:6px 8px;background:#0f172a;border-radius:4px;color:#c084fc;word-break:break-all;border:1px solid #334155"></code>
+        <button id="mg-install-copy" class="mg-btn primary" style="white-space:nowrap">📋 복사</button>
       </div>
     </div>
+
+    <!-- ★★★ 위저드 (모두 준비되지 않았을 때만 노출) ★★★ -->
+    <div id="mg-wizard" style="display:none">
+      <!-- 진행 인디케이터 -->
+      <div class="mg-wiz-indicator">
+        <div class="mg-wiz-step-dot" data-step="1"><div class="dot">1</div><div class="label">PC 설치</div></div>
+        <div class="mg-wiz-bar" data-bar="1"></div>
+        <div class="mg-wiz-step-dot" data-step="2"><div class="dot">2</div><div class="label">단말 연결</div></div>
+        <div class="mg-wiz-bar" data-bar="2"></div>
+        <div class="mg-wiz-step-dot" data-step="3"><div class="dot">3</div><div class="label">앱 설치</div></div>
+      </div>
+
+      <!-- Step 1: PC 설치 -->
+      <div class="mg-wiz-card" id="mg-wiz-step1" style="margin-top:12px">
+        <div class="head"><span class="num">1</span><span class="title">🖥 PC 설치</span><span class="check" style="display:none">✓</span></div>
+        <ul class="checklist">
+          <li>릴레이 서버 자동 설치</li>
+          <li>MnsMockGps APK 자동 다운로드</li>
+          <li>PC 부팅 시 자동 시작 등록</li>
+        </ul>
+        <div class="mg-btn-group">
+          <button id="mg-hero-mac" class="mg-btn primary" style="font-size:13px;padding:10px 12px">🍎 macOS / Linux</button>
+          <button id="mg-hero-win" class="mg-btn primary" style="font-size:13px;padding:10px 12px;background:#0078d4;border-color:#0078d4">🪟 Windows</button>
+        </div>
+        <div class="mg-hint" style="margin-top:6px;text-align:center">Python3 + ADB 필요</div>
+      </div>
+
+      <!-- Step 2: 단말 연결 -->
+      <div class="mg-wiz-card waiting" id="mg-wiz-step2" style="margin-top:10px">
+        <div class="head"><span class="num">2</span><span class="title">📱 단말 연결</span><span class="check" style="display:none">✓</span></div>
+        <div class="mg-hint" id="mg-wiz-step2-body" style="line-height:1.7">
+          Android 에뮬레이터 실행 또는 실기기 USB 연결 대기 중...
+        </div>
+      </div>
+
+      <!-- Step 3: 앱 설치 -->
+      <div class="mg-wiz-card waiting" id="mg-wiz-step3" style="margin-top:10px">
+        <div class="head"><span class="num">3</span><span class="title">📲 MnsMockGps 앱 설치</span><span class="check" style="display:none">✓</span></div>
+        <div id="mg-wiz-step3-body">
+          <div class="mg-hint" style="line-height:1.7">앞 단계 완료 후 자동 설치 진행</div>
+        </div>
+      </div>
+
+      <button id="mg-wiz-refresh" class="mg-btn" style="margin-top:10px">🔄 Step 상태 확인</button>
+    </div>
+
+    <!-- ★★★ 메인 UI (모두 준비된 경우에만 노출) ★★★ -->
+    <div id="mg-main-ui" style="display:none;flex-direction:column;gap:12px">
 
     <!-- ADB 연결 상태 -->
     <div class="mg-section">
@@ -1594,12 +1851,52 @@
       </div>
       <div class="mg-btn-group" style="margin-top:8px">
         <button id="mg-adb-refresh" class="mg-btn">새로고침</button>
+        <button id="mg-adb-setup" class="mg-btn primary">🔌 단말 연결</button>
       </div>
-      <div class="mg-hint" style="margin-top:6px">릴레이 서버: <code>python3 adb-relay.py</code> (포트 21234)</div>
+      <!-- PC 설치 (항상 노출) -->
+      <details style="margin-top:8px" id="mg-pc-install-details">
+        <summary class="mg-hint" style="cursor:pointer;font-weight:600;color:#c084fc">💻 PC 설치 (처음이거나 다른 PC에 설치 시)</summary>
+        <div class="mg-hint" style="margin:6px 0 8px;line-height:1.6">
+          한 번 설치하면 PC 부팅 시 릴레이가 자동 시작됩니다.<br>
+          (Python3 + ADB 필요)
+        </div>
+        <div class="mg-btn-group">
+          <button id="mg-install-mac-2" class="mg-btn primary" style="font-size:11px"> macOS / Linux</button>
+          <button id="mg-install-win-2" class="mg-btn primary" style="font-size:11px;background:#0078d4;border-color:#0078d4">🪟 Windows</button>
+        </div>
+      </details>
+      <!-- 앱 설치/실행 상태 박스 (ADB 연결 시에만 노출) -->
+      <div id="mg-app-status-box" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+          <span id="mg-app-dot" class="mg-adb-dot"></span>
+          <span id="mg-app-text" style="flex:1">앱 상태 확인 중...</span>
+        </div>
+        <div class="mg-btn-group" style="margin-top:6px">
+          <button id="mg-app-install" class="mg-btn primary" style="display:none">📥 자동 설치</button>
+          <button id="mg-app-launch"  class="mg-btn" style="display:none">▶ 앱 실행</button>
+        </div>
+      </div>
+      <div id="mg-relay-cmd-box" style="display:none;margin-top:8px;padding:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px">
+        <div style="font-size:11px;color:#f87171;font-weight:700;margin-bottom:6px">⚠️ 릴레이 서버가 실행되지 않았습니다</div>
+        <div class="mg-hint" style="margin-bottom:8px">
+          처음이라면 <b>자동 설치</b> 한 번이면 끝납니다 (Python3 + ADB 필요).<br>
+          이후엔 PC 부팅 시 릴레이가 자동으로 시작됩니다.
+        </div>
+        <div class="mg-btn-group">
+          <button id="mg-install-mac" class="mg-btn primary" style="font-size:11px"> macOS / Linux 자동 설치</button>
+          <button id="mg-install-win" class="mg-btn primary" style="font-size:11px;background:#0078d4;border-color:#0078d4">🪟 Windows 자동 설치</button>
+        </div>
+      </div>
+
+      <!-- 자동 설치 안내 다이얼로그 -->
+      <div class="mg-hint" style="margin-top:6px" id="mg-setup-hint">
+        릴레이 서버: <code>python3 adb-relay.py</code> (포트 21234)<br>
+        <b>🔌 단말 연결</b> = adb forward(27042) + MnsMockGps 모의위치 앱 지정
+      </div>
     </div>
 
-    <!-- 설정: 속도 / 정확도 -->
-    <div class="mg-section">
+    <!-- 설정: 속도 / Location.accuracy -->
+    <div class="mg-section mg-gated">
       <div class="mg-section-title">⚙️ 전송 설정</div>
       <div class="mg-row">
         <label>속도</label>
@@ -1607,41 +1904,100 @@
         <span class="mg-val" id="mg-speed-val">40 km/h</span>
       </div>
       <div class="mg-row">
-        <label>정확도</label>
-        <input type="range" id="mg-accuracy" min="1" max="50" step="1" value="5">
-        <span class="mg-val" id="mg-accuracy-val">5 m</span>
+        <label title="Android Location.accuracy 값 (m). 작을수록 정확한 GPS로 인식됩니다.">정확도</label>
+        <input type="range" id="mg-accuracy" min="0.5" max="100" step="0.5" value="5">
+        <span class="mg-val" id="mg-accuracy-val">5.0 m</span>
       </div>
-      <div class="mg-row">
-        <label>위성 수</label>
-        <input type="range" id="mg-satellites" min="0" max="20" step="1" value="10">
-        <span class="mg-val" id="mg-satellites-val">10개</span>
+      <div class="mg-row" style="margin-top:8px">
+        <label title="Location.extras Bundle의 'satellites' 키로 전송 (구식 LocationListener 호환)">위성 수</label>
+        <input type="range" id="mg-satellites" min="0" max="12" step="1" value="11">
+        <span class="mg-val" id="mg-satellites-val">11 개</span>
       </div>
-      <div class="mg-hint">속도는 궤적 보간 간격(1초당 이동거리), 정확도·위성수는 에뮬레이터로 함께 전송됩니다.</div>
+      <div class="mg-row" style="gap:4px;margin-top:-2px">
+        <label style="min-width:56px"></label>
+        <label style="display:flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer;font-size:10px">
+          <input type="checkbox" id="mg-sat-link" checked style="accent-color:#a855f7">
+          🔗 정확도와 연동 (정확도 ↑ → 위성 ↑, 정확도 ↓ → 위성 ↓)
+        </label>
+      </div>
+      <div class="mg-hint">
+        속도·<b>Location.accuracy</b>·방위각이 MnsMockGps 앱으로 전송됩니다.<br>
+        앱은 받은 값을 그대로 <code>Location.setAccuracy()</code>에 사용합니다.<br>
+        <b>위성 수</b>는 <code>Location.extras["satellites"]</code> 로 노출됩니다 (T맵 등 구식 API 호환). 최신 GnssStatus 콜백은 Mock 불가.
+      </div>
     </div>
 
-    <!-- 주행 궤적 -->
-    <div class="mg-section">
-      <div class="mg-section-title">🗺️ 주행 궤적</div>
-      <div class="mg-stat-line">점 개수: <b id="mg-point-count">0</b> 개 · 총 거리: <b id="mg-total-dist">0</b> m</div>
-      <div class="mg-btn-group" style="margin-top:8px">
-        <button id="mg-clear-path" class="mg-btn danger">궤적 지우기</button>
+    <!-- 소스 모드 선택 -->
+    <div class="mg-section mg-gated">
+      <div class="mg-section-title">📍 데이터 소스<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="3가지 모드 도움말 열기" rel="noopener">?</a></div>
+      <div class="mg-mode-tabs">
+        <button class="mg-mode-tab active" data-mode="draw">✏️ 드로잉</button>
+        <button class="mg-mode-tab" data-mode="tvas">🛣️ TVAS</button>
+        <button class="mg-mode-tab" data-mode="dlt">📋 DLT</button>
+      </div>
+
+      <!-- 드로잉 모드 -->
+      <div class="mg-mode-content" data-mode="draw">
+        <div class="mg-toggle" style="margin-top:8px;padding:6px 0;border-bottom:1px solid rgba(168,85,247,0.15)">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text)">지도 드로잉 모드<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="드로잉 모드 도움말" rel="noopener">?</a></div>
+            <div class="mg-hint" id="mg-mode-hint">OFF — 켜면 지도를 드래그해 주행 궤적을 그립니다.</div>
+          </div>
+          <div id="mg-switch" class="mg-switch"></div>
+        </div>
+        <div class="mg-stat-line" style="margin-top:8px">점 개수: <b id="mg-point-count">0</b> 개 · 총 거리: <b id="mg-total-dist">0</b> m</div>
+        <div class="mg-btn-group" style="margin-top:8px">
+          <button id="mg-clear-path" class="mg-btn danger">궤적 지우기</button>
+        </div>
+      </div>
+
+      <!-- TVAS 모드 -->
+      <div class="mg-mode-content" data-mode="tvas" style="display:none">
+        <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)">
+          🛣️ TVAS 모드<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="TVAS 모드 도움말" rel="noopener">?</a>
+        </div>
+        <div class="mg-hint" style="margin-bottom:6px">경로 요청 결과(TVAS)의 보간점(VX)을 따라 이동합니다. 속도 슬라이더로 보간 간격을 조정합니다.</div>
+        <div class="mg-stat-line" id="mg-tvas-status">경로 요청 결과가 없습니다. 먼저 '경로 요청' 탭에서 요청하세요.</div>
+        <div class="mg-btn-group" style="margin-top:8px">
+          <button id="mg-tvas-load" class="mg-btn primary">현재 TVAS 경로 불러오기</button>
+        </div>
+      </div>
+
+      <!-- DLT 모드 -->
+      <div class="mg-mode-content" data-mode="dlt" style="display:none">
+        <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)">
+          📋 DLT 모드<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="DLT 모드 도움말" rel="noopener">?</a>
+        </div>
+        <div class="mg-hint" style="margin-bottom:6px">DLT 로그에서 추출된 위치 데이터를 <b>원본 타임스탬프 그대로(1x 실시간)</b> 재현합니다. 정확도·위성수는 슬라이더 값으로 전송됩니다.</div>
+        <div class="mg-stat-line" id="mg-dlt-status">DLT 분석 결과가 없습니다. 먼저 'DLT GPS Log' 탭에서 분석하세요.</div>
+        <div class="mg-row" style="margin-top:6px">
+          <label>GPS 소스</label>
+          <select id="mg-dlt-source" class="mg-select">
+            <option value="gps_dr" selected>GPS / DR_GPS (Location 콜백)</option>
+            <option value="nmea">NMEA $GPRMC</option>
+          </select>
+        </div>
+        <div class="mg-btn-group" style="margin-top:8px">
+          <button id="mg-dlt-load" class="mg-btn primary">DLT 로그 불러오기</button>
+        </div>
       </div>
     </div>
 
     <!-- 전송 제어 -->
-    <div class="mg-section">
+    <div class="mg-section mg-gated">
       <div class="mg-section-title">▶ Mock GPS 전송</div>
       <div class="mg-btn-group">
         <button id="mg-play" class="mg-btn primary" disabled>▶ 시작</button>
         <button id="mg-pause" class="mg-btn warn" disabled>⏸ 일시정지</button>
         <button id="mg-stop" class="mg-btn danger" disabled>■ 정지</button>
       </div>
-      <div class="mg-progress-track"><div id="mg-progress-bar" class="mg-progress-bar"></div></div>
+      <div class="mg-progress-track" id="mg-progress-track" title="클릭으로 해당 위치로 이동"><div id="mg-progress-bar" class="mg-progress-bar"></div></div>
       <div class="mg-stat-line">진행: <b id="mg-progress-text">0 / 0</b></div>
       <div class="mg-stat-line">현재 좌표: <b id="mg-current-coord">-</b></div>
       <div class="mg-stat-line" id="mg-send-status" style="color:var(--muted)"></div>
     </div>
 
+    </div><!-- /#mg-main-ui -->
   </div>
 </div>
 
@@ -1662,8 +2018,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
-<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-<script type="module" src="js/shp-app.js?v=20260413"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script><script type="module" src="js/shp-app.js?v=20260413"></script>
 
 <!-- Traffic incident overlay -->
 <script type="module">
@@ -1746,6 +2101,12 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
+import {
+  haversineM as mgHaversineMImpl,
+  interpolatePath as mgInterpolatePathImpl,
+  reinterpolateFromCurrent as mgReinterpolateImpl,
+  indexFromProgress as mgIndexFromProgress,
+} from './js/mock-gps-playback.js';
 
 // ---- Right panel open/close ---- //
 const tvasPanel      = document.getElementById('tvas-right-panel');
@@ -1816,6 +2177,13 @@ const mgModeHint     = document.getElementById('mg-mode-hint');
 const mgAdbDot       = document.getElementById('mg-adb-dot');
 const mgAdbText      = document.getElementById('mg-adb-text');
 const mgAdbRefresh   = document.getElementById('mg-adb-refresh');
+const mgAdbSetup     = document.getElementById('mg-adb-setup');
+const mgAppBox       = document.getElementById('mg-app-status-box');
+const mgAppDot       = document.getElementById('mg-app-dot');
+const mgAppText      = document.getElementById('mg-app-text');
+const mgAppInstall   = document.getElementById('mg-app-install');
+const mgAppLaunch    = document.getElementById('mg-app-launch');
+const mgSetupHint    = document.getElementById('mg-setup-hint');
 const mgSpeed        = document.getElementById('mg-speed');
 const mgSpeedVal     = document.getElementById('mg-speed-val');
 const mgAccuracy     = document.getElementById('mg-accuracy');
@@ -1834,50 +2202,462 @@ const mgCurrentCoord = document.getElementById('mg-current-coord');
 const mgSendStatus   = document.getElementById('mg-send-status');
 
 let mgEnabled = false;
-let mgDrawPoints = [];          // [{lat, lng}, ...] 사용자가 찍은 궤적 점
+let mgMode = 'draw';            // 'draw' | 'tvas' | 'dlt'
+let mgDrawPoints = [];          // [{lat, lng}, ...] - 모든 모드의 원본 궤적
 let mgDrawPolyline = null;      // L.polyline
-let mgDrawMarkers = [];         // 각 점의 작은 마커
-let mgPlaybackCoords = [];      // 보간된 좌표 배열
+let mgDrawMarkers = [];         // 시작/끝 마커
+let mgPlaybackCoords = [];      // 재생용 좌표 (draw/tvas: 보간됨, dlt: 원본+타임스탬프)
 let mgPlaybackIdx = 0;
 let mgPlaybackTimer = null;
 let mgPlaybackState = 'idle';   // idle | playing | paused
 let mgCarMarker = null;
+let mgDltPlayMode = false;      // true면 setTimeout(타임스탬프) 재생, false면 1초 setInterval
 
 // ---- haversine 거리 (m) ---- //
-function mgHaversineM(a, b) {
-  const R = 6371000;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
+const mgHaversineM = mgHaversineMImpl;
+
+// ---- 방위각 (정북 기준 시계방향, 도) ---- //
+function mgBearingDeg(a, b) {
+  const lat1 = a.lat * Math.PI / 180, lat2 = b.lat * Math.PI / 180;
   const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const s = Math.sin(dLat/2)**2 +
-            Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.asin(Math.sqrt(s));
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) -
+            Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-// ---- ADB 상태 새로고침 ---- //
-async function refreshAdbStatus() {
-  mgAdbDot.className = 'mg-adb-dot';
-  mgAdbText.textContent = '확인 중...';
+// ---- 릴레이 미실행 안내 박스 토글 (자동 설치 버튼만 노출) ---- //
+const mgRelayCmdBox = document.getElementById('mg-relay-cmd-box');
+
+// ---- 자동 설치 ---- //
+const mgInstallMac      = document.getElementById('mg-install-mac');
+const mgInstallWin      = document.getElementById('mg-install-win');
+const mgInstallDialog   = document.getElementById('mg-install-dialog');
+const mgInstallTitle    = document.getElementById('mg-install-title');
+const mgInstallCmd      = document.getElementById('mg-install-cmd');
+const mgInstallSteps    = document.getElementById('mg-install-steps');
+const mgInstallCopy     = document.getElementById('mg-install-copy');
+
+let mgCurrentOs = 'mac';   // mac | win
+
+function mgScriptsBase() {
+  return new URL('scripts/', location.href).toString();
+}
+
+function mgBuildCmd(os) {
+  const base = mgScriptsBase();
+  return os === 'mac'
+    ? `curl -fsSL ${base}install.sh | bash`
+    : `iwr ${base}install.ps1 -UseBasicParsing | iex`;
+}
+
+function mgStepsHtml(os) {
+  if (os === 'mac') {
+    return `<b>1.</b> 터미널 열기 (<kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">⌘+Space</kbd> → "터미널" 검색 → Enter)<br>
+            <b>2.</b> 터미널에서 <kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">⌘+V</kbd> → <kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">Enter</kbd><br>
+            <b>3.</b> 30초 안에 설치 완료 → 이 페이지 새로고침`;
+  }
+  return `<b>1.</b> PowerShell 열기 (<kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">⊞+X</kbd> → "Windows PowerShell")<br>
+          <b>2.</b> <kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">Ctrl+V</kbd> → <kbd style="background:#1e293b;padding:1px 5px;border-radius:3px;font-size:10px;color:#c084fc">Enter</kbd><br>
+          <b>3.</b> 30초 안에 설치 완료 → 이 페이지 새로고침`;
+}
+
+async function mgShowInstall(os) {
+  mgCurrentOs = os;
+  const cmd = mgBuildCmd(os);
+  // 1) 즉시 클립보드 복사
+  let copied = false;
   try {
-    const res = await fetch(`${MG_RELAY}/devices`, { signal: AbortSignal.timeout(4000) });
-    const data = await res.json();
-    if (data.ok && data.devices && data.devices.length > 0) {
-      mgAdbDot.className = 'mg-adb-dot connected';
-      mgAdbText.textContent = `연결됨: ${data.devices.join(', ')}`;
-    } else {
-      mgAdbDot.className = 'mg-adb-dot error';
-      mgAdbText.textContent = data.error || '연결된 에뮬레이터 없음';
-    }
+    await navigator.clipboard.writeText(cmd);
+    copied = true;
+  } catch (_) { /* fallback below */ }
+  // 2) 다이얼로그 채우기
+  mgInstallTitle.textContent = os === 'mac' ? '🍎 macOS / Linux 설치' : '🪟 Windows 설치';
+  mgInstallCmd.textContent = cmd;
+  mgInstallSteps.innerHTML = mgStepsHtml(os);
+  document.getElementById('mg-install-step1').style.display = copied ? 'block' : 'none';
+  mgInstallDialog.style.display = 'block';
+}
+
+mgInstallMac.addEventListener('click', () => mgShowInstall('mac'));
+mgInstallWin.addEventListener('click', () => mgShowInstall('win'));
+
+// ADB 섹션 안의 PC 설치 details — 같은 핸들러 재사용
+const mgInstallMac2 = document.getElementById('mg-install-mac-2');
+const mgInstallWin2 = document.getElementById('mg-install-win-2');
+mgInstallMac2.addEventListener('click', () => mgShowInstall('mac'));
+mgInstallWin2.addEventListener('click', () => mgShowInstall('win'));
+
+// 히어로/위저드 카드 버튼 — 같은 핸들러
+const mgHeroMac = document.getElementById('mg-hero-mac');
+const mgHeroWin = document.getElementById('mg-hero-win');
+mgHeroMac.addEventListener('click', () => mgShowInstall('mac'));
+mgHeroWin.addEventListener('click', () => mgShowInstall('win'));
+
+// 명령 복사 버튼
+mgInstallCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(mgInstallCmd.textContent);
+    const orig = mgInstallCopy.textContent;
+    mgInstallCopy.textContent = '✓ 복사됨';
+    setTimeout(() => { mgInstallCopy.textContent = orig; }, 1500);
   } catch (e) {
-    mgAdbDot.className = 'mg-adb-dot error';
-    mgAdbText.textContent = '릴레이 서버 응답 없음 (adb-relay.py 실행 필요)';
+    const range = document.createRange();
+    range.selectNodeContents(mgInstallCmd);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    alert('자동 복사 실패. 강조된 텍스트를 Cmd/Ctrl+C로 복사하세요.');
+  }
+});
+
+// OS 자동 감지 → 해당 버튼 강조 (모든 install 버튼)
+(function highlightOsButton() {
+  const ua = navigator.userAgent.toLowerCase();
+  const isWin = ua.includes('win');
+  const isMacLinux = ua.includes('mac') || ua.includes('linux');
+  if (isWin) {
+    [mgInstallWin, mgInstallWin2, mgHeroWin].forEach(b => b && (b.style.boxShadow = '0 0 0 3px #93c5fd, 0 4px 10px rgba(0,0,0,0.2)'));
+  } else if (isMacLinux) {
+    [mgInstallMac, mgInstallMac2, mgHeroMac].forEach(b => b && (b.style.boxShadow = '0 0 0 3px #fbbf24, 0 4px 10px rgba(0,0,0,0.2)'));
+  }
+})();
+
+// ---- 게이트 토글: ADB 연결 시 모든 mg-gated 섹션 활성화 ---- //
+function mgSetGated(locked) {
+  document.querySelectorAll('.mg-section.mg-gated').forEach(el => {
+    el.classList.toggle('mg-locked', locked);
+  });
+}
+// 초기: 잠금
+mgSetGated(true);
+
+// ---- 위저드 / 메인 UI 토글 + 상태 폴링 ---- //
+const mgWizard       = document.getElementById('mg-wizard');
+const mgMainUi       = document.getElementById('mg-main-ui');
+const mgWizStep1     = document.getElementById('mg-wiz-step1');
+const mgWizStep2     = document.getElementById('mg-wiz-step2');
+const mgWizStep3     = document.getElementById('mg-wiz-step3');
+const mgWizStep2Body = document.getElementById('mg-wiz-step2-body');
+const mgWizStep3Body = document.getElementById('mg-wiz-step3-body');
+const mgWizRefresh   = document.getElementById('mg-wiz-refresh');
+
+function mgWizSetStep(num, state) {
+  // num: 1|2|3, state: 'waiting' | 'current' | 'done'
+  const card = num === 1 ? mgWizStep1 : num === 2 ? mgWizStep2 : mgWizStep3;
+  card.classList.remove('waiting', 'done');
+  if (state !== 'current') card.classList.add(state);
+  card.querySelector('.check').style.display = state === 'done' ? '' : 'none';
+
+  // 인디케이터 dot
+  const dot = document.querySelector(`.mg-wiz-step-dot[data-step="${num}"]`);
+  dot.classList.remove('current', 'done');
+  if (state === 'done') {
+    dot.classList.add('done');
+    dot.querySelector('.dot').textContent = '✓';
+  } else if (state === 'current') {
+    dot.classList.add('current');
+    dot.querySelector('.dot').textContent = String(num);
+  } else {
+    dot.querySelector('.dot').textContent = String(num);
+  }
+  // 인디케이터 bar (이전 step 의 완료 여부에 따라)
+  if (num <= 2) {
+    const bar = document.querySelector(`.mg-wiz-bar[data-bar="${num}"]`);
+    bar.classList.toggle('done', state === 'done');
   }
 }
+
+async function mgPollState() {
+  // 1) 릴레이 ping
+  let relayUp = false, devices = [], appInstalled = false, appRunning = false;
+  try {
+    const res = await fetch(`${MG_RELAY}/ping`, { signal: AbortSignal.timeout(3000) });
+    const d = await res.json();
+    relayUp = !!d.status;
+  } catch (_) {}
+
+  if (relayUp) {
+    // 2) devices
+    try {
+      const res = await fetch(`${MG_RELAY}/devices`, { signal: AbortSignal.timeout(3000) });
+      const d = await res.json();
+      if (d.ok) devices = d.devices || [];
+    } catch (_) {}
+    // 3) app status
+    if (devices.length > 0) {
+      try {
+        const res = await fetch(`${MG_RELAY}/app-status`, { signal: AbortSignal.timeout(3000) });
+        const d = await res.json();
+        if (d.ok) { appInstalled = !!d.installed; appRunning = !!d.serviceRunning; }
+      } catch (_) {}
+    }
+  }
+
+  const adbConnected = devices.length > 0;
+  const allReady = relayUp && adbConnected && appInstalled;
+
+  // === 위저드 ↔ 메인 토글 ===
+  if (allReady) {
+    mgWizard.style.display = 'none';
+    mgMainUi.style.display = 'flex';
+    // 메인 UI 안의 ADB 상태 영역 동기화
+    await refreshAdbStatusFull(devices, appInstalled, appRunning);
+  } else {
+    mgWizard.style.display = '';
+    mgMainUi.style.display = 'none';
+    // Step 상태 갱신
+    mgWizSetStep(1, relayUp ? 'done' : 'current');
+    if (!relayUp) {
+      mgWizSetStep(2, 'waiting');
+      mgWizSetStep(3, 'waiting');
+    } else if (!adbConnected) {
+      mgWizSetStep(2, 'current');
+      mgWizSetStep(3, 'waiting');
+      mgWizStep2Body.innerHTML =
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;animation:evPulse 1.2s infinite"></span>' +
+          '<b style="color:#fbbf24">단말 연결을 기다리는 중...</b>' +
+        '</div>' +
+        '<div style="line-height:1.8">' +
+          '아래 중 하나를 실행하세요:<br>' +
+          '<b>① Android 에뮬레이터 실행</b> (Android Studio → Device Manager → ▶)<br>' +
+          '<b>② 실기기를 USB 케이블로 연결</b> (USB 디버깅 허용)' +
+        '</div>' +
+        '<div style="color:var(--muted);margin-top:8px;font-size:10px">연결되면 자동으로 다음 단계로 넘어갑니다 (10초마다 자동 확인).</div>';
+    } else if (!appInstalled) {
+      mgWizSetStep(2, 'done');
+      mgWizStep2Body.innerHTML = `<b style="color:#4ade80">연결됨:</b> ${devices.join(', ')}`;
+      mgWizSetStep(3, 'current');
+      // 자동 설치 시도 안내 + 버튼
+      if (!mgWizStep3Body.dataset.rendered) {
+        mgWizStep3Body.innerHTML = `
+          <div class="mg-hint" style="line-height:1.7;margin-bottom:8px">APK 자동 다운로드 + adb install + 권한 설정</div>
+          <button id="mg-wiz-install" class="mg-btn primary" style="width:100%">📥 자동 설치 시작</button>
+          <div id="mg-wiz-install-msg" class="mg-hint" style="margin-top:6px"></div>
+        `;
+        mgWizStep3Body.dataset.rendered = '1';
+        document.getElementById('mg-wiz-install').addEventListener('click', mgWizInstallApp);
+      }
+    }
+  }
+}
+
+async function mgWizInstallApp() {
+  const btn = document.getElementById('mg-wiz-install');
+  const msg = document.getElementById('mg-wiz-install-msg');
+  btn.disabled = true;
+  btn.textContent = '⏳ 설치 중...';
+  msg.innerHTML = 'APK 다운로드 + adb install + 권한 설정 진행 중...';
+  try {
+    const url = `${MG_RELAY}/install-app?url=${encodeURIComponent(mgApkUrl())}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    const data = await res.json();
+    if (data.ok) {
+      msg.innerHTML = `<span style="color:#4ade80">✓ 설치 완료 (${Math.round((data.apkSize||0)/1024)}KB)</span>`;
+      // 자동으로 다음 폴링이 메인 UI 로 전환해줌
+      setTimeout(mgPollState, 500);
+    } else {
+      msg.innerHTML = `
+        <div style="color:#f87171;margin-bottom:6px">✗ 자동 설치 실패: ${data.error || 'unknown'}</div>
+        <div style="background:rgba(15,23,42,0.6);border-radius:6px;padding:8px;font-size:10px;line-height:1.6">
+          <div style="color:var(--muted);margin-bottom:4px">수동 설치:</div>
+          <code style="color:#c084fc;word-break:break-all">adb install -r ~/.mockgps/MnsMockGps.apk</code>
+          <button onclick="navigator.clipboard.writeText('adb install -r ~/.mockgps/MnsMockGps.apk')" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:1px 6px;font-size:9px;margin-left:4px;cursor:pointer">복사</button>
+          <br>
+          <code style="color:#c084fc;word-break:break-all">adb shell appops set com.mns.mockgps android:mock_location allow</code>
+          <button onclick="navigator.clipboard.writeText('adb shell appops set com.mns.mockgps android:mock_location allow')" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:1px 6px;font-size:9px;margin-left:4px;cursor:pointer">복사</button>
+        </div>
+        <button id="mg-wiz-install" class="mg-btn primary" style="width:100%;margin-top:6px">🔄 다시 시도</button>
+      `;
+      document.getElementById('mg-wiz-install').addEventListener('click', mgWizInstallApp);
+    }
+  } catch (e) {
+    msg.innerHTML = `<span style="color:#f87171">통신 실패: ${e.message}</span>`;
+  } finally {
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.textContent = '📥 자동 설치 시작';
+    }
+  }
+}
+
+mgWizRefresh.addEventListener('click', mgPollState);
+
+// 메인 UI 안의 ADB 상태 영역 채우기 (allReady 시)
+async function refreshAdbStatusFull(devices, appInstalled, appRunning) {
+  mgAdbDot.className = 'mg-adb-dot connected';
+  mgAdbText.textContent = `연결됨: ${devices.join(', ')}`;
+  mgRelayCmdBox.style.display = 'none';
+  mgSetGated(false);
+  mgAppBox.style.display = 'block';
+  if (appInstalled && appRunning) {
+    mgAppDot.className = 'mg-adb-dot connected';
+    mgAppText.innerHTML = '<b style="color:#4ade80">MnsMockGps 실행 중</b>';
+    mgAppInstall.style.display = 'none';
+    mgAppLaunch.style.display = 'none';
+  } else if (appInstalled) {
+    mgAppDot.className = 'mg-adb-dot';
+    mgAppDot.style.background = '#fbbf24';
+    mgAppText.innerHTML = '앱 설치됨 · 서비스 중지 상태';
+    mgAppLaunch.style.display = '';
+    mgAppInstall.style.display = 'none';
+  }
+}
+
+// 기존 ADB 새로고침 — 메인 UI 의 새로고침 버튼 호환
+async function refreshAdbStatus() { return mgPollState(); }
 mgAdbRefresh.addEventListener('click', refreshAdbStatus);
 
+// ---- 자동 폴링 (10초마다) — 패널 열려있을 때만 ---- //
+let mgPollTimer = null;
+function mgStartPolling() {
+  if (mgPollTimer) return;
+  mgPollState();
+  mgPollTimer = setInterval(() => {
+    if (mockgpsPanel.classList.contains('open')) mgPollState();
+  }, 10000);
+}
+function mgStopPolling() {
+  if (mgPollTimer) { clearInterval(mgPollTimer); mgPollTimer = null; }
+}
+// 패널 열릴 때 즉시 + 폴링 시작
+const _origMockgpsObserver = new MutationObserver(() => {
+  if (mockgpsPanel.classList.contains('open')) mgStartPolling();
+  else mgStopPolling();
+});
+_origMockgpsObserver.observe(mockgpsPanel, { attributes: true, attributeFilter: ['class'] });
+
+// ---- MnsMockGps 앱 상태 ---- //
+function mgApkUrl() {
+  // 현재 페이지가 호스팅된 위치 기반으로 APK 절대 URL 계산
+  // 예: http://localhost:8080/DltLogViewer/  →  http://localhost:8080/DltLogViewer/assets/MnsMockGps.apk
+  return new URL('assets/MnsMockGps.apk', location.href).toString();
+}
+
+async function refreshAppStatus() {
+  mgAppDot.className = 'mg-adb-dot';
+  mgAppText.textContent = '앱 상태 확인 중...';
+  mgAppInstall.style.display = 'none';
+  mgAppLaunch.style.display = 'none';
+  try {
+    const res = await fetch(`${MG_RELAY}/app-status`, { signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+    if (!data.ok) {
+      mgAppDot.className = 'mg-adb-dot error';
+      mgAppText.textContent = data.error || '앱 상태 확인 실패';
+      return;
+    }
+    if (data.installed && data.serviceRunning) {
+      mgAppDot.className = 'mg-adb-dot connected';
+      mgAppText.innerHTML = '<b style="color:#4ade80">MnsMockGps 실행 중</b>';
+    } else if (data.installed) {
+      mgAppDot.className = 'mg-adb-dot';
+      mgAppDot.style.background = '#fbbf24';
+      mgAppText.innerHTML = '앱 설치됨 · 서비스 중지 상태';
+      mgAppLaunch.style.display = '';
+    } else {
+      mgAppDot.className = 'mg-adb-dot error';
+      mgAppText.innerHTML = '<b>앱 미설치</b> — 자동 설치할 수 있습니다';
+      mgAppInstall.style.display = '';
+    }
+  } catch (e) {
+    mgAppDot.className = 'mg-adb-dot error';
+    mgAppText.textContent = '앱 상태 조회 실패';
+  }
+}
+
+mgAppInstall.addEventListener('click', async () => {
+  mgAppInstall.disabled = true;
+  const orig = mgAppInstall.textContent;
+  mgAppInstall.textContent = '⏳ 다운로드 + 설치 중...';
+  mgAppText.textContent = `APK 다운로드 중 (${mgApkUrl()})...`;
+  try {
+    const url = `${MG_RELAY}/install-app?url=${encodeURIComponent(mgApkUrl())}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    const data = await res.json();
+    if (data.ok) {
+      mgAppText.innerHTML = `<b style="color:#4ade80">설치 완료</b> (${Math.round((data.downloadedSize||0)/1024)}KB · adb forward·appops 자동 적용)`;
+      // 잠시 후 상태 다시 확인
+      setTimeout(refreshAppStatus, 1000);
+    } else {
+      mgAppText.innerHTML = `<span style="color:#f87171">설치 실패: ${data.error || 'unknown'}</span>`;
+    }
+  } catch (e) {
+    mgAppText.innerHTML = `<span style="color:#f87171">통신 실패: ${e.message}</span>`;
+  } finally {
+    mgAppInstall.disabled = false;
+    mgAppInstall.textContent = orig;
+  }
+});
+
+mgAppLaunch.addEventListener('click', async () => {
+  mgAppLaunch.disabled = true;
+  try {
+    await fetch(`${MG_RELAY}/launch-app`, { signal: AbortSignal.timeout(5000) });
+    mgAppText.textContent = '앱 실행됨 — 단말에서 "시작" 버튼을 눌러주세요';
+    setTimeout(refreshAppStatus, 1500);
+  } catch (e) {
+    mgAppText.innerHTML = `<span style="color:#f87171">실행 실패: ${e.message}</span>`;
+  } finally {
+    mgAppLaunch.disabled = false;
+  }
+});
+
+// ---- 단말 연결 (adb forward + 모의위치 앱 지정) ---- //
+mgAdbSetup.addEventListener('click', async () => {
+  mgAdbSetup.disabled = true;
+  mgSetupHint.innerHTML = '단말 연결 중...';
+  try {
+    const res = await fetch(`${MG_RELAY}/setup`, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    const fwd = data.forward && data.forward.ok;
+    const ops = data.appops && data.appops.ok;
+    mgSetupHint.innerHTML =
+      `adb forward(27042): ${fwd ? '<span style="color:#4ade80">OK</span>' : '<span style="color:#f87171">실패</span>'} · ` +
+      `모의위치 앱 지정: ${ops ? '<span style="color:#4ade80">OK</span>' : '<span style="color:#f87171">실패 — 단말 개발자옵션에서 직접 지정 필요</span>'}`;
+  } catch (e) {
+    mgSetupHint.innerHTML = '<span style="color:#f87171">릴레이 서버 응답 없음 (adb-relay.py 실행 필요)</span>';
+  }
+  mgAdbSetup.disabled = false;
+});
+
 // ---- 슬라이더 값 표시 ---- //
-mgSpeed.addEventListener('input', () => { mgSpeedVal.textContent = `${mgSpeed.value} km/h`; });
-mgAccuracy.addEventListener('input', () => { mgAccuracyVal.textContent = `${mgAccuracy.value} m`; });
-mgSatellites.addEventListener('input', () => { mgSatellitesVal.textContent = `${mgSatellites.value}개`; });
+function mgFmtAcc(v) { return `${Number(v).toFixed(1)} m`; }
+
+// 정확도(m) → 위성 수 매핑: 0.5m=12개, 100m=0개 (선형 반비례)
+function mgAccToSat(acc) {
+  const t = Math.max(0, Math.min(1, (acc - 0.5) / 99.5));
+  return Math.max(0, Math.min(12, Math.round(12 * (1 - t))));
+}
+function mgSyncSatFromAcc() {
+  const link = document.getElementById('mg-sat-link');
+  if (!link || !link.checked) return;
+  const sat = mgAccToSat(Number(mgAccuracy.value));
+  mgSatellites.value = sat;
+  mgSatellitesVal.textContent = `${sat} 개`;
+}
+
+function mgFmtSpeedLabel() {
+  const v = mgSpeed.value;
+  if (mgMode === 'dlt') {
+    const x = (Number(v) / 40).toFixed(2);
+    return `${v} km/h (×${x})`;
+  }
+  return `${v} km/h`;
+}
+mgSpeed.addEventListener('input', () => {
+  mgSpeedVal.textContent = mgFmtSpeedLabel();
+  mgOnSpeedChangedDuringPlayback();
+});
+mgAccuracy.addEventListener('input', () => {
+  mgAccuracyVal.textContent = mgFmtAcc(mgAccuracy.value);
+  mgSyncSatFromAcc();
+});
+mgSatellites.addEventListener('input', () => { mgSatellitesVal.textContent = `${mgSatellites.value} 개`; });
+// 연동 체크박스 토글 시 즉시 sync
+document.getElementById('mg-sat-link').addEventListener('change', mgSyncSatFromAcc);
+// 초기 sync (기본 정확도 5m → 위성 약 11개)
+mgSyncSatFromAcc();
 
 // ---- 궤적 통계 갱신 ---- //
 function mgUpdateStats() {
@@ -1891,25 +2671,80 @@ function mgUpdateStats() {
   mgPlay.disabled = !(mgDrawPoints.length >= 2 && mgPlaybackState === 'idle');
 }
 
-// ---- 지도 클릭 → 궤적 점 추가 ---- //
-function mgOnMapClick(e) {
-  if (!mgEnabled || mgPlaybackState !== 'idle') return;
+// ---- 지도 드래그 → 자유 선 그리기 ---- //
+let mgDrawing = false;
+
+function mgAddDrawPoint(latlng) {
   const map = getMap();
   if (!map) return;
-  const latlng = e.latlng;
   mgDrawPoints.push({ lat: latlng.lat, lng: latlng.lng });
-  // 폴리라인
   if (!mgDrawPolyline) {
-    mgDrawPolyline = L.polyline([latlng], { color: '#a855f7', weight: 4, dashArray: '8,5', opacity: 0.9 }).addTo(map);
+    mgDrawPolyline = L.polyline([latlng], { color: '#a855f7', weight: 4, opacity: 0.9 }).addTo(map);
   } else {
     mgDrawPolyline.addLatLng(latlng);
   }
-  // 점 마커
-  const m = L.circleMarker(latlng, {
-    radius: 5, color: '#fff', weight: 2, fillColor: '#a855f7', fillOpacity: 1,
-  }).addTo(map);
-  mgDrawMarkers.push(m);
   mgUpdateStats();
+}
+
+function mgOnMapMousedown(e) {
+  if (!mgEnabled || mgPlaybackState !== 'idle') return;
+  // 좌클릭만 처리 (마우스 휠/우클릭 등 무시)
+  if (e.originalEvent && e.originalEvent.button !== 0) return;
+  mgDrawing = true;
+  mgClearTrajectory();
+  if (e.originalEvent) e.originalEvent.preventDefault();
+  mgAddDrawPoint(e.latlng);
+}
+
+function mgOnMapMousemove(e) {
+  if (!mgDrawing) return;
+  const last = mgDrawPoints[mgDrawPoints.length - 1];
+  if (last) {
+    const d = mgHaversineM(last, { lat: e.latlng.lat, lng: e.latlng.lng });
+    if (d < 2) return;  // 너무 가까우면 스킵
+  }
+  mgAddDrawPoint(e.latlng);
+}
+
+function mgOnMapMouseup() {
+  if (!mgDrawing) return;
+  mgDrawing = false;
+  const map = getMap();
+  // 출발/도착 마커
+  if (mgDrawPoints.length >= 2 && map) {
+    const s = mgDrawPoints[0];
+    const e2 = mgDrawPoints[mgDrawPoints.length - 1];
+    const startM = L.circleMarker([s.lat, s.lng], {
+      radius: 7, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1,
+    }).bindTooltip('출발', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map);
+    const endM = L.circleMarker([e2.lat, e2.lng], {
+      radius: 7, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1,
+    }).bindTooltip('도착', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map);
+    mgDrawMarkers.push(startM, endM);
+  }
+}
+
+function mgAttachDrawHandlers(map) {
+  if (!map) return;
+  // Leaflet 기본 팬/박스줌 비활성화 (모드 ON 동안 자유 그리기 전용)
+  map.dragging.disable();
+  map.boxZoom.disable();
+  map.on('mousedown', mgOnMapMousedown);
+  map.on('mousemove', mgOnMapMousemove);
+  map.on('mouseup', mgOnMapMouseup);
+  // window 레벨에서도 mouseup 잡기 (지도 밖에서 손 떼는 경우)
+  window.addEventListener('mouseup', mgOnMapMouseup);
+  map.getContainer().style.cursor = 'crosshair';
+}
+function mgDetachDrawHandlers(map) {
+  if (!map) return;
+  map.off('mousedown', mgOnMapMousedown);
+  map.off('mousemove', mgOnMapMousemove);
+  map.off('mouseup', mgOnMapMouseup);
+  window.removeEventListener('mouseup', mgOnMapMouseup);
+  map.dragging.enable();
+  map.boxZoom.enable();
+  map.getContainer().style.cursor = '';
 }
 
 // ---- 궤적 지우기 ---- //
@@ -1927,62 +2762,63 @@ mgClearPath.addEventListener('click', () => {
 });
 
 // ---- ON/OFF 토글 ---- //
+function mgUpdateDrawHandlerState() {
+  const map = getMap();
+  if (!map) return;
+  // draw 모드 + ON 일 때만 드래그 핸들러 부착
+  if (mgEnabled && mgMode === 'draw') {
+    mgAttachDrawHandlers(map);
+  } else {
+    mgDetachDrawHandlers(map);
+  }
+}
 mgSwitch.addEventListener('click', () => {
   mgEnabled = !mgEnabled;
   mgSwitch.classList.toggle('on', mgEnabled);
-  const map = getMap();
-  if (mgEnabled) {
-    mgModeHint.textContent = 'ON — 지도를 클릭해 주행 궤적을 추가하세요.';
-    if (map) {
-      map.on('click', mgOnMapClick);
-      map.getContainer().style.cursor = 'crosshair';
-    }
-  } else {
-    mgModeHint.textContent = 'OFF — 켜면 지도를 클릭해 주행 궤적을 그립니다.';
-    if (map) {
-      map.off('click', mgOnMapClick);
-      map.getContainer().style.cursor = '';
-    }
+  mgModeHint.textContent = mgEnabled
+    ? 'ON — 지도를 드래그해 주행 궤적을 그리세요.'
+    : 'OFF — 켜면 지도를 드래그해 주행 궤적을 그립니다.';
+  mgUpdateDrawHandlerState();
+});
+
+// ---- 모드 탭 전환 ---- //
+const mgModeTabs = document.querySelectorAll('.mg-mode-tab');
+const mgModeContents = document.querySelectorAll('.mg-mode-content');
+mgModeTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
     if (mgPlaybackState !== 'idle') mgStopPlayback();
-  }
+    mgMode = tab.dataset.mode;
+    mgModeTabs.forEach(t => t.classList.toggle('active', t === tab));
+    mgModeContents.forEach(c => c.style.display = (c.dataset.mode === mgMode) ? '' : 'none');
+    // 모드 전환 시 이전 궤적 정리 + 드로잉 핸들러 상태 갱신
+    mgClearTrajectory();
+    mgUpdateDrawHandlerState();
+    mgSpeedVal.textContent = mgFmtSpeedLabel();
+  });
 });
 
 // ---- 속도 기반 좌표 보간 (1초 간격) ---- //
-function mgInterpolatePath(points, speedKmh) {
-  const stepM = Math.max(1, speedKmh * 1000 / 3600); // m/s = 1초당 이동거리
-  const coords = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i], b = points[i+1];
-    const dist = mgHaversineM(a, b);
-    const steps = Math.max(1, Math.round(dist / stepM));
-    for (let s = 0; s < steps; s++) {
-      const t = s / steps;
-      coords.push({
-        lat: a.lat + (b.lat - a.lat) * t,
-        lng: a.lng + (b.lng - a.lng) * t,
-      });
-    }
-  }
-  coords.push(points[points.length - 1]);
-  return coords;
-}
+const mgInterpolatePath = mgInterpolatePathImpl;
 
-// ---- Mock GPS 1좌표 전송 ---- //
-async function mgSendCoord(lat, lng) {
+// ---- Mock GPS 1좌표 전송 (→ 릴레이 → MnsMockGps 앱) ---- //
+async function mgSendCoord(lat, lng, bearing) {
   const accuracy   = Number(mgAccuracy.value);
+  const speedKmh   = Number(mgSpeed.value);
   const satellites = Number(mgSatellites.value);
-  const speed      = Number(mgSpeed.value);
-  const url = `${MG_RELAY}/mock-gps?lat=${lat}&lon=${lng}`
-            + `&accuracy=${accuracy}&satellites=${satellites}&speed=${speed}`;
+  let url = `${MG_RELAY}/mock-gps?lat=${lat}&lon=${lng}`
+          + `&accuracy=${accuracy}&speed_kmh=${speedKmh}&satellites=${satellites}`;
+  if (bearing != null && !Number.isNaN(bearing)) url += `&bearing=${bearing.toFixed(1)}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     const data = await res.json();
     if (data.ok) {
       mgSendStatus.style.color = '#4ade80';
-      mgSendStatus.textContent = `전송 OK (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+      mgSendStatus.textContent = `전송 OK (${lat.toFixed(5)}, ${lng.toFixed(5)}`
+        + (bearing != null ? `, ${bearing.toFixed(0)}°` : '') + ')';
     } else {
       mgSendStatus.style.color = '#f87171';
-      mgSendStatus.textContent = `전송 실패: ${data.error || data.stderr || 'unknown'}`;
+      const err = data.error || (data.app_response && data.app_response.error) || 'unknown';
+      mgSendStatus.textContent = `전송 실패: ${err}`;
     }
   } catch (e) {
     mgSendStatus.style.color = '#f87171';
@@ -2000,9 +2836,22 @@ function mgUpdatePlaybackUI() {
   mgPause.disabled = mgPlaybackState !== 'playing';
   mgStop.disabled  = mgPlaybackState === 'idle';
   mgPlay.textContent = mgPlaybackState === 'paused' ? '▶ 계속' : '▶ 시작';
+  const track = document.getElementById('mg-progress-track');
+  if (track) track.classList.toggle('disabled', mgPlaybackState === 'idle' || total === 0);
 }
 
-// ---- 재생 틱 ---- //
+// 진행바 클릭 → 점프
+const mgProgressTrack = document.getElementById('mg-progress-track');
+if (mgProgressTrack) {
+  mgProgressTrack.addEventListener('click', (e) => {
+    if (mgPlaybackState === 'idle' || mgPlaybackCoords.length === 0) return;
+    const rect = mgProgressTrack.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    mgJumpToIndex(mgIndexFromProgress(mgPlaybackCoords.length, pct));
+  });
+}
+
+// ---- 재생 틱 (모드 공통) ---- //
 function mgPlaybackTick() {
   if (mgPlaybackIdx >= mgPlaybackCoords.length) {
     mgStopPlayback(true);
@@ -2010,7 +2859,21 @@ function mgPlaybackTick() {
     mgSendStatus.textContent = '✓ 궤적 전송 완료';
     return;
   }
-  const { lat, lng } = mgPlaybackCoords[mgPlaybackIdx++];
+  const cur = mgPlaybackCoords[mgPlaybackIdx++];
+  const lat = cur.lat;
+  const lng = cur.lng != null ? cur.lng : cur.lon;     // DLT: lon, draw/tvas: lng
+  // 방위각: 원본에 있으면 우선 사용, 없으면 다음/이전 좌표로 계산
+  let bearing = (cur.bearing != null) ? cur.bearing : null;
+  if (bearing == null) {
+    const next = mgPlaybackCoords[mgPlaybackIdx];
+    const prev = mgPlaybackCoords[mgPlaybackIdx - 2];
+    const curLL  = { lat, lng };
+    const nextLL = next ? { lat: next.lat, lng: next.lng != null ? next.lng : next.lon } : null;
+    const prevLL = prev ? { lat: prev.lat, lng: prev.lng != null ? prev.lng : prev.lon } : null;
+    if (nextLL) bearing = mgBearingDeg(curLL, nextLL);
+    else if (prevLL) bearing = mgBearingDeg(prevLL, curLL);
+  }
+
   const map = getMap();
   if (map) {
     if (!mgCarMarker) {
@@ -2025,42 +2888,145 @@ function mgPlaybackTick() {
       mgCarMarker.setLatLng([lat, lng]);
     }
   }
-  mgCurrentCoord.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  mgCurrentCoord.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    + (bearing != null ? ` · ${bearing.toFixed(0)}°` : '');
   mgUpdatePlaybackUI();
-  mgSendCoord(lat, lng);
+  mgSendCoord(lat, lng, bearing);
+
+  // DLT 모드: 다음 좌표까지의 타임스탬프 간격으로 setTimeout 예약. 속도 슬라이더를 배속으로 사용.
+  if (mgDltPlayMode && mgPlaybackState === 'playing') {
+    const next = mgPlaybackCoords[mgPlaybackIdx];
+    const rate = mgGetDltPlaybackRate();
+    if (next && cur.timestamp && next.timestamp) {
+      const diffMs = next.timestamp.getTime() - cur.timestamp.getTime();
+      const delay = Math.max(20, Math.min(60000, diffMs / rate));
+      mgPlaybackTimer = setTimeout(mgPlaybackTick, delay);
+    } else if (next) {
+      mgPlaybackTimer = setTimeout(mgPlaybackTick, 1000 / rate);
+    }
+  }
+}
+
+// DLT 모드 배속: 속도 슬라이더(km/h) ÷ 40 = 배속 (40 → 1.0x)
+function mgGetDltPlaybackRate() {
+  return Math.max(0.05, Number(mgSpeed.value) / 40);
+}
+
+// 진행바 클릭 → 해당 인덱스로 점프 (재생 중이면 mock GPS 좌표도 즉시 송신)
+function mgJumpToIndex(newIdx) {
+  if (mgPlaybackCoords.length === 0 || mgPlaybackState === 'idle') return;
+  newIdx = Math.max(0, Math.min(mgPlaybackCoords.length - 1, newIdx));
+  // 기존 타이머 취소
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
+  mgPlaybackIdx = newIdx;
+  // 즉시 한 tick → 새 좌표를 차량 마커/mock GPS 로 송신
+  mgPlaybackTick();
+  // 재생 중이면 스케줄 복원 (DLT 는 tick 내부에서 setTimeout 예약함)
+  if (mgPlaybackState === 'playing' && !mgDltPlayMode) {
+    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  }
+}
+
+// 속도 슬라이더 변경 시: draw/tvas 재생 중이면 현재 위치 기준 재보간, DLT 는 다음 tick 에서 새 배속 자동 적용
+function mgOnSpeedChangedDuringPlayback() {
+  if (mgPlaybackState === 'idle') return;
+  if (mgDltPlayMode) return;   // DLT 는 별도 처리 없이 다음 tick 에서 mgGetDltPlaybackRate() 가 새 값 사용
+  if (mgPlaybackCoords.length === 0) return;
+  // 마지막으로 송신된 좌표 (= tick 직후 mgPlaybackIdx 는 다음 좌표를 가리킴)
+  const lastEmittedIdx = Math.max(0, mgPlaybackIdx - 1);
+  const cur = mgPlaybackCoords[lastEmittedIdx];
+  if (!cur) return;
+  const srcNextIdx = (cur.srcNextIdx != null) ? cur.srcNextIdx : 0;
+  if (srcNextIdx >= mgDrawPoints.length) return; // 이미 종점
+  const wasPlaying = mgPlaybackState === 'playing';
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
+  const newCoords = mgReinterpolateImpl(
+    { lat: cur.lat, lng: cur.lng != null ? cur.lng : cur.lon },
+    mgDrawPoints,
+    srcNextIdx,
+    Number(mgSpeed.value),
+  );
+  mgPlaybackCoords = newCoords;
+  mgPlaybackIdx = 0;
+  if (wasPlaying) {
+    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  }
+  mgUpdatePlaybackUI();
 }
 
 // ---- 시작 / 일시정지 / 정지 ---- //
 function mgStartPlayback() {
   if (mgPlaybackState === 'paused') {
     mgPlaybackState = 'playing';
-    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+    if (mgDltPlayMode) {
+      // DLT 모드: 다음 좌표까지 다시 setTimeout
+      mgPlaybackTick();
+    } else {
+      mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+    }
     mgUpdatePlaybackUI();
     return;
   }
-  if (mgDrawPoints.length < 2) return;
-  mgPlaybackCoords = mgInterpolatePath(mgDrawPoints, Number(mgSpeed.value));
+  // 새로 시작
+  if (mgMode === 'draw' || mgMode === 'tvas') {
+    if (mgDrawPoints.length < 2) {
+      mgSendStatus.style.color = '#f87171';
+      mgSendStatus.textContent = '궤적이 없습니다. 모드에 따라 그리거나 불러오세요.';
+      return;
+    }
+    mgDltPlayMode = false;
+    mgPlaybackCoords = mgInterpolatePath(mgDrawPoints, Number(mgSpeed.value));
+  } else if (mgMode === 'dlt') {
+    if (mgDrawPoints.length < 1) {
+      mgSendStatus.style.color = '#f87171';
+      mgSendStatus.textContent = 'DLT 로그를 먼저 불러오세요.';
+      return;
+    }
+    mgDltPlayMode = true;
+    mgPlaybackCoords = mgDrawPoints.slice();   // 보간 없이 원본 그대로 (타임스탬프 보존)
+  }
   mgPlaybackIdx = 0;
   mgPlaybackState = 'playing';
   mgSendStatus.style.color = 'var(--muted)';
   mgSendStatus.textContent = `${mgPlaybackCoords.length}개 좌표 전송 시작...`;
-  mgPlaybackTick(); // 즉시 첫 좌표 전송
-  mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  if (mgDltPlayMode) {
+    mgPlaybackTick();   // 즉시 첫 좌표 + 내부에서 setTimeout 예약
+  } else {
+    mgPlaybackTick();
+    mgPlaybackTimer = setInterval(mgPlaybackTick, 1000);
+  }
   mgUpdatePlaybackUI();
 }
 function mgPausePlayback() {
   if (mgPlaybackState !== 'playing') return;
-  clearInterval(mgPlaybackTimer); mgPlaybackTimer = null;
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
   mgPlaybackState = 'paused';
   mgSendStatus.style.color = '#f59e0b';
   mgSendStatus.textContent = '⏸ 일시정지됨';
   mgUpdatePlaybackUI();
 }
 function mgStopPlayback(finished) {
-  if (mgPlaybackTimer) { clearInterval(mgPlaybackTimer); mgPlaybackTimer = null; }
+  if (mgPlaybackTimer) {
+    clearInterval(mgPlaybackTimer);
+    clearTimeout(mgPlaybackTimer);
+    mgPlaybackTimer = null;
+  }
   mgPlaybackState = 'idle';
   mgPlaybackIdx = 0;
   mgPlaybackCoords = [];
+  mgDltPlayMode = false;
   const map = getMap();
   if (mgCarMarker && map) { map.removeLayer(mgCarMarker); mgCarMarker = null; }
   if (!finished) {
@@ -2073,19 +3039,122 @@ function mgStopPlayback(finished) {
   mgUpdatePlaybackUI();
   mgUpdateStats();
 }
+
+// ---- TVAS 모드: 현재 경로 불러오기 ---- //
+// lastCoords 는 같은 스크립트에서 let 으로 더 아래에 선언됨 → TDZ 회피용 안전 접근
+function mgGetTvasCoords() {
+  try { return (typeof lastCoords !== 'undefined') ? lastCoords : null; }
+  catch (_) { return null; }
+}
+const mgTvasLoadBtn = document.getElementById('mg-tvas-load');
+const mgTvasStatus  = document.getElementById('mg-tvas-status');
+function mgUpdateTvasStatus() {
+  const c = mgGetTvasCoords();
+  if (c && c.length > 0) {
+    mgTvasStatus.innerHTML = `현재 TVAS 경로: <b>${c.length}</b>개 보간점(VX)`;
+  } else {
+    mgTvasStatus.textContent = "경로 요청 결과가 없습니다. 먼저 '경로 요청' 탭에서 요청하세요.";
+  }
+}
+mgTvasLoadBtn.addEventListener('click', () => {
+  const coords = mgGetTvasCoords();
+  if (!coords || coords.length < 2) {
+    mgSendStatus.style.color = '#f87171';
+    mgSendStatus.textContent = 'TVAS 경로요청 결과가 없습니다.';
+    return;
+  }
+  mgClearTrajectory();
+  // VX 좌표 → {lat, lng} 변환해서 mgDrawPoints에 채우기
+  mgDrawPoints = coords.map(c => ({ lat: c.lat, lng: c.lon }));
+  const map = getMap();
+  if (map && mgDrawPoints.length > 1) {
+    mgDrawPolyline = L.polyline(mgDrawPoints.map(p => [p.lat, p.lng]),
+      { color: '#a855f7', weight: 4, opacity: 0.9 }).addTo(map);
+    const s = mgDrawPoints[0], e2 = mgDrawPoints[mgDrawPoints.length - 1];
+    mgDrawMarkers.push(
+      L.circleMarker([s.lat, s.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 })
+        .bindTooltip('출발', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map),
+      L.circleMarker([e2.lat, e2.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 })
+        .bindTooltip('도착', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map),
+    );
+    map.fitBounds(mgDrawPolyline.getBounds(), { padding: [50, 50] });
+  }
+  mgUpdateStats();
+  mgUpdateTvasStatus();
+  mgSendStatus.style.color = '#4ade80';
+  mgSendStatus.textContent = `TVAS 경로 불러옴 (${mgDrawPoints.length} VX)`;
+});
+
+// ---- DLT 모드: 분석 결과 불러오기 ---- //
+const mgDltLoadBtn = document.getElementById('mg-dlt-load');
+const mgDltStatus  = document.getElementById('mg-dlt-status');
+const mgDltSource  = document.getElementById('mg-dlt-source');
+function mgUpdateDltStatus() {
+  const a = window.__dltAnalysis;
+  if (!a) {
+    mgDltStatus.textContent = "DLT 분석 결과가 없습니다. 먼저 'DLT GPS Log' 탭에서 분석하세요.";
+    return;
+  }
+  const gpsDr = a.locationLogs.filter(p => p.sourceType === 'gps' || p.sourceType === 'dr_gps').length;
+  const nmea  = a.locationLogs.filter(p => p.sourceType === 'nmea').length;
+  mgDltStatus.innerHTML = `분석 결과: GPS/DR_GPS <b>${gpsDr}</b> · NMEA <b>${nmea}</b>`;
+}
+mgDltLoadBtn.addEventListener('click', () => {
+  const a = window.__dltAnalysis;
+  if (!a) {
+    mgSendStatus.style.color = '#f87171';
+    mgSendStatus.textContent = "DLT 분석 결과가 없습니다. 'DLT GPS Log' 탭에서 분석하세요.";
+    return;
+  }
+  const src = mgDltSource.value;   // 'gps_dr' | 'nmea'
+  let raw;
+  if (src === 'gps_dr') {
+    raw = a.locationLogs.filter(p => p.sourceType === 'gps' || p.sourceType === 'dr_gps');
+  } else if (src === 'nmea') {
+    raw = a.locationLogs.filter(p => p.sourceType === 'nmea');
+  } else {
+    raw = [];
+  }
+  if (raw.length < 1) {
+    mgSendStatus.style.color = '#f87171';
+    mgSendStatus.textContent = `선택한 소스(${src})에 데이터가 없습니다.`;
+    return;
+  }
+  mgClearTrajectory();
+  // {lat, lon, bearing, timestamp} → {lat, lng, lon, bearing, timestamp}
+  mgDrawPoints = raw.map(p => ({
+    lat: p.lat, lng: p.lon, lon: p.lon,
+    bearing: p.bearing, timestamp: p.timestamp,
+  }));
+  const map = getMap();
+  if (map && mgDrawPoints.length > 1) {
+    mgDrawPolyline = L.polyline(mgDrawPoints.map(p => [p.lat, p.lng]),
+      { color: '#a855f7', weight: 3, opacity: 0.8 }).addTo(map);
+    const s = mgDrawPoints[0], e2 = mgDrawPoints[mgDrawPoints.length - 1];
+    mgDrawMarkers.push(
+      L.circleMarker([s.lat, s.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 })
+        .bindTooltip('출발', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map),
+      L.circleMarker([e2.lat, e2.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 })
+        .bindTooltip('도착', { permanent: true, direction: 'top', offset: [0, -6] }).addTo(map),
+    );
+    map.fitBounds(mgDrawPolyline.getBounds(), { padding: [50, 50] });
+  }
+  mgUpdateStats();
+  mgSendStatus.style.color = '#4ade80';
+  mgSendStatus.textContent = `DLT 로그 불러옴 (${src}, ${mgDrawPoints.length}개 좌표)`;
+});
+
+// DLT 분석 완료 이벤트 수신
+window.addEventListener('dlt-analysis-complete', mgUpdateDltStatus);
+mgUpdateDltStatus();
+mgUpdateTvasStatus();
 mgPlay.addEventListener('click', mgStartPlayback);
 mgPause.addEventListener('click', mgPausePlayback);
 mgStop.addEventListener('click', () => mgStopPlayback(false));
 
-// 맵이 재생성되면 (DLT 분석 후 등) 클릭 핸들러 재부착
+// 맵이 재생성되면 (DLT 분석 후 등) 드래그 핸들러 재부착
 window.addEventListener('map-init', () => {
-  if (mgEnabled) {
-    const map = getMap();
-    if (map) {
-      map.on('click', mgOnMapClick);
-      map.getContainer().style.cursor = 'crosshair';
-    }
-  }
+  if (mgEnabled) mgAttachDrawHandlers(getMap());
 });
 
 // 초기 상태

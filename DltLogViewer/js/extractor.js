@@ -39,12 +39,14 @@ const TTS_SCRIPT_RE = /TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTT
 const GPS_INTERESTING_STRINGS = [
   '#onLocationChanged',
   '[MM_RESULT]',
+  'Nmea : $G',                // NMEA RMC 라인
 ];
 
 const ROUTE_TTS_INTERESTING_STRINGS = [
   '#onLocationChanged',   // needed for recentLocation (route anchor)
   '#RpLog[',
   'requestTTS',
+  'Nmea : $G',
 ];
 
 const ALL_INTERESTING_STRINGS = [
@@ -52,6 +54,7 @@ const ALL_INTERESTING_STRINGS = [
   '[MM_RESULT]',
   '#RpLog[',
   'requestTTS',
+  'Nmea : $G',
 ];
 
 // ---- Helpers ------------------------------------------------------------- //
@@ -115,11 +118,13 @@ function extractFirstJsonObject(text) {
   return null;
 }
 
-// Parse "RP-218-Traffic_MinTime" → { rpId: 218, rpOption: "Traffic_MinTime" }
-function parseRpLabel(label) {
-  const m = /^RP-(\d+)-(.+)$/.exec(label);
+// Parse RP 라벨 → { rpPrefix, rpId, rpOption, rawLabel }
+//  기존:  "RP-218-Traffic_MinTime"        → prefix=null,  id=218, option=Traffic_MinTime
+//  변경:  "RP-ROUTE-132-Traffic_Recommend" → prefix=ROUTE, id=132, option=Traffic_Recommend
+export function parseRpLabel(label) {
+  const m = /^RP-(?:([A-Za-z][A-Za-z0-9_]*)-)?(\d+)-(.+)$/.exec(label);
   if (!m) return null;
-  return { rpId: parseInt(m[1], 10), rpOption: m[2] };
+  return { rpPrefix: m[1] || null, rpId: parseInt(m[2], 10), rpOption: m[3], rawLabel: label };
 }
 
 // ---- Partial route payload extraction ------------------------------------ //
@@ -478,6 +483,10 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
   const markerStrings = mode === 'gps' ? GPS_INTERESTING_STRINGS
     : mode === 'route_tts' ? ROUTE_TTS_INTERESTING_STRINGS
     : ALL_INTERESTING_STRINGS;
+  // route 처리 시 멀티-청크 JSON 의 연속 라인(#RpLog 접두사 없는 조각)도 모두 봐야 하므로
+  // 마커 필터를 비활성화한다. 약간 느려지지만 REQ JSON 누락을 방지한다.
+  // 마커 필터는 항상 켠다(대용량 성능). route 처리 시 멀티-청크 REQ JSON 의
+  // 마커 없는 연속 라인은 iterator 의 routeCapture 상태머신이 따로 yield 한다.
   const interestingMarkers = encodeMarkers(markerStrings);
 
   // Track per-file progress for concurrent reporting
@@ -505,19 +514,28 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
     const ttsStatusByRequestId = {};
     const rplogMap = new Map();
     const rplogSessionLastRpId = new Map();
+    // 현재 진행 중인 RpLog REQ (멀티-청크 JSON 흡수용). REQ: 라인에서 set, RES:/POST(다른 RP) 에서 clear
+    let activeRpEntry = null;
 
     function finalizeRpLogEntry(entry) {
       if (entry.finalized) return;
       entry.finalized = true;
-      const payload = extractPartialRoutePayload(entry.reqBuffer);
+      // 멀티-청크 합쳐진 raw buffer 에서 newline 제거 후 JSON.parse 시도
+      const { cleaned, parsed, parseError } = cleanAndParseRpReqBuffer(entry.reqBuffer);
+      // 기존 정규식 기반 파셜 추출은 백업으로 유지
+      const payload = extractPartialRoutePayload(cleaned);
       const rr = buildRouteRequest(routeSequence++, file.name,
-        entry.timestamp, entry.endpoint || '', entry.reqBuffer, payload);
+        entry.timestamp, entry.endpoint || '', cleaned, payload);
       rr.rpId      = entry.rpId;
       rr.rpOption  = entry.rpOption;
-      rr.rpLabel   = `RP-${entry.rpId}-${entry.rpOption}`;
+      rr.rpLabel   = entry.rawLabel || `RP-${entry.rpId}-${entry.rpOption}`;
       rr.sessionId = entry.sessionId || null;
       rr.responseTimeMs = entry.responseTimeMs;
       rr.responseSize   = entry.responseSize;
+      // 전체 JSON 파싱 결과 + 파싱 실패시 원본 보존
+      rr.payloadFull = parsed;
+      rr.payloadParseError = parseError;
+      rr.rawReqBuffer = cleaned;
       if (entry.responseCode != null) {
         rr.responseCode   = entry.responseCode;
         rr.responseStatus = entry.responseCode >= 200 && entry.responseCode < 300 ? 'SUCCESS' : 'FAILED';
@@ -525,14 +543,21 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
           ? `[${entry.responseResult}] (${entry.responseTimeMs}ms) SessionID: ${entry.sessionId || 'N/A'}`
           : `HTTP ${entry.responseCode}`;
       }
-      applyRecentLocationToRequest(rr, recentLocation);
+      // 마커 위치: REQ 시점 GPS 스냅샷을 우선 사용, 없으면 최근 위치로 폴백
+      const locForMarker = entry.reqLocation || recentLocation;
+      applyRecentLocationToRequest(rr, locForMarker);
+      // REQ 시점 정보도 함께 보존 (팝업에서 표시용)
+      if (entry.reqTimestamp) rr.reqTimestamp = entry.reqTimestamp;
+      if (entry.reqLocation) rr.reqLocationTime = entry.reqLocation.timestamp;
       routeRequests.push(rr);
+      if (activeRpEntry === entry) activeRpEntry = null;
     }
 
     for await (const record of iterateDltRecords(
       file,
       (fb, ft) => reportProgress(fileIndex, fb, ft),
-      interestingMarkers
+      interestingMarkers,
+      doRoute   // routeCapture: route 모드일 때 REQ 멀티-청크 연속 라인 캡처
     )) {
       const { text: line, timestamp } = record;
 
@@ -540,6 +565,7 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
       const hasMm = doGps && (line.includes('[MM_RESULT]') || currentMmResult != null);
       const hasRoute = doRoute && line.includes('#RpLog[');
       const hasTts = doTts && line.includes('requestTTS');
+      const hasNmea = doGps && line.includes('Nmea : $G') && line.includes('RMC,');
 
       // ---- Location ---- //
       if (hasLocation) {
@@ -556,6 +582,29 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
             sequence++;
           }
           recentLocation = { lon, lat, bearing, timestamp, sourceType };
+        }
+      }
+
+      // ---- NMEA RMC ---- //
+      if (hasNmea) {
+        // 'NAVD[820]:Nmea : $GPRMC,...' 에서 $G... 부분만 잘라서 파서로
+        const sIdx = line.indexOf('$G');
+        const nmeaLine = sIdx >= 0 ? line.slice(sIdx) : line;
+        const nm = parseNmeaRmc(nmeaLine);
+        if (nm) {
+          // DLT 라인 타임스탬프를 우선 사용 (NMEA 의 UTC 와 분리)
+          locationLogs.push({
+            lon: nm.lon, lat: nm.lat,
+            bearing: nm.bearing != null ? nm.bearing : 0,
+            timestamp,
+            et: '',
+            sourceType: 'nmea',
+            sequence,
+            speed: nm.speed,            // m/s
+            nmeaUtc: nm.timestamp,      // NMEA 내부 UTC (별도 보존)
+          });
+          sequence++;
+          recentLocation = { lon: nm.lon, lat: nm.lat, bearing: nm.bearing || 0, timestamp, sourceType: 'nmea' };
         }
       }
 
@@ -650,7 +699,19 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
               }
               entry.reqBuffer = body;
               entry.hasReqStarted = true;
+              entry.reqTimestamp = timestamp;
+              // REQ 시점의 최신 GPS 위치를 스냅샷으로 저장 (finalize 시 응답 도착까지 시간이 흘러
+              // recentLocation 이 바뀌어 있어도 REQ 시점 위치로 마커가 찍히도록)
+              entry.reqLocation = recentLocation ? { ...recentLocation } : null;
+              // JSON 깊이 상태 초기화 + 첫 body 청크 반영
+              entry.jsonState = { depth: 0, inString: false, escape: false };
+              entry.jsonState = advanceJsonDepth(body, entry.jsonState);
+              entry.jsonComplete = entry.jsonState.depth === 0 && body.length > 0;
               rplogSessionLastRpId.set(sgId, rpInfo.rpId);
+              // 멀티-청크 흡수용 active 포인터만 갱신 (이전 entry 는 조기 finalize 하지 않는다 —
+              // 응답 라인이 새 REQ 이후에 도착할 수 있어서 sessionId/responseCode 가 유실됨).
+              // 미완료 entry 들은 파일 끝에서 일괄 finalize 된다.
+              activeRpEntry = entry;
             }
           } else {
             const respM = RPLOG_RESP_RE.exec(line);
@@ -686,14 +747,34 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
                   const lastRpId = rplogSessionLastRpId.get(sgId);
                   if (lastRpId != null) {
                     const entry = rplogMap.get(`${sgId}:${lastRpId}`);
-                    if (entry && entry.hasReqStarted && !entry.finalized) {
+                    if (entry && entry.hasReqStarted && !entry.finalized && !entry.jsonComplete) {
                       entry.reqBuffer += chunk;
+                      entry.jsonState = advanceJsonDepth(chunk, entry.jsonState || { depth: 0, inString: false, escape: false });
+                      if (entry.jsonState.depth === 0) entry.jsonComplete = true;
                     }
                   }
                 }
               }
             }
           }
+        }
+      }
+
+      // ---- 접두사 없는 RpLog 연속 라인 흡수 ---- //
+      // REQ JSON 이 매우 길면 DLT 가 여러 레코드로 쪼개는데, 일부 청크는
+      // "#RpLog[sgId]:" 접두사 없이 message body 만 나오기도 한다.
+      // 다른 알려진 로그 타입에 매칭되지 않고, active REQ 의 JSON 이 아직
+      // 미완료(`jsonComplete=false`) 일 때만 그 buffer 에 이어붙인다.
+      // 깊이가 0 으로 떨어지면 즉시 jsonComplete 로 마킹해 noise 흡수를 멈춘다.
+      if (doRoute && activeRpEntry && !activeRpEntry.finalized && !activeRpEntry.jsonComplete
+          && !hasLocation && !hasMm && !hasTts
+          && !line.includes('#RpLog[')) {
+        // DLT 바이너리 헤더 제거 후 페이로드만 이어붙임
+        const chunk = stripDltBinaryPrefix(line);
+        if (chunk) {
+          activeRpEntry.reqBuffer += chunk;
+          activeRpEntry.jsonState = advanceJsonDepth(chunk, activeRpEntry.jsonState || { depth: 0, inString: false, escape: false });
+          if (activeRpEntry.jsonState.depth === 0) activeRpEntry.jsonComplete = true;
         }
       }
 
@@ -795,4 +876,117 @@ export function formatTimestamp(ts) {
 
 export function preparePayloadForDisplayExport(payload) {
   return preparePayloadForDisplay(payload);
+}
+
+/**
+ * NMEA RMC 문장 파싱.
+ * 예: $GPRMC,231804.412,A,3731.4598530,N,12641.0831974,E,6.1057,280.7618,280426,,,D,S*12
+ *
+ * @returns {{lat,lon,bearing,speed,timestamp}|null}
+ *   speed 단위: m/s (knots 에서 변환)
+ *   timestamp: UTC Date
+ */
+export function parseNmeaRmc(line) {
+  if (!line) return null;
+  // $G[N|P]RMC,hhmmss[.fff],status,ddmm.mmmm,N|S,dddmm.mmmm,E|W,speedKn,bearing,DDMMYY,...
+  const re = /\$G[NPL]RMC,(\d{2})(\d{2})(\d{2})(?:\.(\d{1,3}))?,([AV]),(\d{2})(\d+(?:\.\d+)?),([NS]),(\d{3})(\d+(?:\.\d+)?),([EW]),([\d.]*),([\d.]*),(\d{2})(\d{2})(\d{2})/;
+  const m = re.exec(line);
+  if (!m) return null;
+  const [, hh, mi, ss, ms, status, latDeg, latMin, ns, lonDeg, lonMin, ew, speedKn, bearing, dd, mm_, yy] = m;
+  if (status !== 'A') return null; // V = invalid fix
+  const lat = (Number(latDeg) + Number(latMin) / 60) * (ns === 'S' ? -1 : 1);
+  const lon = (Number(lonDeg) + Number(lonMin) / 60) * (ew === 'W' ? -1 : 1);
+  const year = 2000 + Number(yy);
+  const date = new Date(Date.UTC(
+    year, Number(mm_) - 1, Number(dd),
+    Number(hh), Number(mi), Number(ss),
+    Number(ms ? (ms + '00').slice(0, 3) : 0)
+  ));
+  return {
+    lat, lon,
+    bearing: bearing !== '' ? Number(bearing) : null,
+    speed:   speedKn  !== '' ? Number(speedKn) * 0.514444 : null,   // knots → m/s
+    timestamp: date,
+  };
+}
+
+/**
+ * DLT 레코드 텍스트 앞부분에 있는 바이너리 헤더(ECU/AppId/CtxId + control bytes)를
+ * 제거하고 실제 메시지 페이로드 부분만 반환한다.
+ *
+ * DLT 페이로드 직전에는 보통  (EOT, End of Transmission) 또는 다른
+ * control byte 시퀀스가 있다. 처음 256바이트 안의 마지막 control char (< 0x20)
+ * 이후를 메시지 본문으로 간주한다.
+ *
+ * 헤더 패턴이 없는 라인 (이미 깨끗한 경우) 은 그대로 반환.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripDltBinaryPrefix(text) {
+  if (!text) return text;
+  const limit = Math.min(256, text.length);
+  let lastCtrl = -1;
+  for (let i = 0; i < limit; i++) {
+    const code = text.charCodeAt(i);
+    // 제어 문자 (탭/개행/CR 제외) 또는 UTF-8 replacement char (�)
+    if ((code < 0x20 && code !== 9 && code !== 10 && code !== 13) || code === 0xFFFD) {
+      lastCtrl = i;
+    }
+  }
+  return lastCtrl >= 0 ? text.slice(lastCtrl + 1) : text;
+}
+
+/**
+ * 문자열에서 JSON brace/bracket 깊이를 한 글자씩 누적 계산한다.
+ * 문자열 리터럴 안 (큰따옴표) + escape (`\`) 을 추적해 무시한다.
+ *
+ * @param {string} str  추가된 청크
+ * @param {{depth:number,inString:boolean,escape:boolean}} state  이전 상태
+ * @returns {{depth:number,inString:boolean,escape:boolean}}
+ */
+export function advanceJsonDepth(str, state) {
+  let { depth, inString, escape } = state;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') depth--;
+  }
+  return { depth, inString, escape };
+}
+
+/**
+ * RpLog REQ 멀티-청크 버퍼를 정리하고 JSON 파싱한다.
+ *
+ * - DLT 가 길어진 REQ JSON 을 여러 레코드로 쪼개기 때문에 청크 사이에는
+ *   진짜 newline 이 끼어든다 (문자열 escape 가 아닌 실제 LF).
+ * - 그 진짜 newline 만 제거하고, 문자열 안의 `\n` (백슬래시+n) 은 유지해야
+ *   JSON 파싱 후 원본 문자열이 보존된다.
+ *
+ * @param {string} rawBuffer  연결된 REQ 버퍼
+ * @returns {{cleaned: string, parsed: object|null, parseError: string|null}}
+ */
+export function cleanAndParseRpReqBuffer(rawBuffer) {
+  if (!rawBuffer) return { cleaned: '', parsed: null, parseError: 'empty buffer' };
+  // 실제 LF/CR 만 제거 (JSON 문자열 안의 `\\n` escape 는 백슬래시+n 이므로 영향 없음)
+  const cleaned = String(rawBuffer).replace(/[\r\n]/g, '');
+  // 1차: 버퍼 전체 파싱
+  try {
+    const parsed = JSON.parse(cleaned);
+    return { cleaned, parsed, parseError: null };
+  } catch (e1) {
+    // 2차: 첫 번째 균형 잡힌 {...} 만 추출해서 파싱 (뒤에 바이너리 잡음이 붙은 경우 대응)
+    const firstObj = extractFirstJsonObject(cleaned);
+    if (firstObj) {
+      try {
+        const parsed = JSON.parse(firstObj);
+        return { cleaned: firstObj, parsed, parseError: null };
+      } catch (e2) { /* fall through */ }
+    }
+    return { cleaned, parsed: null, parseError: e1.message };
+  }
 }

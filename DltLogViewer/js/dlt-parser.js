@@ -104,6 +104,31 @@ function extractRelativeTime(recordBytes) {
 }
 
 /**
+ * DLT 확장 헤더에서 채널 식별자(APID+CTID, 8 ASCII) 추출.
+ * storage header(16B) + standard header 파싱.
+ * @returns {string|null}  예: "AZYGLCAT", 없으면 null
+ */
+function extractChannelId(recordBytes) {
+  if (recordBytes.length < 26) return null;
+  if (recordBytes[0] !== 0x44 || recordBytes[1] !== 0x4C ||
+      recordBytes[2] !== 0x54 || recordBytes[3] !== 0x01) return null;
+  const htyp = recordBytes[16];          // standard header HTYP
+  if ((htyp & 0x01) === 0) return null;  // UEH(확장헤더) 없음
+  let off = 16 + 4;                      // HTYP(1)+MCNT(1)+LEN(2)
+  if (htyp & 0x04) off += 4;             // WEID
+  if (htyp & 0x08) off += 4;             // WSID
+  if (htyp & 0x10) off += 4;             // WTMS
+  const apid = off + 2;                  // ext header: MSIN(1)+NOAR(1) 다음
+  if (apid + 8 > recordBytes.length) return null;
+  let s = '';
+  for (let i = apid; i < apid + 8; i++) {
+    const c = recordBytes[i];
+    if (c >= 0x20 && c < 0x7f) s += String.fromCharCode(c);
+  }
+  return s || null;
+}
+
+/**
  * Decode a DLT record's bytes to a string, stripping null bytes.
  */
 function decodeRecord(recordBytes) {
@@ -174,7 +199,7 @@ export function medianOf(values) {
  * @param {Function|null} progressCallback  (bytesRead, totalBytes)
  * @param {Uint8Array[]|null} interestingMarkers  pre-encoded byte arrays
  */
-export async function* iterateDltRecords(file, progressCallback = null, interestingMarkers = null) {
+export async function* iterateDltRecords(file, progressCallback = null, interestingMarkers = null, routeCapture = false) {
   const totalSize = file.size;
   let bytesRead = 0;
   let carry = new Uint8Array(0);
@@ -182,11 +207,52 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
   const offsetSamples = [];
   let relativeOffset = null; // wallclock - relativeTime
 
+  // ---- RpLog REQ 멀티-청크 캡처 상태 ----
+  // routeCapture=true 이면, REQ JSON 시작 후 닫힐 때까지(또는 안전 한도) 마커 없는
+  // 연속 레코드도 강제로 yield 한다. 평소엔 빠른 바이트 필터 유지 → 대용량 성능 보존.
+  const rpCap = { active: false, depth: 0, inStr: false, esc: false, count: 0, channel: null };
+  const RP_CAP_MAX = 400; // 한 REQ 당 캡처 안전 한도 (폭주 방지)
+
+  function rpAdvanceDepth(str) {
+    let { depth, inStr, esc } = rpCap;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{' || ch === '[') depth++;
+      else if (ch === '}' || ch === ']') depth--;
+    }
+    rpCap.depth = depth; rpCap.inStr = inStr; rpCap.esc = esc;
+  }
+
+  // 바이너리 헤더(제어문자/replacement char) 이후 페이로드만 추출 (depth 계산용)
+  function rpStripPrefix(text) {
+    const limit = Math.min(256, text.length);
+    let last = -1;
+    for (let i = 0; i < limit; i++) {
+      const c = text.charCodeAt(i);
+      if ((c < 0x20 && c !== 9 && c !== 10 && c !== 13) || c === 0xFFFD) last = i;
+    }
+    return last >= 0 ? text.slice(last + 1) : text;
+  }
+
   // Build record from a region of buf[start..end) — avoids slice when filtering
   function buildRecord(buf, start, end) {
-    if (!isInterestingRecord(buf, start, end, interestingMarkers)) return null;
+    const hasMarker = isInterestingRecord(buf, start, end, interestingMarkers);
+    const capturing = routeCapture && rpCap.active;
+    if (!hasMarker && !capturing) return null;
 
     const recordBytes = buf.subarray(start, end);
+
+    // 캡처 중 + 마커 없음 → 같은 채널(APID+CTID) 레코드만 허용.
+    // 다른 채널의 인터리빙 로그(CAN, CID 등)는 REQ JSON 사이에 끼어들어도 배제.
+    if (capturing && !hasMarker && rpCap.channel) {
+      const ch = extractChannelId(recordBytes);
+      if (ch && ch !== rpCap.channel) return null;
+    }
+
     const text = decodeRecord(recordBytes);
     const wallclock = parseDltTimestamp(text);
     const relativeTime = extractRelativeTime(recordBytes);
@@ -200,6 +266,24 @@ export async function* iterateDltRecords(file, progressCallback = null, interest
     let timestamp = wallclock;
     if (timestamp === null && relativeOffset !== null && relativeTime !== null) {
       timestamp = new Date((relativeTime + relativeOffset) * 1000);
+    }
+
+    // ---- route capture 상태 머신 ----
+    if (routeCapture) {
+      if (!rpCap.active) {
+        const reqIdx = text.indexOf('] REQ: {');
+        if (reqIdx >= 0) {
+          rpCap.active = true; rpCap.depth = 0; rpCap.inStr = false; rpCap.esc = false; rpCap.count = 0;
+          rpCap.channel = extractChannelId(recordBytes);   // 이 REQ 의 채널 기록
+          const js = text.indexOf('{', reqIdx);
+          rpAdvanceDepth(text.slice(js));
+          if (rpCap.depth <= 0) rpCap.active = false;
+        }
+      } else {
+        rpCap.count++;
+        rpAdvanceDepth(rpStripPrefix(text));
+        if (rpCap.depth <= 0 || rpCap.count >= RP_CAP_MAX) rpCap.active = false;
+      }
     }
 
     return { text, timestamp };

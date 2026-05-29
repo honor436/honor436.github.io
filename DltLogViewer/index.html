@@ -843,6 +843,88 @@
       border-color: #a855f7;
       color: #c084fc;
     }
+    #tab-poi {
+      top: 440px;
+      background: #3a2a12;
+      border-color: #f59e0b;
+      color: #fbbf24;
+    }
+
+    /* ---- POI 검색 패널 ---- */
+    #poi-panel-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #poi-url, #poi-detail-url, #poi-keyword {
+      background: rgba(15,23,42,0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 7px 10px;
+      width: 100%;
+      outline: none;
+      box-sizing: border-box;
+    }
+    #poi-url:focus, #poi-detail-url:focus, #poi-keyword:focus { border-color: #f59e0b; }
+    .poi-search-row { display: flex; gap: 6px; }
+    #poi-search-btn {
+      flex: 0 0 auto;
+      background: #f59e0b;
+      color: #1a1208;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 14px;
+      cursor: pointer;
+    }
+    #poi-search-btn:hover { background: #fbbf24; }
+    #poi-search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #poi-status { font-size: 11px; color: var(--muted); min-height: 14px; }
+    #poi-status.error { color: #f87171; }
+    #poi-status.ok    { color: #4ade80; }
+    #poi-results {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 46vh;
+      overflow-y: auto;
+    }
+    .poi-result {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      background: rgba(15,23,42,0.5);
+      transition: border-color .12s, background .12s;
+    }
+    .poi-result:hover { border-color: #f59e0b; }
+    .poi-result.selected { border-color: #f59e0b; background: rgba(245,158,11,0.12); }
+    .poi-result .poi-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .poi-result .poi-addr { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .poi-actions { display: none; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .poi-actions.show { display: flex; }
+    .poi-act-btn {
+      flex: 1 1 auto;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .poi-act-btn.depart { border-color: #22c55e; color: #4ade80; }
+    .poi-act-btn.via    { border-color: #f59e0b; color: #fbbf24; }
+    .poi-act-btn.dest   { border-color: #ef4444; color: #f87171; }
+    .poi-act-btn:hover  { background: var(--bg); }
 
     /* ---- MockGPS panel ---- */
     #mockgps-right-panel .mockgps-panel-body {
@@ -1579,6 +1661,7 @@
 <div id="tab-tvas" class="bookmark-tab" title="경로 요청">경로 요청</div>
 <div id="tab-dlt" class="bookmark-tab" title="DLT GPS Log">DLT GPS Log</div>
 <div id="tab-mockgps" class="bookmark-tab" title="Mock GPS">Mock GPS</div>
+<div id="tab-poi" class="bookmark-tab" title="POI 검색">POI 검색</div>
 
 <!-- ======== TVAS Right Panel ======== -->
 <div id="tvas-right-panel" class="right-slide-panel">
@@ -1658,6 +1741,56 @@
       <summary>응답 원문</summary>
       <pre id="tvas-response-pre"></pre>
     </details>
+  </div>
+</div>
+
+<!-- ======== POI 검색 Right Panel ======== -->
+<div id="poi-right-panel" class="right-slide-panel">
+  <div class="right-panel-header" style="border-left:3px solid #f59e0b">
+    <h2>POI 검색</h2>
+  </div>
+  <div id="poi-panel-body">
+    <!-- CORS 안내 -->
+    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.5;color:#78350f">
+      검색 서버가 교차 출처(CORS)를 허용하지 않으면 <b>CORS Unblock</b> 확장을 켜야 응답을 받을 수 있습니다.
+    </div>
+    <!-- 검색 서버 URL -->
+    <div>
+      <div class="tvas-field-label">검색 서버 URL</div>
+      <input type="text" id="poi-url" placeholder="https://검색서버주소/poi/search">
+    </div>
+    <details>
+      <summary class="tvas-field-label" style="cursor:pointer;font-weight:600">상세정보 URL</summary>
+      <input type="text" id="poi-detail-url" placeholder="https://검색서버주소/poi/detail" style="margin-top:4px">
+    </details>
+    <!-- 검색어 -->
+    <div>
+      <div class="tvas-field-label">검색어</div>
+      <div class="poi-search-row">
+        <input type="text" id="poi-keyword" placeholder="예: BMW 드라이빙센터">
+        <button id="poi-search-btn">검색</button>
+      </div>
+    </div>
+    <div id="poi-status"></div>
+    <!-- 결과 리스트 -->
+    <div id="poi-results"></div>
+    <!-- 선택 POI 액션 -->
+    <div id="poi-actions" class="poi-actions">
+      <button class="poi-act-btn depart" data-act="depart">출발지</button>
+      <button class="poi-act-btn via" data-act="via">경유지</button>
+      <button class="poi-act-btn dest" data-act="dest">목적지</button>
+      <button class="poi-act-btn" data-act="detail">상세정보</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== POI 상세 모달 ======== -->
+<div id="poi-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:480px;width:90%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div id="poi-detail-content" style="color:var(--text)"></div>
+    <div style="text-align:right;margin-top:12px">
+      <button id="poi-detail-close" style="padding:7px 16px;background:#f59e0b;color:#1a1208;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -2099,8 +2232,13 @@ catCbs.forEach(cb => {
 <script type="module">
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
-import { getMap } from './js/map-viewer.js';
+import { getMap, setMapCenter } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
+import {
+  DEFAULT_POI_SEARCH_URL, DEFAULT_POI_DETAIL_URL,
+  poiSearchHeaders, buildPoiSearchBody, buildPoiDetailBody,
+  centerToNoor, parsePoiResults, formatPoiDetailHtml,
+} from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -2115,13 +2253,15 @@ const mockgpsPanel   = document.getElementById('mockgps-right-panel');
 const tabTvas        = document.getElementById('tab-tvas');
 const tabDlt         = document.getElementById('tab-dlt');
 const tabMockgps     = document.getElementById('tab-mockgps');
+const poiPanel       = document.getElementById('poi-right-panel');
+const tabPoi         = document.getElementById('tab-poi');
 const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
 
 const tvasClearRouteBtn = document.getElementById('tvas-clear-route-btn');
 
 // ---- Bookmark tab toggle logic (3 panels) ---- //
-const _allPanels = [tvasPanel, dltPanel, mockgpsPanel];
-const _allTabs   = [tabTvas, tabDlt, tabMockgps];
+const _allPanels = [tvasPanel, dltPanel, mockgpsPanel, poiPanel];
+const _allTabs   = [tabTvas, tabDlt, tabMockgps, tabPoi];
 function closeAllPanels() {
   _allPanels.forEach(p => p.classList.remove('open'));
   _allTabs.forEach(t => t.classList.remove('active'));
@@ -2140,6 +2280,7 @@ function togglePanelTo(panel, tab) {
 tabTvas.addEventListener('click', () => togglePanelTo(tvasPanel, tabTvas));
 tabDlt.addEventListener('click', () => togglePanelTo(dltPanel, tabDlt));
 tabMockgps.addEventListener('click', () => togglePanelTo(mockgpsPanel, tabMockgps));
+tabPoi.addEventListener('click', () => togglePanelTo(poiPanel, tabPoi));
 // Sidebar button also opens TVAS panel
 tvasMenuBtn.addEventListener('click', () => openPanel(tvasPanel, tabTvas));
 
@@ -4294,6 +4435,156 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
 
   return html;
 }
+
+// ===================== POI 검색 ===================== //
+const poiUrl       = document.getElementById('poi-url');
+const poiDetailUrl = document.getElementById('poi-detail-url');
+const poiKeyword   = document.getElementById('poi-keyword');
+const poiSearchBtn = document.getElementById('poi-search-btn');
+const poiStatus    = document.getElementById('poi-status');
+const poiResults   = document.getElementById('poi-results');
+const poiActions   = document.getElementById('poi-actions');
+const poiDetailModal   = document.getElementById('poi-detail-modal');
+const poiDetailContent = document.getElementById('poi-detail-content');
+const poiDetailClose   = document.getElementById('poi-detail-close');
+
+poiUrl.value = DEFAULT_POI_SEARCH_URL;
+poiDetailUrl.value = DEFAULT_POI_DETAIL_URL;
+
+let poiList = [];          // 정규화된 검색 결과
+let poiSelected = null;    // 선택된 POI
+let poiMarker = null;      // 지도 마커
+
+function setPoiStatus(msg, cls = '') {
+  poiStatus.textContent = msg;
+  poiStatus.className = cls;
+}
+
+// 검색 기준 좌표: 현재 지도 중심(없으면 서울).
+function poiSearchCenter() {
+  const map = getMap();
+  if (map) {
+    const c = map.getCenter();
+    return centerToNoor(c.lat, c.lng);
+  }
+  return centerToNoor(37.5665, 126.9780);
+}
+
+function poiMarkerIcon() {
+  const html = '<div style="width:30px;height:30px;background:#f59e0b;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,.5)"></div>';
+  return L.divIcon({ className: '', html, iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] });
+}
+
+function showPoiOnMap(poi) {
+  const map = getMap();
+  if (!map || poi.lat == null || poi.lon == null) return;
+  if (poiMarker) map.removeLayer(poiMarker);
+  poiMarker = L.marker([poi.lat, poi.lon], { icon: poiMarkerIcon(), zIndexOffset: 2500 })
+    .bindPopup(`<b>${poi.name}</b>${poi.address ? '<br>' + poi.address : ''}`)
+    .addTo(map)
+    .openPopup();
+  setMapCenter(poi.lat, poi.lon, Math.max(map.getZoom(), 15));
+}
+
+function selectPoi(poi, rowEl) {
+  poiSelected = poi;
+  poiResults.querySelectorAll('.poi-result').forEach(r => r.classList.remove('selected'));
+  if (rowEl) rowEl.classList.add('selected');
+  if (poi.lat != null && poi.lon != null) {
+    showPoiOnMap(poi);
+    poiActions.classList.add('show');
+  } else {
+    poiActions.classList.remove('show');
+    setPoiStatus('이 결과에는 좌표가 없어 지도에 표시할 수 없습니다.', 'error');
+  }
+}
+
+function renderPoiResults(list) {
+  poiResults.innerHTML = '';
+  poiSelected = null;
+  poiActions.classList.remove('show');
+  if (!list.length) {
+    poiResults.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">검색 결과가 없습니다.</div>';
+    return;
+  }
+  list.forEach(poi => {
+    const row = document.createElement('div');
+    row.className = 'poi-result';
+    const addr = poi.address || (poi.lat != null ? `${poi.lat.toFixed(5)}, ${poi.lon.toFixed(5)}` : '좌표 없음');
+    row.innerHTML = `<div class="poi-name"></div><div class="poi-addr"></div>`;
+    row.querySelector('.poi-name').textContent = poi.name;
+    row.querySelector('.poi-addr').textContent = addr;
+    row.addEventListener('click', () => selectPoi(poi, row));
+    poiResults.appendChild(row);
+  });
+}
+
+async function doPoiSearch() {
+  const url = poiUrl.value.trim();
+  const kw = poiKeyword.value.trim();
+  if (!url) { setPoiStatus('검색 서버 URL을 입력하세요.', 'error'); return; }
+  if (!kw) { setPoiStatus('검색어를 입력하세요.', 'error'); return; }
+
+  const { noorX, noorY } = poiSearchCenter();
+  const body = buildPoiSearchBody(kw, { noorX, noorY });
+
+  poiSearchBtn.disabled = true;
+  setPoiStatus('검색 중...');
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: poiSearchHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) { setPoiStatus(`HTTP ${resp.status} ${resp.statusText}`, 'error'); return; }
+    const json = await resp.json();
+    poiList = parsePoiResults(json);
+    renderPoiResults(poiList);
+    setPoiStatus(`${poiList.length}건 검색됨`, 'ok');
+  } catch (e) {
+    setPoiStatus('요청 실패: ' + e.message + ' (CORS 차단 여부를 확인하세요)', 'error');
+  } finally {
+    poiSearchBtn.disabled = false;
+  }
+}
+
+async function doPoiDetail() {
+  if (!poiSelected) return;
+  const url = poiDetailUrl.value.trim();
+  poiDetailContent.innerHTML = formatPoiDetailHtml(poiSelected, null);
+  poiDetailModal.style.display = 'flex';
+  if (!url) { return; }
+  const { noorX, noorY } = poiSearchCenter();
+  const body = buildPoiDetailBody(poiSelected, { noorX, noorY });
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: poiSearchHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      poiDetailContent.innerHTML = formatPoiDetailHtml(poiSelected, `HTTP ${resp.status} ${resp.statusText}`);
+      return;
+    }
+    const detailJson = await resp.json();
+    poiDetailContent.innerHTML = formatPoiDetailHtml(poiSelected, detailJson);
+  } catch (e) {
+    poiDetailContent.innerHTML = formatPoiDetailHtml(poiSelected, '상세 조회 실패: ' + e.message);
+  }
+}
+
+poiSearchBtn.addEventListener('click', doPoiSearch);
+poiKeyword.addEventListener('keydown', e => { if (e.key === 'Enter') doPoiSearch(); });
+poiActions.addEventListener('click', e => {
+  const btn = e.target.closest('.poi-act-btn');
+  if (!btn || !poiSelected) return;
+  const act = btn.dataset.act;
+  if (act === 'detail') { doPoiDetail(); return; }
+  if (poiSelected.lat == null || poiSelected.lon == null) { setPoiStatus('좌표가 없어 경로점으로 설정할 수 없습니다.', 'error'); return; }
+  setWaypoint(act, poiSelected.lat, poiSelected.lon);
+});
+poiDetailClose.addEventListener('click', () => { poiDetailModal.style.display = 'none'; });
+poiDetailModal.addEventListener('click', e => { if (e.target === poiDetailModal) poiDetailModal.style.display = 'none'; });
 </script>
 </body>
 </html>

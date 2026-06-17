@@ -5,6 +5,8 @@ import {
   buildPoiSearchUrl,
   buildPoiSearchBody,
   parsePoiSearchResponse,
+  coerceJson,
+  buildPoiSearchHeaders,
 } from '../DltLogViewer/js/poi-search.js';
 
 // ---- buildPoiSearchUrl ---------------------------------------------------- //
@@ -107,4 +109,56 @@ test('parsePoiSearchResponse_deep_scans_when_shape_differs', () => {
   assert.equal(pois[0].name, '스타벅스 강남');
   assert.equal(pois[0].x, 4575000);
   assert.equal(pois[0].y, 1351000);
+});
+
+// ---- coerceJson ----------------------------------------------------------- //
+//
+// findpois 응답이 순수 JSON 이 아닐 때(선행 BOM/공백/접두 바이트)도 최대한
+// 살려서 객체로 파싱한다. 도저히 안 되면 null.
+
+test('coerceJson_parses_plain_json', () => {
+  assert.deepEqual(coerceJson('{"a":1}'), { a: 1 });
+});
+
+test('coerceJson_strips_bom_and_whitespace', () => {
+  assert.deepEqual(coerceJson('﻿  {"a":1}  '), { a: 1 });
+});
+
+test('coerceJson_recovers_json_after_prefix_garbage', () => {
+  assert.deepEqual(coerceJson('something{"a":1}'), { a: 1 });
+});
+
+test('coerceJson_returns_null_for_non_json', () => {
+  assert.equal(coerceJson('totally not json'), null);
+  assert.equal(coerceJson(''), null);
+  assert.equal(coerceJson(null), null);
+});
+
+// ---- buildPoiSearchHeaders ------------------------------------------------ //
+//
+// findpois 서버가 요구하는 HTTP 헤더. Client_ReqTime 은 현재시간(yyyyMMddHHmmss),
+// requestHashToken/CIH 는 기본값 제공(편집 가능). Connection/Content-Length 는
+// 브라우저가 자동 설정하는 금지 헤더라 포함하지 않는다.
+
+test('buildPoiSearchHeaders_has_required_static_headers', () => {
+  const h = buildPoiSearchHeaders();
+  assert.equal(h['Accept'], 'application/json');
+  assert.equal(h['requestHashToken'], '1988490197');
+  assert.equal(h['CIH'], '582079726');
+});
+
+test('buildPoiSearchHeaders_client_reqtime_is_14_digit_timestamp', () => {
+  const h = buildPoiSearchHeaders();
+  assert.match(h['Client_ReqTime'], /^\d{14}$/);
+});
+
+test('buildPoiSearchHeaders_does_not_set_forbidden_headers', () => {
+  const h = buildPoiSearchHeaders();
+  assert.equal(h['Connection'], undefined);
+  assert.equal(h['Content-Length'], undefined);
+});
+
+test('buildPoiSearchHeaders_respects_reqTime_override', () => {
+  const h = buildPoiSearchHeaders({ reqTime: '20210511180658' });
+  assert.equal(h['Client_ReqTime'], '20210511180658');
 });

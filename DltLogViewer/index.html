@@ -354,6 +354,136 @@
     }
     #ruler-badge.visible { display: block; }
 
+    /* ---- Google-Maps style POI search box ---- */
+    #poi-search-box {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1001;
+      width: 360px;
+      max-width: calc(100% - 24px);
+      font-size: 13px;
+    }
+    .poi-search-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      padding: 4px 6px 4px 10px;
+    }
+    .poi-search-row .poi-search-icon { font-size: 14px; opacity: 0.7; }
+    #poi-env {
+      border: none;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 14px;
+      padding: 4px 6px;
+      cursor: pointer;
+      outline: none;
+    }
+    #poi-keyword {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #0f172a;
+      font-size: 13px;
+      padding: 6px 2px;
+    }
+    #poi-search-btn {
+      border: none;
+      background: #3182f6;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 16px;
+      padding: 6px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #poi-edit-toggle {
+      border: none;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 13px;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+    }
+    #poi-edit-toggle.active { background: #dbeafe; color: #1d4ed8; }
+    #poi-edit-area {
+      display: none;
+      margin-top: 6px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      padding: 10px;
+    }
+    #poi-edit-area.open { display: block; }
+    .poi-edit-label { font-size: 11px; font-weight: 600; color: #475569; margin: 2px 0 3px; }
+    #poi-url {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11px;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    #poi-body {
+      width: 100%;
+      box-sizing: border-box;
+      height: 150px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px;
+      color: #0f172a;
+      resize: vertical;
+    }
+    #poi-send-edited {
+      margin-top: 8px;
+      width: 100%;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-weight: 700;
+      font-size: 12px;
+      border-radius: 6px;
+      padding: 7px;
+      cursor: pointer;
+    }
+    #poi-status { font-size: 11px; margin: 6px 2px 0; min-height: 0; }
+    #poi-status.error { color: #f87171; }
+    #poi-status.ok { color: #4ade80; }
+    #poi-results {
+      margin-top: 6px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    #poi-results:empty { display: none; }
+    .poi-result-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid #eef2f7;
+      cursor: pointer;
+    }
+    .poi-result-item:last-child { border-bottom: none; }
+    .poi-result-item:hover { background: #f1f5f9; }
+    .poi-result-name { font-size: 13px; font-weight: 600; color: #0f172a; }
+    .poi-result-addr { font-size: 11px; color: #64748b; margin-top: 2px; }
+    /* 검색창과 Leaflet 줌 컨트롤(좌상단) 겹침 방지 */
+    .leaflet-top.leaflet-left { margin-top: 52px; }
+
     /* ---- Ruler tooltips ---- */
     .ruler-tooltip,
     .ruler-dist-label {
@@ -2012,6 +2142,29 @@
 
 <div id="map-wrap">
   <div id="ruler-badge">줄자 모드 켜짐 - 지도를 클릭하세요</div>
+  <!-- Google-Maps style POI search box -->
+  <div id="poi-search-box">
+    <div class="poi-search-row">
+      <select id="poi-env" title="검색 서버">
+        <option value="prod">상용</option>
+        <option value="stg" selected>스테이징</option>
+        <option value="dev">개발</option>
+      </select>
+      <span class="poi-search-icon">🔍</span>
+      <input id="poi-keyword" type="text" placeholder="장소·주소 검색 (예: BMW 드라이빙센터)" autocomplete="off">
+      <button id="poi-search-btn" title="검색">검색</button>
+      <button id="poi-edit-toggle" title="검색 URL / 요청 데이터 편집">⚙</button>
+    </div>
+    <div id="poi-edit-area">
+      <div class="poi-edit-label">검색 URL</div>
+      <input id="poi-url" type="text" spellcheck="false" placeholder="https://...findpois">
+      <div class="poi-edit-label">요청 데이터 (JSON) — 직접 편집 가능</div>
+      <textarea id="poi-body" spellcheck="false" placeholder="{ ... }"></textarea>
+      <button id="poi-send-edited">이 내용으로 전송</button>
+    </div>
+    <div id="poi-status"></div>
+    <div id="poi-results"></div>
+  </div>
   <div id="map"></div>
 </div>
 
@@ -2100,7 +2253,8 @@ catCbs.forEach(cb => {
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
-import { wgs84ToSkCoord } from './js/coordinate.js';
+import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3410,6 +3564,140 @@ window._addEvWaypoint = function(idx) {
   const map = getMap();
   if (map) map.closePopup();
 };
+
+// ---- POI keyword search (Google-Maps style 검색창) ---- //
+(function setupPoiSearch() {
+  const box = document.getElementById('poi-search-box');
+  if (!box) return;
+  const envSel    = document.getElementById('poi-env');
+  const kwInput   = document.getElementById('poi-keyword');
+  const searchBtn = document.getElementById('poi-search-btn');
+  const editTgl   = document.getElementById('poi-edit-toggle');
+  const editArea  = document.getElementById('poi-edit-area');
+  const urlInput  = document.getElementById('poi-url');
+  const bodyTa    = document.getElementById('poi-body');
+  const sendEdit  = document.getElementById('poi-send-edited');
+  const statusEl  = document.getElementById('poi-status');
+  const resultsEl = document.getElementById('poi-results');
+  let lastPois = [];
+
+  function setPoiStatus(msg, type = '') { statusEl.textContent = msg; statusEl.className = type; }
+
+  function currentCenterSk() {
+    const map = getMap();
+    const c = (map && map.getCenter) ? map.getCenter() : { lat: 37.5665, lng: 126.9780 };
+    const sk = wgs84ToSkCoord(c.lat, c.lng);
+    return { noorX: sk[0], noorY: sk[1] };
+  }
+
+  function nowReqTime() {
+    const n = new Date();
+    return n.getFullYear().toString() +
+      String(n.getMonth() + 1).padStart(2, '0') + String(n.getDate()).padStart(2, '0') +
+      String(n.getHours()).padStart(2, '0') + String(n.getMinutes()).padStart(2, '0') +
+      String(n.getSeconds()).padStart(2, '0');
+  }
+
+  function syncUrlFromEnv() { urlInput.value = buildPoiSearchUrl(envSel.value); }
+  syncUrlFromEnv();
+  envSel.addEventListener('change', syncUrlFromEnv);
+
+  editTgl.addEventListener('click', () => {
+    editArea.classList.toggle('open');
+    editTgl.classList.toggle('active');
+  });
+
+  async function runSearch(url, bodyObj) {
+    if (bodyObj && bodyObj.header && !bodyObj.header.reqTime) bodyObj.header.reqTime = nowReqTime();
+    // 항상 편집 필드에 반영 → 사용자가 보고 수정 가능
+    urlInput.value = url;
+    bodyTa.value = JSON.stringify(bodyObj, null, 2);
+    setPoiStatus('검색 중...');
+    resultsEl.innerHTML = '';
+    searchBtn.disabled = true;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+      });
+      if (!resp.ok) { setPoiStatus(`HTTP ${resp.status} ${resp.statusText}`, 'error'); return; }
+      const json = await resp.json();
+      const pois = parsePoiSearchResponse(json);
+      lastPois = pois;
+      renderResults(pois);
+      setPoiStatus(`${pois.length}건 검색됨`, pois.length ? 'ok' : '');
+    } catch (e) {
+      setPoiStatus('요청 실패 (CORS Unblock 확장 필요할 수 있음): ' + e.message, 'error');
+    } finally {
+      searchBtn.disabled = false;
+    }
+  }
+
+  function doKeywordSearch() {
+    const kw = kwInput.value.trim();
+    if (!kw) { setPoiStatus('검색어를 입력하세요.', 'error'); kwInput.focus(); return; }
+    const { noorX, noorY } = currentCenterSk();
+    runSearch(buildPoiSearchUrl(envSel.value), buildPoiSearchBody({ keyword: kw, noorX, noorY }));
+  }
+
+  searchBtn.addEventListener('click', doKeywordSearch);
+  kwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doKeywordSearch(); } });
+
+  sendEdit.addEventListener('click', () => {
+    let bodyObj;
+    try { bodyObj = JSON.parse(bodyTa.value); }
+    catch (e) { setPoiStatus('요청 데이터 JSON 파싱 오류: ' + e.message, 'error'); return; }
+    runSearch(urlInput.value.trim(), bodyObj);
+  });
+
+  function renderResults(pois) {
+    if (!pois.length) {
+      resultsEl.innerHTML = '<div class="poi-result-item" style="color:#94a3b8;cursor:default">검색 결과 없음</div>';
+      return;
+    }
+    resultsEl.innerHTML = pois.map((p, i) =>
+      `<div class="poi-result-item" data-i="${i}">
+         <div class="poi-result-name">${esc(p.name)}</div>
+         ${p.address ? `<div class="poi-result-addr">${esc(p.address)}${p.tel ? ' · ' + esc(p.tel) : ''}</div>` : ''}
+       </div>`).join('');
+    resultsEl.querySelectorAll('.poi-result-item[data-i]').forEach(el => {
+      el.addEventListener('click', () => focusPoi(lastPois[+el.dataset.i]));
+    });
+  }
+
+  function focusPoi(p) {
+    if (!p) return;
+    const wgs = skCoordToWgs84(p.x, p.y);
+    if (!wgs) { setPoiStatus('좌표 변환 실패', 'error'); return; }
+    const [lat, lon] = wgs;
+    const map = getMap();
+    if (!map) return;
+    map.setView([lat, lon], 16, { animate: true });
+    if (window._poiMarker) map.removeLayer(window._poiMarker);
+    window._poiPending = { lat, lon, name: p.name };
+    const popupHtml =
+      `<div style="font-size:12px;min-width:190px">
+         <b style="font-size:13px">${esc(p.name)}</b>
+         ${p.address ? `<br><span style="color:#64748b">${esc(p.address)}</span>` : ''}
+         <br><span style="color:#64748b;font-size:11px">SK: ${p.x}, ${p.y}</span>
+         <div style="display:flex;gap:4px;margin-top:6px">
+           <button onclick="window._poiSetWp('depart')" style="flex:1;padding:4px;background:#22c55e;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">출발</button>
+           <button onclick="window._poiSetWp('via')" style="flex:1;padding:4px;background:#f59e0b;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">경유</button>
+           <button onclick="window._poiSetWp('dest')" style="flex:1;padding:4px;background:#ef4444;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">목적</button>
+         </div>
+       </div>`;
+    window._poiMarker = L.marker([lat, lon], { zIndexOffset: 2500 }).addTo(map).bindPopup(popupHtml, { maxWidth: 260 }).openPopup();
+  }
+
+  window._poiSetWp = function(type) {
+    const p = window._poiPending;
+    if (!p) return;
+    setWaypoint(type, p.lat, p.lon, type === 'via' ? p.name : undefined);
+    const map = getMap();
+    if (map) map.closePopup();
+  };
+})();
 
 function esc(s) {
   return String(s ?? '')

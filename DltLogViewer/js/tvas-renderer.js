@@ -971,7 +971,7 @@ export function evChargerLayerKey(ev) {
 // Store individual charger markers for show/hide from list
 let evChargerMarkers = [];
 
-function buildEvPopup(ev, lat, lon) {
+export function buildEvPopup(ev, lat, lon, idx) {
   const isMust = ev.mustCharge === 1;
   const speedName = {0:'정보없음',1:'완속',2:'급속',3:'초급속'}[ev.chargeSpeed] || '';
   let sockets = [];
@@ -995,10 +995,15 @@ function buildEvPopup(ev, lat, lon) {
   if (ev.chargePower) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전 파워</td><td>${ev.chargePower} kW</td></tr>`;
   if (ev.arrivalSoc) popup += `<tr><td style="color:#8b95a1;padding:2px 0">SoC</td><td>도착 ${ev.arrivalSoc}% → ${ev.expectedSoc}%</td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${ev.poiId}</td></tr>`;
+  if (ev.vxIdx != null) popup += `<tr><td style="color:#8b95a1;padding:2px 0">VX index</td><td>VX${ev.vxIdx}</td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
   if (ev.manualStation) popup += `<tr><td style="color:#8b95a1">구분</td><td style="color:#fbbf24">수동충전소</td></tr>`;
   if (ev.isSelf) popup += `<tr><td style="color:#8b95a1">셀프</td><td>셀프 충전</td></tr>`;
-  popup += `</table></div>`;
+  popup += `</table>`;
+  if (idx != null) {
+    popup += `<button onclick="window._addEvWaypoint(${idx})" style="margin-top:8px;width:100%;padding:6px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🚩 경유지 추가</button>`;
+  }
+  popup += `</div>`;
   return popup;
 }
 
@@ -1043,18 +1048,25 @@ function renderEvChargers(layers, coords, evChargers) {
       iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:rgba(49,130,246,0.85);border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⚡</div>`;
     }
 
-    const popup = buildEvPopup(ev, lat, lon);
+    const popup = buildEvPopup(ev, lat, lon, idx);
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, isMust ? size+16 : size], iconAnchor: [size/2, isMust ? (size+16)/2 : size/2] }),
       zIndexOffset: zOff,
     }).bindPopup(popup, { maxWidth: 320 });
 
-    evChargerMarkers.push({ marker, lat, lon, isMust, layerKey });
+    evChargerMarkers.push({ marker, lat, lon, name: ev.name || '충전소', isMust, layerKey });
 
     // Add every charger to its category layer so the category toggle
     // (경로상/경로주변) fully controls visibility.
     if (lg) marker.addTo(lg);
   }
+}
+
+// Return a charger's coords + name for adding it as a route waypoint.
+export function getEvChargerWaypoint(idx) {
+  const m = evChargerMarkers[idx];
+  if (!m) return null;
+  return { lat: m.lat, lon: m.lon, name: m.name };
 }
 
 // Pan/zoom to a charger from the list and open its popup.

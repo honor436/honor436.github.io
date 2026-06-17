@@ -2098,7 +2098,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord } from './js/coordinate.js';
 import {
@@ -3237,10 +3237,10 @@ function addViaMarker(lat, lon, idx) {
   wpMarkers.vias[idx] = marker;
 }
 
-function setWaypoint(type, lat, lon) {
+function setWaypoint(type, lat, lon, name) {
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    routeWaypoints.vias.push({ lat, lon });
+    routeWaypoints.vias.push({ lat, lon, name });
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
     routeWaypoints[type] = { lat, lon };
@@ -3286,7 +3286,7 @@ function applyWaypointsToBody() {
         return {
           x: sk[0],
           y: sk[1],
-          wayPointName: '경유지' + (i + 1),
+          wayPointName: v.name || ('경유지' + (i + 1)),
           wayPointSearchFlag: 'WaypointSearch',
           rpFlag: 99,
         };
@@ -3400,6 +3400,15 @@ window._showEvCharger = function(idx) {
   const map = getMap();
   if (!map) return;
   showEvChargerOnMap(map, idx);
+};
+
+// Add EV charger as a via waypoint from its popup button
+window._addEvWaypoint = function(idx) {
+  const wp = getEvChargerWaypoint(idx);
+  if (!wp) return;
+  setWaypoint('via', wp.lat, wp.lon, wp.name);
+  const map = getMap();
+  if (map) map.closePopup();
 };
 
 function esc(s) {

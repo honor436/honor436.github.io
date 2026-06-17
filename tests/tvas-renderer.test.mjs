@@ -9,6 +9,7 @@ import {
   buildRangeSegments,
   buildCongestionLabels,
   evChargerLayerKey,
+  buildEvPopup,
   buildRpLinkPopup,
   rpLinkStyle,
 } from '../DltLogViewer/js/tvas-renderer.js';
@@ -66,6 +67,26 @@ test('buildRouteArrowSpecs_colors_congestion_level_원활_green', () => {
   const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
   const items = [{ startVxIdx: 0, endVxIdx: 1, congestion: '1' }];
   assert.equal(buildRouteArrowSpecs(coords, items)[0].color, GREEN);
+});
+
+// ---- buildEvPopup --------------------------------------------------------- //
+//
+// EV charger popup includes an "경유지 추가" (add waypoint) button that calls
+// window._addEvWaypoint(idx) so the charger can be appended to the route
+// request as a via. It also surfaces the charger's vertex index (vxIdx).
+
+test('buildEvPopup_includes_add_waypoint_button_with_charger_index', () => {
+  const ev = { name: '서울충전소', onRoute: 0, availChargers: 2, totalChargers: 4, poiId: 123, vxIdx: 17 };
+  const html = buildEvPopup(ev, 37.5, 127.1, 3);
+  assert.match(html, /경유지 추가/);
+  assert.match(html, /_addEvWaypoint\(3\)/);
+});
+
+test('buildEvPopup_shows_vertex_index', () => {
+  const ev = { name: '서울충전소', onRoute: 0, availChargers: 2, totalChargers: 4, poiId: 123, vxIdx: 17 };
+  const html = buildEvPopup(ev, 37.5, 127.1, 3);
+  assert.match(html, /VX/);
+  assert.match(html, /17/);
 });
 
 test('buildRouteArrowSpecs_colors_congestion_level_정보없음_sky', () => {

@@ -12,6 +12,7 @@ import {
   buildEvPopup,
   buildRpLinkPopup,
   rpLinkStyle,
+  vertexHighlightLatLngs,
 } from '../DltLogViewer/js/tvas-renderer.js';
 
 // ---- buildRouteArrowSpecs ------------------------------------------------- //
@@ -156,6 +157,41 @@ test('buildRouteArrowSpecs_multiple_items_produce_colored_segments', () => {
   assert.equal(specs[0].color, GREEN);
   assert.equal(specs[1].color, ORANGE);
   assert.equal(specs[2].color, RED);
+});
+
+// ---- vertexHighlightLatLngs ----------------------------------------------- //
+//
+// 충전소/휴게소/톨게이트 등 vertex 인덱스를 가진 항목을 선택했을 때, 해당
+// vertex 위치를 강조 표시하기 위한 좌표 목록을 만든다. 범위를 벗어나거나
+// 유효하지 않은 인덱스는 제외한다. 반환 shape: [[lat, lon], ...]
+
+test('vertexHighlightLatLngs_returns_latlng_for_single_index', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
+  assert.deepEqual(vertexHighlightLatLngs(coords, [1]), [[37.1, 127.1]]);
+});
+
+test('vertexHighlightLatLngs_returns_multiple_for_range_endpoints', () => {
+  const coords = [
+    { lat: 37.0, lon: 127.0 },
+    { lat: 37.1, lon: 127.1 },
+    { lat: 37.2, lon: 127.2 },
+  ];
+  assert.deepEqual(vertexHighlightLatLngs(coords, [0, 2]), [[37.0, 127.0], [37.2, 127.2]]);
+});
+
+test('vertexHighlightLatLngs_skips_out_of_range_index', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }];
+  assert.deepEqual(vertexHighlightLatLngs(coords, [5]), []);
+});
+
+test('vertexHighlightLatLngs_skips_negative_and_null_index', () => {
+  const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
+  assert.deepEqual(vertexHighlightLatLngs(coords, [-1, null, 0]), [[37.0, 127.0]]);
+});
+
+test('vertexHighlightLatLngs_empty_inputs_return_empty', () => {
+  assert.deepEqual(vertexHighlightLatLngs([], [0]), []);
+  assert.deepEqual(vertexHighlightLatLngs([{ lat: 1, lon: 2 }], []), []);
 });
 
 // ---- buildLanePopup ------------------------------------------------------- //

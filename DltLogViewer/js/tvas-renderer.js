@@ -36,6 +36,7 @@ let tvasLayers = {
   rpLink: null,        // RP 링크 (RD5)
   truck: null,         // 화물차 제한구간
   complexIntersection: null, // 복잡교차로 (MC4)
+  vertexHighlight: null, // 선택된 항목의 vertex 강조 (한 번에 하나만)
 };
 
 // ---- Color schemes -------------------------------------------------------- //
@@ -756,9 +757,10 @@ function renderGuidancePoints(lg, coords, guidancePoints, directionNames, inters
     if (dirName) popup += `<br>방면: ${esc(dirName)}`;
     if (intName) popup += `<br>교차로: ${esc(intName)}`;
     popup += `<br>VX: ${gp.vxIndex}<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: guidanceIconHtml(gp.guidanceCode), iconSize: [22, 22], iconAnchor: [11, 11] }),
-    }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 300 });
+    attachVertexHighlight(m, coords, [gp.vxIndex]).addTo(lg);
   }
 }
 
@@ -846,13 +848,14 @@ function renderDangerAreas(lg, coords, dangerAreas) {
     const svgHtml = getDangerIconSvg(da.type);
     const sz = bigTypes.has(da.type) ? 28 : 26;
     const popup = buildDangerPopup(da, coords);
-    L.marker([startC.lat, startC.lon], {
+    const m = L.marker([startC.lat, startC.lon], {
       icon: L.divIcon({
         className: '',
         html: `<div style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))">${svgHtml}</div>`,
         iconSize: [sz, sz], iconAnchor: [sz/2, sz/2],
       }),
-    }).bindPopup(popup, { maxWidth: 360 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 360 });
+    attachVertexHighlight(m, coords, [da.startVxIdx, da.endVxIdx]).addTo(lg);
   }
 }
 
@@ -902,6 +905,7 @@ function renderComplexIntersections(lg, coords, mc) {
         iconAnchor: [15, 15],
       }),
     }).bindPopup(popup, popupOpts).addTo(lg);
+    attachVertexHighlight(marker, coords, [mi.vxIdx]);
 
     // popup 열린 후 탭 클릭 처리
     marker.on('popupopen', (e) => {
@@ -941,9 +945,10 @@ function renderTollGates(lg, coords, tollGates) {
     if (tg.fare > 0) popup += `<br>요금: ${tg.fare.toLocaleString()}원`;
     if (tg.hipassOnly) popup += `<br>하이패스 전용`;
     popup += `<br>혼잡도: ${congNames[tg.congestion] || tg.congestion}<br>VX: ${tg.vxIdx}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: `<div style="width:26px;height:24px;line-height:24px;text-align:center;background:rgba(251,191,36,0.95);border-radius:6px;font-size:11px;font-weight:800;letter-spacing:-0.5px;color:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">TG</div>`, iconSize: [26, 24], iconAnchor: [13, 12] }),
-    }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 300 });
+    attachVertexHighlight(m, coords, [tg.vxIdx]).addTo(lg);
   }
 }
 
@@ -953,9 +958,10 @@ function renderRestAreas(lg, coords, restAreas) {
     const c = coords[ra.entryVxIdx];
     let popup = `<b>🍴 ${esc(ra.name || '휴게소')}</b><br>VX: ${ra.entryVxIdx}~${ra.exitVxIdx}`;
     if (ra.poiId) popup += `<br>POI: ${ra.poiId}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(34,197,94,0.9);border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">🍴</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
-    }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 300 });
+    attachVertexHighlight(m, coords, [ra.entryVxIdx, ra.exitVxIdx]).addTo(lg);
   }
 }
 
@@ -1053,6 +1059,7 @@ function renderEvChargers(layers, coords, evChargers) {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, isMust ? size+16 : size], iconAnchor: [size/2, isMust ? (size+16)/2 : size/2] }),
       zIndexOffset: zOff,
     }).bindPopup(popup, { maxWidth: 320 });
+    attachVertexHighlight(marker, coords, [ev.vxIdx]);
 
     evChargerMarkers.push({ marker, lat, lon, name: ev.name || '충전소', isMust, layerKey });
 
@@ -1177,10 +1184,11 @@ function renderLaneGuidance(lg, coords, laneGuidance) {
     if (!iconHtml) continue;
     const n = tl.totalLanes;
     const popup = buildLanePopup(tl, c);
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [n * 18 + 8, 30], iconAnchor: [(n * 18 + 8) / 2, 36] }),
       zIndexOffset: 500,
-    }).bindPopup(popup, { maxWidth: 380 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 380 });
+    attachVertexHighlight(m, coords, [tl.vxIdx]).addTo(lg);
   }
 }
 
@@ -1246,10 +1254,11 @@ function renderWaypoints(lg, coords, waypoints) {
     if (wp.type) popup += `<br>유형: ${wp.type}`;
     if (wp.poiId) popup += `<br>POI: ${wp.poiId}`;
     popup += `<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: waypointIconHtml(i), iconSize: [26, 26], iconAnchor: [13, 13] }),
       zIndexOffset: 900,
-    }).bindPopup(popup, { maxWidth: 260 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 260 });
+    attachVertexHighlight(m, coords, [wp.vxIdx]).addTo(lg);
   }
 }
 
@@ -1267,10 +1276,11 @@ function renderIncidents(lg, coords, incidents) {
     let popup = `<b>돌발정보</b> (유형:${esc(ua.typeCode)})`;
     if (ua.content) popup += `<br>${esc(ua.content)}`;
     popup += `<br>VX: ${ua.startVxIdx}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: incidentIconHtml(ua.typeCode), iconSize: [24, 24], iconAnchor: [12, 12] }),
       zIndexOffset: 800,
-    }).bindPopup(popup, { maxWidth: 280 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 280 });
+    attachVertexHighlight(m, coords, [ua.startVxIdx]).addTo(lg);
   }
 }
 
@@ -1288,10 +1298,11 @@ function renderForcedReroute(lg, coords, points) {
     if (pt.distance) popup += `<br>거리: ${pt.distance}m`;
     if (pt.rid) popup += `<br>RID: ${pt.rid}`;
     popup += `<br>VX: ${pt.vxIdx}`;
-    L.marker([c.lat, c.lon], {
+    const m = L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: rerouteIconHtml(), iconSize: [22, 22], iconAnchor: [11, 11] }),
       zIndexOffset: 700,
-    }).bindPopup(popup, { maxWidth: 260 }).addTo(lg);
+    }).bindPopup(popup, { maxWidth: 260 });
+    attachVertexHighlight(m, coords, [pt.vxIdx]).addTo(lg);
   }
 }
 
@@ -1409,6 +1420,60 @@ export function rpLinkStyle(isSelected) {
   return isSelected
     ? { color: '#dc2626', weight: 6, opacity: 1 }
     : { color: '#eab308', weight: 2, opacity: 0.7 };
+}
+
+// ---- Vertex highlight (선택 항목의 vertex 강조) --------------------------- //
+
+/**
+ * 주어진 vertex 인덱스 목록을 좌표 배열로 변환한다.
+ * 범위를 벗어나거나(음수/배열 길이 이상) null/비정수 인덱스는 제외한다.
+ * Pure: (coords, vxIndices) → [[lat, lon], ...]
+ */
+export function vertexHighlightLatLngs(coords, vxIndices) {
+  if (!coords || coords.length === 0 || !vxIndices) return [];
+  const out = [];
+  for (const idx of vxIndices) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= coords.length) continue;
+    out.push([coords[idx].lat, coords[idx].lon]);
+  }
+  return out;
+}
+
+// 강조 마커 스타일 — 경로/혼잡도 색(빨강/주황/녹색/하늘/노랑)과 겹치지 않는
+// 마젠타 헤일로로 한눈에 보이게 한다. 아이콘 위에 올라온 항목이라도 반경을
+// 넉넉히 줘서 아이콘 둘레로 테두리(링)가 보이도록 한다.
+const VERTEX_HIGHLIGHT_STYLE = {
+  radius: 16, color: '#ff00ff', weight: 4,
+  fillColor: '#ff00ff', fillOpacity: 0.25,
+  interactive: false,
+};
+
+/**
+ * 선택된 항목의 vertex 를 강조 표시한다. 기존 강조는 항상 먼저 지우므로
+ * "다른 항목 선택 시 이전 항목 해제" 동작이 보장된다.
+ */
+function setVertexHighlight(coords, vxIndices) {
+  const lg = tvasLayers.vertexHighlight;
+  if (!lg) return;
+  lg.clearLayers();
+  for (const ll of vertexHighlightLatLngs(coords, vxIndices)) {
+    L.circleMarker(ll, VERTEX_HIGHLIGHT_STYLE).addTo(lg);
+  }
+}
+
+function clearVertexHighlight() {
+  if (tvasLayers.vertexHighlight) tvasLayers.vertexHighlight.clearLayers();
+}
+
+/**
+ * 팝업이 열리면 해당 vertex 를 강조하고, 닫히면 강조를 지운다.
+ * Leaflet 은 새 팝업을 열기 전에 기존 팝업을 먼저 닫으므로(close → open),
+ * 항목을 바꿔 선택하면 이전 강조가 해제되고 새 강조만 남는다.
+ */
+function attachVertexHighlight(marker, coords, vxIndices) {
+  marker.on('popupopen', () => setVertexHighlight(coords, vxIndices));
+  marker.on('popupclose', clearVertexHighlight);
+  return marker;
 }
 
 // 현재 선택된 RP링크 폴리라인 (한 번에 하나만 강조)

@@ -436,7 +436,7 @@
       color: #0f172a;
       margin-bottom: 8px;
     }
-    #poi-body {
+    #poi-body, #poi-headers {
       width: 100%;
       box-sizing: border-box;
       height: 150px;
@@ -2158,6 +2158,8 @@
     <div id="poi-edit-area">
       <div class="poi-edit-label">검색 URL</div>
       <input id="poi-url" type="text" spellcheck="false" placeholder="https://...findpois">
+      <div class="poi-edit-label">요청 헤더 (JSON) — 직접 편집 가능</div>
+      <textarea id="poi-headers" spellcheck="false" placeholder="{ ... }" style="height:96px"></textarea>
       <div class="poi-edit-label">요청 데이터 (JSON) — 직접 편집 가능</div>
       <textarea id="poi-body" spellcheck="false" placeholder="{ ... }"></textarea>
       <button id="poi-send-edited">이 내용으로 전송</button>
@@ -2254,7 +2256,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, buildPoiSearchHeaders } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3575,6 +3577,7 @@ window._addEvWaypoint = function(idx) {
   const editTgl   = document.getElementById('poi-edit-toggle');
   const editArea  = document.getElementById('poi-edit-area');
   const urlInput  = document.getElementById('poi-url');
+  const headersTa = document.getElementById('poi-headers');
   const bodyTa    = document.getElementById('poi-body');
   const sendEdit  = document.getElementById('poi-send-edited');
   const statusEl  = document.getElementById('poi-status');
@@ -3600,6 +3603,7 @@ window._addEvWaypoint = function(idx) {
 
   function syncUrlFromEnv() { urlInput.value = buildPoiSearchUrl(envSel.value); }
   syncUrlFromEnv();
+  headersTa.value = JSON.stringify(buildPoiSearchHeaders(), null, 2);
   envSel.addEventListener('change', syncUrlFromEnv);
 
   editTgl.addEventListener('click', () => {
@@ -3607,10 +3611,12 @@ window._addEvWaypoint = function(idx) {
     editTgl.classList.toggle('active');
   });
 
-  async function runSearch(url, bodyObj) {
+  async function runSearch(url, bodyObj, headersObj) {
     if (bodyObj && bodyObj.header && !bodyObj.header.reqTime) bodyObj.header.reqTime = nowReqTime();
+    if (!headersObj) headersObj = buildPoiSearchHeaders();
     // 항상 편집 필드에 반영 → 사용자가 보고 수정 가능
     urlInput.value = url;
+    headersTa.value = JSON.stringify(headersObj, null, 2);
     bodyTa.value = JSON.stringify(bodyObj, null, 2);
     setPoiStatus('검색 중...');
     resultsEl.innerHTML = '';
@@ -3618,11 +3624,22 @@ window._addEvWaypoint = function(idx) {
     try {
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headersObj,
         body: JSON.stringify(bodyObj),
       });
-      if (!resp.ok) { setPoiStatus(`HTTP ${resp.status} ${resp.statusText}`, 'error'); return; }
-      const json = await resp.json();
+      const raw = await resp.text();
+      if (!resp.ok) {
+        setPoiStatus(`HTTP ${resp.status} ${resp.statusText}`, 'error');
+        showRawResponse(raw);
+        return;
+      }
+      const json = coerceJson(raw);
+      if (json == null) {
+        // 응답이 JSON 이 아님 — 원본을 보여줘 진단할 수 있게 한다
+        setPoiStatus('응답이 JSON 형식이 아닙니다. 아래 원본 응답을 확인하세요.', 'error');
+        showRawResponse(raw);
+        return;
+      }
       const pois = parsePoiSearchResponse(json);
       lastPois = pois;
       renderResults(pois);
@@ -3645,11 +3662,22 @@ window._addEvWaypoint = function(idx) {
   kwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doKeywordSearch(); } });
 
   sendEdit.addEventListener('click', () => {
-    let bodyObj;
+    let bodyObj, headersObj;
     try { bodyObj = JSON.parse(bodyTa.value); }
     catch (e) { setPoiStatus('요청 데이터 JSON 파싱 오류: ' + e.message, 'error'); return; }
-    runSearch(urlInput.value.trim(), bodyObj);
+    try { headersObj = headersTa.value.trim() ? JSON.parse(headersTa.value) : buildPoiSearchHeaders(); }
+    catch (e) { setPoiStatus('요청 헤더 JSON 파싱 오류: ' + e.message, 'error'); return; }
+    runSearch(urlInput.value.trim(), bodyObj, headersObj);
   });
+
+  function showRawResponse(raw) {
+    const snippet = (raw || '(빈 응답)').slice(0, 1200);
+    resultsEl.innerHTML =
+      `<div class="poi-result-item" style="cursor:default">
+         <div class="poi-result-name" style="color:#ef4444">원본 응답 (진단용)</div>
+         <pre style="white-space:pre-wrap;word-break:break-all;font-size:11px;color:#334155;margin:6px 0 0">${esc(snippet)}</pre>
+       </div>`;
+  }
 
   function renderResults(pois) {
     if (!pois.length) {

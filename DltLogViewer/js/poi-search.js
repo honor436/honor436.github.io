@@ -72,6 +72,54 @@ export function buildPoiSearchBody({ keyword, noorX, noorY, reqSeq = 1 }) {
   };
 }
 
+// ---- request headers ------------------------------------------------------ //
+
+function nowReqTime14() {
+  const n = new Date();
+  return n.getFullYear().toString() +
+    String(n.getMonth() + 1).padStart(2, '0') + String(n.getDate()).padStart(2, '0') +
+    String(n.getHours()).padStart(2, '0') + String(n.getMinutes()).padStart(2, '0') +
+    String(n.getSeconds()).padStart(2, '0');
+}
+
+/**
+ * findpois 서버 요구 헤더.
+ * Connection / Content-Length 는 브라우저가 자동 설정하는 금지 헤더(fetch 가
+ * 무시)이므로 포함하지 않는다. Client_ReqTime 은 기본적으로 현재시간.
+ * @param {{ reqTime?:string, requestHashToken?:string, cih?:string }} [opts]
+ */
+export function buildPoiSearchHeaders(opts = {}) {
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'requestHashToken': opts.requestHashToken || '1988490197',
+    'CIH': opts.cih || '582079726',
+    'Client_ReqTime': opts.reqTime || nowReqTime14(),
+  };
+}
+
+// ---- lenient JSON ---------------------------------------------------------- //
+
+/**
+ * 응답 텍스트를 최대한 JSON 객체로 파싱한다. 순수 JSON 이 아니면
+ * BOM/공백 제거 후, 첫 '{' 또는 '[' 부터 끝까지를 점진적으로 줄여가며 시도.
+ * 끝내 실패하면 null.
+ */
+export function coerceJson(text) {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  try { return JSON.parse(text); } catch {}
+  const t = text.replace(/^﻿/, '').trim();
+  if (t !== text) { try { return JSON.parse(t); } catch {} }
+  const start = t.search(/[\{\[]/);
+  if (start < 0) return null;
+  for (let end = t.length; end > start; end--) {
+    const ch = t[end - 1];
+    if (ch !== '}' && ch !== ']') continue;
+    try { return JSON.parse(t.slice(start, end)); } catch {}
+  }
+  return null;
+}
+
 // ---- response parsing ----------------------------------------------------- //
 
 const NAME_KEYS = ['name', 'poiName', 'bldName', 'fullName'];

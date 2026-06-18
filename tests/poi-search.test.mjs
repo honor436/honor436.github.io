@@ -13,6 +13,7 @@ import {
   extractTmapErrorHint,
   buildPoiDetailBody,
   derivePoiDetailUrl,
+  resolveRpFlag,
 } from '../DltLogViewer/js/poi-search.js';
 
 // ---- buildPoiSearchUrl ---------------------------------------------------- //
@@ -304,4 +305,29 @@ test('extractTmapErrorHint_detects_html_error_page', () => {
   const html = '<html><head><title></title></head><body>서비스 이용에 불편을 드려 죄송합니다.</body></html>';
   const hint = extractTmapErrorHint(html);
   assert.ok(hint && /(HTML|엔드포인트|경로)/.test(hint));
+});
+
+// ---- rpFlag (경유지 18 / 목적지 16, POI rpFlag 우선) ---------------------- //
+
+test('parsePoiSearchResponse_extracts_rpFlag', () => {
+  const json = { poiInfo: { pois: { poi: [
+    { name: '행당대림', noorX: '4575887', noorY: '1351438', rpFlag: 7 },
+  ] } } };
+  assert.equal(parsePoiSearchResponse(json)[0].rpFlag, 7);
+});
+
+test('resolveRpFlag_defaults_via_18_dest_16', () => {
+  assert.equal(resolveRpFlag('via'), 18);
+  assert.equal(resolveRpFlag('dest'), 16);
+});
+
+test('resolveRpFlag_prefers_poi_rpFlag', () => {
+  assert.equal(resolveRpFlag('via', 7), 7);
+  assert.equal(resolveRpFlag('dest', '5'), 5);
+});
+
+test('resolveRpFlag_ignores_empty_or_nan_poi_rpFlag', () => {
+  assert.equal(resolveRpFlag('via', null), 18);
+  assert.equal(resolveRpFlag('via', ''), 18);
+  assert.equal(resolveRpFlag('dest', 'abc'), 16);
 });

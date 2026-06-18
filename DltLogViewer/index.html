@@ -2272,7 +2272,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3409,13 +3409,13 @@ function addViaMarker(lat, lon, idx) {
   wpMarkers.vias[idx] = marker;
 }
 
-function setWaypoint(type, lat, lon, name) {
+function setWaypoint(type, lat, lon, name, rpFlag) {
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    routeWaypoints.vias.push({ lat, lon, name });
+    routeWaypoints.vias.push({ lat, lon, name, rpFlag });
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
-    routeWaypoints[type] = { lat, lon };
+    routeWaypoints[type] = { lat, lon, name, rpFlag };
     const map = getMap();
     if (!map) return;
     if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
@@ -3450,6 +3450,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);
       body.destXPos = sk[0];
       body.destYPos = sk[1];
+      // 목적지 rpFlag: POI(검색/상세) 값 우선, 없으면 16
+      body.destRpFlag = resolveRpFlag('dest', routeWaypoints.dest.rpFlag);
     }
     // 경유지 반영
     if (routeWaypoints.vias.length > 0) {
@@ -3460,7 +3462,8 @@ function applyWaypointsToBody() {
           y: sk[1],
           wayPointName: v.name || ('경유지' + (i + 1)),
           wayPointSearchFlag: 'WaypointSearch',
-          rpFlag: 99,
+          // 경유지 rpFlag: POI(검색/상세) 값 우선, 없으면 18
+          rpFlag: resolveRpFlag('via', v.rpFlag),
         };
       });
     } else {
@@ -3729,7 +3732,7 @@ window._addEvWaypoint = function(idx) {
     if (!map) return;
     map.setView([lat, lon], 16, { animate: true });
     if (window._poiMarker) map.removeLayer(window._poiMarker);
-    window._poiPending = { lat, lon, name: p.name, poiId: p.poiId, pkey: p.pkey };
+    window._poiPending = { lat, lon, name: p.name, poiId: p.poiId, pkey: p.pkey, rpFlag: p.rpFlag };
     const idAttr = p.pkey != null || p.poiId != null
       ? `<br><span style="color:#64748b;font-size:11px">poiId: ${esc(p.poiId || '-')} / pkey: ${esc(p.pkey || '-')}</span>` : '';
     const detailBtn = (p.pkey != null || p.poiId != null)
@@ -3790,7 +3793,7 @@ window._addEvWaypoint = function(idx) {
   window._poiSetWp = function(type) {
     const p = window._poiPending;
     if (!p) return;
-    setWaypoint(type, p.lat, p.lon, type === 'via' ? p.name : undefined);
+    setWaypoint(type, p.lat, p.lon, p.name, p.rpFlag);
     const map = getMap();
     if (map) map.closePopup();
   };

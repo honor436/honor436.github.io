@@ -109,14 +109,17 @@ export function buildPoiDetailBody({ name, poiId, pkey, findOption = 'PKEY' }) {
   };
 }
 
+// 실제 POI 상세 엔드포인트 경로 (검색의 /poi/search/findpois 와 다름).
+export const POI_DETAIL_PATH = '/tmap-channel/poi/detailinfo/findpoidetailinfoforauto';
+
 /**
- * 상세 URL 도출: 검색 URL 의 'findpois' 경로만 'findpoidetails' 로 치환.
- * 호스트/포트/스킴은 검색 URL 을 그대로 따른다(편집 가능).
+ * 상세 URL 도출: 검색 URL 의 호스트(스킴+호스트+포트)를 그대로 쓰고
+ * 실제 상세 경로(POI_DETAIL_PATH)를 붙인다.
  */
 export function derivePoiDetailUrl(searchUrl) {
   const u = String(searchUrl || '');
-  if (/findpois\b/.test(u)) return u.replace(/findpois\b/, 'findpoidetails');
-  return u.replace(/\/?$/, '/').replace(/\/$/, '/findpoidetails');
+  const origin = /^(https?:\/\/[^/]+)/i.exec(u);
+  return origin ? origin[1] + POI_DETAIL_PATH : POI_DETAIL_PATH;
 }
 
 // ---- request headers ------------------------------------------------------ //

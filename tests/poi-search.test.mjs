@@ -273,20 +273,20 @@ test('buildPoiDetailBody_coerces_ids_to_string', () => {
 
 // ---- derivePoiDetailUrl --------------------------------------------------- //
 //
-// 상세 URL 은 검색 URL(findpois)의 마지막 경로만 findpoidetails 로 바꿔 도출.
-// (호스트/포트는 검색 URL 그대로) — 편집 가능.
+// 상세 URL 은 검색 URL 의 호스트를 그대로 쓰고 실제 상세 경로
+// (/tmap-channel/poi/detailinfo/findpoidetailinfoforauto) 로 도출한다.
 
-test('derivePoiDetailUrl_swaps_findpois_segment', () => {
+test('derivePoiDetailUrl_uses_detailinfo_path_on_same_host', () => {
   assert.equal(
-    derivePoiDetailUrl('https://ntmapstg.tmap.co.kr:9443/tmap-channel/poi/search/findpois'),
-    'https://ntmapstg.tmap.co.kr:9443/tmap-channel/poi/search/findpoidetails'
+    derivePoiDetailUrl('https://ntmapdev.tmap.co.kr:9443/tmap-channel/poi/search/findpois'),
+    'https://ntmapdev.tmap.co.kr:9443/tmap-channel/poi/detailinfo/findpoidetailinfoforauto'
   );
 });
 
 test('derivePoiDetailUrl_keeps_custom_host', () => {
   assert.equal(
     derivePoiDetailUrl('https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/search/findpois'),
-    'https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/search/findpoidetails'
+    'https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/detailinfo/findpoidetailinfoforauto'
   );
 });
 

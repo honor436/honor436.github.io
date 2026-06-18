@@ -51,7 +51,7 @@ export const REQUEST_TYPES = [
     id: 'findpoidetails',
     label: 'POI 상세',
     method: 'POST',
-    path: '/tmap-channel/poi/search/findpoidetails',
+    path: '/tmap-channel/poi/detailinfo/findpoidetailinfoforauto',
     sampleBody: () => buildPoiDetailBody({ name: 'EV충전소 행당대림아파트', poiId: '10185460', pkey: '1018546001' }),
   },
   {

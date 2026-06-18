@@ -212,6 +212,9 @@ export function decodeTmapBody(bytes, contentType = '') {
  */
 export function extractTmapErrorHint(text) {
   const s = String(text || '');
+  if (/<html[\s>]/i.test(s) || /서비스\s*이용에\s*불편/.test(s)) {
+    return 'HTML 오류 페이지 응답 — 엔드포인트 URL/경로가 틀렸거나 게이트웨이가 차단했습니다(상세 URL 확인 필요)';
+  }
   const code = /\bNCH\d{5}\b/.exec(s);
   if (code) {
     return `채널 오류 ${code[0]} — AccessKey/AccessToken 누락·만료 가능성(헤더 확인 필요)`;

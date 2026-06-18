@@ -297,3 +297,11 @@ test('buildPoiDetailBody_uses_detail_header_svctype_114', () => {
   assert.equal(body.header.svcType, 114);
   assert.equal(body.header.appVersion, '1.0.13');
 });
+
+// ---- HTML 게이트웨이 오류 페이지 감지 ------------------------------------- //
+
+test('extractTmapErrorHint_detects_html_error_page', () => {
+  const html = '<html><head><title></title></head><body>서비스 이용에 불편을 드려 죄송합니다.</body></html>';
+  const hint = extractTmapErrorHint(html);
+  assert.ok(hint && /(HTML|엔드포인트|경로)/.test(hint));
+});

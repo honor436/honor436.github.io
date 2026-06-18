@@ -2272,7 +2272,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3729,20 +3729,63 @@ window._addEvWaypoint = function(idx) {
     if (!map) return;
     map.setView([lat, lon], 16, { animate: true });
     if (window._poiMarker) map.removeLayer(window._poiMarker);
-    window._poiPending = { lat, lon, name: p.name };
+    window._poiPending = { lat, lon, name: p.name, poiId: p.poiId, pkey: p.pkey };
+    const idAttr = p.pkey != null || p.poiId != null
+      ? `<br><span style="color:#64748b;font-size:11px">poiId: ${esc(p.poiId || '-')} / pkey: ${esc(p.pkey || '-')}</span>` : '';
+    const detailBtn = (p.pkey != null || p.poiId != null)
+      ? `<button onclick="window._poiDetail()" style="width:100%;margin-top:4px;padding:5px;background:#3182f6;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">📋 상세 조회</button>` : '';
     const popupHtml =
-      `<div style="font-size:12px;min-width:190px">
+      `<div style="font-size:12px;min-width:200px">
          <b style="font-size:13px">${esc(p.name)}</b>
          ${p.address ? `<br><span style="color:#64748b">${esc(p.address)}</span>` : ''}
          <br><span style="color:#64748b;font-size:11px">SK: ${p.x}, ${p.y}</span>
+         ${idAttr}
          <div style="display:flex;gap:4px;margin-top:6px">
            <button onclick="window._poiSetWp('depart')" style="flex:1;padding:4px;background:#22c55e;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">출발</button>
            <button onclick="window._poiSetWp('via')" style="flex:1;padding:4px;background:#f59e0b;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">경유</button>
            <button onclick="window._poiSetWp('dest')" style="flex:1;padding:4px;background:#ef4444;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">목적</button>
          </div>
+         ${detailBtn}
        </div>`;
-    window._poiMarker = L.marker([lat, lon], { zIndexOffset: 2500 }).addTo(map).bindPopup(popupHtml, { maxWidth: 260 }).openPopup();
+    window._poiMarker = L.marker([lat, lon], { zIndexOffset: 2500 }).addTo(map).bindPopup(popupHtml, { maxWidth: 280 }).openPopup();
   }
+
+  // 검색 결과 선택 → POI 상세 조회
+  async function runDetail(p) {
+    if (!p || (p.poiId == null && p.pkey == null)) { setPoiStatus('상세조회할 POI 식별자(poiId/pkey)가 없습니다.', 'error'); return; }
+    const url = derivePoiDetailUrl(urlInput.value.trim() || buildPoiSearchUrl(envSel.value));
+    const body = buildPoiDetailBody({ name: p.name, poiId: p.poiId, pkey: p.pkey });
+    if (body.header) body.header.reqTime = nowReqTime();
+    const { headers } = parseHeaderText(headersTa.value);
+    setPoiStatus('상세 조회 중...');
+    try {
+      const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      const buf = await resp.arrayBuffer();
+      const raw = decodeTmapBody(new Uint8Array(buf), resp.headers.get('content-type') || '');
+      if (!resp.ok) { setPoiStatus(`상세 HTTP ${resp.status} ${resp.statusText}`, 'error'); showRawResponse(raw); return; }
+      const json = coerceJson(raw);
+      if (json == null) {
+        setPoiStatus(extractTmapErrorHint(raw) || '상세 응답이 JSON 형식이 아닙니다.', 'error');
+        showRawResponse(raw);
+        return;
+      }
+      renderDetail(p, json);
+      setPoiStatus(`상세 조회 완료: ${p.name}`, 'ok');
+    } catch (e) {
+      setPoiStatus('상세 조회 실패 (CORS/프록시 필요할 수 있음): ' + e.message, 'error');
+    }
+  }
+
+  function renderDetail(p, json) {
+    resultsEl.innerHTML =
+      `<div class="poi-result-item" style="cursor:default">
+         <div class="poi-result-name">📋 ${esc(p.name)} 상세</div>
+         <div class="poi-result-addr">poiId: ${esc(p.poiId || '-')} / pkey: ${esc(p.pkey || '-')}</div>
+         <pre style="white-space:pre-wrap;word-break:break-all;font-size:11px;color:#334155;margin:6px 0 0;max-height:40vh;overflow:auto">${esc(JSON.stringify(json, null, 2).slice(0, 4000))}</pre>
+       </div>`;
+  }
+
+  window._poiDetail = function() { runDetail(window._poiPending); };
 
   window._poiSetWp = function(type) {
     const p = window._poiPending;

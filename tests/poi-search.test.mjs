@@ -11,6 +11,8 @@ import {
   buildDefaultHeaderText,
   decodeTmapBody,
   extractTmapErrorHint,
+  buildPoiDetailBody,
+  derivePoiDetailUrl,
 } from '../DltLogViewer/js/poi-search.js';
 
 // ---- buildPoiSearchUrl ---------------------------------------------------- //
@@ -237,4 +239,53 @@ test('extractTmapErrorHint_detects_channel_error_code', () => {
 
 test('extractTmapErrorHint_returns_null_for_normal_json', () => {
   assert.equal(extractTmapErrorHint('{"poiInfo":{"pois":{"poi":[]}}}'), null);
+});
+
+// ---- pkey/poiId extraction ------------------------------------------------ //
+
+test('parsePoiSearchResponse_extracts_pkey_and_poiId', () => {
+  const json = { poiInfo: { pois: { poi: [
+    { name: 'EV충전소 행당대림아파트', noorX: '4575887', noorY: '1351438', poiId: '10185460', pkey: '1018546001' },
+  ] } } };
+  const pois = parsePoiSearchResponse(json);
+  assert.equal(pois[0].poiId, '10185460');
+  assert.equal(pois[0].pkey, '1018546001');
+});
+
+// ---- buildPoiDetailBody --------------------------------------------------- //
+//
+// 검색 결과 선택 → POI 상세 조회 요청 바디(findOption=PKEY).
+
+test('buildPoiDetailBody_sets_pkey_lookup_fields', () => {
+  const body = buildPoiDetailBody({ name: 'EV충전소 행당대림아파트', poiId: '10185460', pkey: '1018546001' });
+  assert.equal(body.findOption, 'PKEY');
+  assert.equal(body.name, 'EV충전소 행당대림아파트');
+  assert.equal(body.poiId, '10185460');
+  assert.equal(body.pkey, '1018546001');
+  assert.ok(body.header, 'detail body must carry a header');
+});
+
+test('buildPoiDetailBody_coerces_ids_to_string', () => {
+  const body = buildPoiDetailBody({ name: 'x', poiId: 10185460, pkey: 1018546001 });
+  assert.equal(body.poiId, '10185460');
+  assert.equal(body.pkey, '1018546001');
+});
+
+// ---- derivePoiDetailUrl --------------------------------------------------- //
+//
+// 상세 URL 은 검색 URL(findpois)의 마지막 경로만 findpoidetails 로 바꿔 도출.
+// (호스트/포트는 검색 URL 그대로) — 편집 가능.
+
+test('derivePoiDetailUrl_swaps_findpois_segment', () => {
+  assert.equal(
+    derivePoiDetailUrl('https://ntmapstg.tmap.co.kr:9443/tmap-channel/poi/search/findpois'),
+    'https://ntmapstg.tmap.co.kr:9443/tmap-channel/poi/search/findpoidetails'
+  );
+});
+
+test('derivePoiDetailUrl_keeps_custom_host', () => {
+  assert.equal(
+    derivePoiDetailUrl('https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/search/findpois'),
+    'https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/search/findpoidetails'
+  );
 });

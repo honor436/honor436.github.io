@@ -72,6 +72,32 @@ export function buildPoiSearchBody({ keyword, noorX, noorY, reqSeq = 1 }) {
   };
 }
 
+// ---- POI detail ----------------------------------------------------------- //
+
+/**
+ * 검색 결과 선택 → POI 상세 조회 요청 바디(findOption=PKEY).
+ * @param {{ name:string, poiId:string|number, pkey:string|number, findOption?:string }} opts
+ */
+export function buildPoiDetailBody({ name, poiId, pkey, findOption = 'PKEY' }) {
+  return {
+    findOption,
+    name,
+    poiId: poiId != null ? String(poiId) : '',
+    pkey: pkey != null ? String(pkey) : '',
+    header: defaultHeader(),
+  };
+}
+
+/**
+ * 상세 URL 도출: 검색 URL 의 'findpois' 경로만 'findpoidetails' 로 치환.
+ * 호스트/포트/스킴은 검색 URL 을 그대로 따른다(편집 가능).
+ */
+export function derivePoiDetailUrl(searchUrl) {
+  const u = String(searchUrl || '');
+  if (/findpois\b/.test(u)) return u.replace(/findpois\b/, 'findpoidetails');
+  return u.replace(/\/?$/, '/').replace(/\/$/, '/findpoidetails');
+}
+
 // ---- request headers ------------------------------------------------------ //
 
 function nowReqTime14() {
@@ -253,6 +279,8 @@ function normalizePoi(raw) {
     y: coords.y,
     address: pick(raw, ADDR_KEYS) || '',
     tel: pick(raw, TEL_KEYS) || '',
+    poiId: pick(raw, ['poiId', 'id', 'poiID']),
+    pkey: pick(raw, ['pkey', 'pKey', 'navSeqPkey']),
     raw,
   };
 }

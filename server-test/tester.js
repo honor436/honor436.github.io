@@ -59,6 +59,7 @@ export const REQUEST_TYPES = [
     label: '경로상 POI (poisByRoute)',
     method: 'POST',
     path: '/tmap-channel/poi/search/findpoisbyroute',
+    implemented: false,
     sampleBody: poisByRouteSample,
   },
 ];

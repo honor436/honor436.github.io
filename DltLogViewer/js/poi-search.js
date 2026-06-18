@@ -74,6 +74,27 @@ export function buildPoiSearchBody({ keyword, noorX, noorY, reqSeq = 1 }) {
 
 // ---- POI detail ----------------------------------------------------------- //
 
+// POI 상세 요청 헤더(제공된 상세 샘플 기준 — 검색과 svcType/appVersion 등이 다름).
+function detailHeader() {
+  return {
+    appLaunchCount: 0,
+    pushDeviceKey: '',
+    screenHeight: 854,
+    screenWidth: 768,
+    svcType: 114,
+    using: 'MAIN',
+    appVersion: '1.0.13',
+    buildNo: '100000',
+    carrier: '',
+    deviceId: '2-1-8b8e9a44-cba3-3beb-9a5d-5c6eec7d2d79',
+    modelNo: 'SM-T510',
+    osType: 'AND',
+    osVersion: '10',
+    reqTime: '',
+    resolution: 'WSVGA',
+  };
+}
+
 /**
  * 검색 결과 선택 → POI 상세 조회 요청 바디(findOption=PKEY).
  * @param {{ name:string, poiId:string|number, pkey:string|number, findOption?:string }} opts
@@ -84,7 +105,7 @@ export function buildPoiDetailBody({ name, poiId, pkey, findOption = 'PKEY' }) {
     name,
     poiId: poiId != null ? String(poiId) : '',
     pkey: pkey != null ? String(pkey) : '',
-    header: defaultHeader(),
+    header: detailHeader(),
   };
 }
 

@@ -71,3 +71,14 @@ test('getRequestType_returns_entry_with_sample_body', () => {
 test('getRequestType_unknown_returns_null', () => {
   assert.equal(getRequestType('nope'), null);
 });
+
+// ---- 구현 상태 (미구현 표시) ---------------------------------------------- //
+
+test('REQUEST_TYPES_poisbyroute_is_marked_unimplemented', () => {
+  assert.equal(getRequestType('poisbyroute').implemented, false);
+});
+
+test('REQUEST_TYPES_poi_search_and_detail_are_implemented', () => {
+  assert.notEqual(getRequestType('findpois').implemented, false);
+  assert.notEqual(getRequestType('findpoidetails').implemented, false);
+});

@@ -98,6 +98,83 @@ export function buildPoiSearchHeaders(opts = {}) {
   };
 }
 
+// ---- header text (Key: Value) --------------------------------------------- //
+//
+// Tmap 요청 테스터 규칙: "Key: Value" 한 줄에 하나, '#' 주석/빈 줄 무시,
+// 값이 비었거나 <...> 플레이스홀더면 전송에서 제외하고 skipped 로 보고.
+
+export function parseHeaderText(text) {
+  const headers = {};
+  const skipped = [];
+  for (const rawLine of String(text || '').split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const idx = line.indexOf(':');
+    if (idx < 0) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (!key) continue;
+    if (value === '' || /^<.*>$/.test(value)) { skipped.push(key); continue; }
+    headers[key] = value;
+  }
+  return { headers, skipped };
+}
+
+/**
+ * findpois 요청용 기본 헤더 템플릿(Key: Value 텍스트).
+ * AccessKey/AccessToken/Nonce 는 플레이스홀더 — 사용자가 최신값으로 채워야
+ * 검색이 동작한다(미입력 시 전송에서 제외됨).
+ */
+export function buildDefaultHeaderText(opts = {}) {
+  const reqTime = opts.reqTime || nowReqTime14();
+  return [
+    '# 값이 비었거나 <...> 인 헤더는 전송에서 제외됩니다.',
+    '# AccessKey / AccessToken 은 최신값으로 채워야 검색이 동작합니다(만료 주의).',
+    'Accept: application/json',
+    'Content-Type: application/json',
+    'AccessKey: <AccessKey 입력>',
+    'AccessToken: <AccessToken 입력>',
+    'CIH: 582079726',
+    'Nonce: <Nonce>',
+    'requestHashToken: 1988490197',
+    'Client_ReqTime: ' + reqTime,
+    'Requester: CLIENT_SSL',
+  ].join('\n');
+}
+
+// ---- response decoding ---------------------------------------------------- //
+//
+// Tmap 채널 응답은 JSON(utf-8) 이거나 CP949 바이너리(에러 메시지)일 수 있다.
+// charset → utf-8 → euc-kr 순으로 디코딩한다.
+
+export function decodeTmapBody(bytes, contentType = '') {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const order = [];
+  const m = /charset=([\w-]+)/i.exec(contentType || '');
+  if (m) order.push(m[1].toLowerCase());
+  order.push('utf-8', 'euc-kr');
+  for (const enc of order) {
+    try { return new TextDecoder(enc, { fatal: true }).decode(u8); } catch {}
+  }
+  try { return new TextDecoder('euc-kr').decode(u8); } catch { return ''; }
+}
+
+/**
+ * 디코딩된 본문에서 Tmap 채널 오류 힌트를 추출. 정상 응답이면 null.
+ * 예: "NCH01000 서비스가 지연되고 있습니다" → 인증 헤더 누락/만료 안내.
+ */
+export function extractTmapErrorHint(text) {
+  const s = String(text || '');
+  const code = /\bNCH\d{5}\b/.exec(s);
+  if (code) {
+    return `채널 오류 ${code[0]} — AccessKey/AccessToken 누락·만료 가능성(헤더 확인 필요)`;
+  }
+  if (/서비스가\s*지연/.test(s)) {
+    return '채널이 요청을 거부했습니다(서비스 지연/인증) — AccessKey·AccessToken 확인';
+  }
+  return null;
+}
+
 // ---- lenient JSON ---------------------------------------------------------- //
 
 /**

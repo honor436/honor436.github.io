@@ -7,6 +7,10 @@ import {
   parsePoiSearchResponse,
   coerceJson,
   buildPoiSearchHeaders,
+  parseHeaderText,
+  buildDefaultHeaderText,
+  decodeTmapBody,
+  extractTmapErrorHint,
 } from '../DltLogViewer/js/poi-search.js';
 
 // ---- buildPoiSearchUrl ---------------------------------------------------- //
@@ -161,4 +165,76 @@ test('buildPoiSearchHeaders_does_not_set_forbidden_headers', () => {
 test('buildPoiSearchHeaders_respects_reqTime_override', () => {
   const h = buildPoiSearchHeaders({ reqTime: '20210511180658' });
   assert.equal(h['Client_ReqTime'], '20210511180658');
+});
+
+// ---- parseHeaderText ------------------------------------------------------ //
+//
+// "Key: Value" 한 줄에 하나. '#' 주석/빈 줄 무시. 값이 비었거나 <...>
+// 플레이스홀더면 전송 제외하고 skipped 로 보고 (Tmap 요청 테스터 규칙).
+
+test('parseHeaderText_parses_key_value_lines', () => {
+  const { headers } = parseHeaderText('Accept: application/json\nCIH: 123');
+  assert.equal(headers['Accept'], 'application/json');
+  assert.equal(headers['CIH'], '123');
+});
+
+test('parseHeaderText_ignores_comments_and_blanks', () => {
+  const { headers } = parseHeaderText('# 주석\n\nAccept: application/json\n');
+  assert.deepEqual(Object.keys(headers), ['Accept']);
+});
+
+test('parseHeaderText_skips_empty_and_placeholder_values', () => {
+  const { headers, skipped } = parseHeaderText('AccessKey: <AccessKey>\nAccessToken:   \nCIH: 99');
+  assert.equal(headers['CIH'], '99');
+  assert.equal(headers['AccessKey'], undefined);
+  assert.equal(headers['AccessToken'], undefined);
+  assert.deepEqual(skipped.sort(), ['AccessKey', 'AccessToken']);
+});
+
+test('parseHeaderText_keeps_colons_in_value', () => {
+  const { headers } = parseHeaderText('URL: https://a.b/c:9443/x');
+  assert.equal(headers['URL'], 'https://a.b/c:9443/x');
+});
+
+// ---- buildDefaultHeaderText ----------------------------------------------- //
+
+test('buildDefaultHeaderText_includes_required_auth_headers', () => {
+  const t = buildDefaultHeaderText();
+  assert.match(t, /AccessKey:/);
+  assert.match(t, /AccessToken:/);
+  assert.match(t, /Requester:\s*CLIENT_SSL/);
+  assert.match(t, /Content-Type:\s*application\/json/);
+});
+
+test('buildDefaultHeaderText_client_reqtime_is_14_digits_and_overridable', () => {
+  assert.match(buildDefaultHeaderText(), /Client_ReqTime:\s*\d{14}/);
+  assert.match(buildDefaultHeaderText({ reqTime: '20210511180658' }), /Client_ReqTime:\s*20210511180658/);
+});
+
+// ---- decodeTmapBody ------------------------------------------------------- //
+//
+// Tmap 채널 응답은 JSON(utf-8) 이거나 CP949 바이너리. arrayBuffer 를 받아
+// charset → utf-8 → euc-kr 순으로 디코딩한다.
+
+test('decodeTmapBody_decodes_utf8_json', () => {
+  const bytes = new TextEncoder().encode('{"a":1}');
+  assert.equal(decodeTmapBody(bytes, 'application/json'), '{"a":1}');
+});
+
+test('decodeTmapBody_decodes_cp949_binary_as_korean', () => {
+  // EUC-KR bytes for "서비스" — invalid as UTF-8, so euc-kr fallback kicks in
+  const bytes = new Uint8Array([0xBC, 0xAD, 0xBA, 0xF1, 0xBD, 0xBA]);
+  const out = decodeTmapBody(bytes, 'application/binary');
+  assert.match(out, /서비스/);
+});
+
+// ---- extractTmapErrorHint ------------------------------------------------- //
+
+test('extractTmapErrorHint_detects_channel_error_code', () => {
+  const hint = extractTmapErrorHint('010100 NCH01000 서비스가 지연되고 있습니다.');
+  assert.ok(hint && /NCH01000/.test(hint));
+});
+
+test('extractTmapErrorHint_returns_null_for_normal_json', () => {
+  assert.equal(extractTmapErrorHint('{"poiInfo":{"pois":{"poi":[]}}}'), null);
 });

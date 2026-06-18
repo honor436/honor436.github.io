@@ -2174,8 +2174,8 @@
     <div id="poi-edit-area">
       <div class="poi-edit-label">검색 URL</div>
       <input id="poi-url" type="text" spellcheck="false" placeholder="https://...findpois">
-      <div class="poi-edit-label">요청 헤더 (JSON) — 직접 편집 가능</div>
-      <textarea id="poi-headers" spellcheck="false" placeholder="{ ... }" style="height:96px"></textarea>
+      <div class="poi-edit-label">요청 헤더 (Key: Value, 한 줄에 하나) — AccessKey/AccessToken 필수</div>
+      <textarea id="poi-headers" spellcheck="false" placeholder="Accept: application/json&#10;AccessKey: ..." style="height:120px"></textarea>
       <div class="poi-edit-label">요청 데이터 (JSON) — 직접 편집 가능</div>
       <textarea id="poi-body" spellcheck="false" placeholder="{ ... }"></textarea>
       <button id="poi-send-edited">이 내용으로 전송</button>
@@ -2272,7 +2272,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, buildPoiSearchHeaders } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3619,7 +3619,7 @@ window._addEvWaypoint = function(idx) {
 
   function syncUrlFromEnv() { urlInput.value = buildPoiSearchUrl(envSel.value); }
   syncUrlFromEnv();
-  headersTa.value = JSON.stringify(buildPoiSearchHeaders(), null, 2);
+  headersTa.value = buildDefaultHeaderText();
   envSel.addEventListener('change', syncUrlFromEnv);
 
   editTgl.addEventListener('click', () => {
@@ -3627,23 +3627,34 @@ window._addEvWaypoint = function(idx) {
     editTgl.classList.toggle('active');
   });
 
-  async function runSearch(url, bodyObj, headersObj) {
+  // headerText(= "Key: Value" 줄) 를 받아 전송. JSON 헤더가 아니라 테스터 규칙.
+  async function runSearch(url, bodyObj, headerText) {
     if (bodyObj && bodyObj.header && !bodyObj.header.reqTime) bodyObj.header.reqTime = nowReqTime();
-    if (!headersObj) headersObj = buildPoiSearchHeaders();
+    if (headerText == null) headerText = headersTa.value;
+    const { headers, skipped } = parseHeaderText(headerText);
     // 항상 편집 필드에 반영 → 사용자가 보고 수정 가능
     urlInput.value = url;
-    headersTa.value = JSON.stringify(headersObj, null, 2);
+    headersTa.value = headerText;
     bodyTa.value = JSON.stringify(bodyObj, null, 2);
-    setPoiStatus('검색 중...');
+
+    // 인증 헤더 누락 경고 (검색 실패의 주원인)
+    const missingAuth = skipped.filter(k => /^(AccessKey|AccessToken)$/i.test(k));
+    if (missingAuth.length) {
+      setPoiStatus(`⚠ ${missingAuth.join(', ')} 미입력 — 채널이 거부할 수 있습니다(⚙에서 입력)`, 'error');
+    } else {
+      setPoiStatus('검색 중...');
+    }
     resultsEl.innerHTML = '';
     searchBtn.disabled = true;
     try {
       const resp = await fetch(url, {
         method: 'POST',
-        headers: headersObj,
+        headers,
         body: JSON.stringify(bodyObj),
       });
-      const raw = await resp.text();
+      // Tmap 채널 응답은 CP949 바이너리일 수 있어 arrayBuffer 로 받아 디코딩
+      const buf = await resp.arrayBuffer();
+      const raw = decodeTmapBody(new Uint8Array(buf), resp.headers.get('content-type') || '');
       if (!resp.ok) {
         setPoiStatus(`HTTP ${resp.status} ${resp.statusText}`, 'error');
         showRawResponse(raw);
@@ -3651,8 +3662,9 @@ window._addEvWaypoint = function(idx) {
       }
       const json = coerceJson(raw);
       if (json == null) {
-        // 응답이 JSON 이 아님 — 원본을 보여줘 진단할 수 있게 한다
-        setPoiStatus('응답이 JSON 형식이 아닙니다. 아래 원본 응답을 확인하세요.', 'error');
+        // JSON 이 아님(대개 CP949 에러 본문) — 힌트 + 원본 표시
+        const hint = extractTmapErrorHint(raw);
+        setPoiStatus(hint || '응답이 JSON 형식이 아닙니다. 아래 원본 응답을 확인하세요.', 'error');
         showRawResponse(raw);
         return;
       }
@@ -3661,7 +3673,7 @@ window._addEvWaypoint = function(idx) {
       renderResults(pois);
       setPoiStatus(`${pois.length}건 검색됨`, pois.length ? 'ok' : '');
     } catch (e) {
-      setPoiStatus('요청 실패 (CORS Unblock 확장 필요할 수 있음): ' + e.message, 'error');
+      setPoiStatus('요청 실패 (CORS Unblock 확장/프록시 필요할 수 있음): ' + e.message, 'error');
     } finally {
       searchBtn.disabled = false;
     }
@@ -3671,19 +3683,17 @@ window._addEvWaypoint = function(idx) {
     const kw = kwInput.value.trim();
     if (!kw) { setPoiStatus('검색어를 입력하세요.', 'error'); kwInput.focus(); return; }
     const { noorX, noorY } = currentCenterSk();
-    runSearch(buildPoiSearchUrl(envSel.value), buildPoiSearchBody({ keyword: kw, noorX, noorY }));
+    runSearch(buildPoiSearchUrl(envSel.value), buildPoiSearchBody({ keyword: kw, noorX, noorY }), headersTa.value);
   }
 
   searchBtn.addEventListener('click', doKeywordSearch);
   kwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doKeywordSearch(); } });
 
   sendEdit.addEventListener('click', () => {
-    let bodyObj, headersObj;
+    let bodyObj;
     try { bodyObj = JSON.parse(bodyTa.value); }
     catch (e) { setPoiStatus('요청 데이터 JSON 파싱 오류: ' + e.message, 'error'); return; }
-    try { headersObj = headersTa.value.trim() ? JSON.parse(headersTa.value) : buildPoiSearchHeaders(); }
-    catch (e) { setPoiStatus('요청 헤더 JSON 파싱 오류: ' + e.message, 'error'); return; }
-    runSearch(urlInput.value.trim(), bodyObj, headersObj);
+    runSearch(urlInput.value.trim(), bodyObj, headersTa.value);
   });
 
   function showRawResponse(raw) {

@@ -72,6 +72,17 @@ export function buildPoiSearchBody({ keyword, noorX, noorY, reqSeq = 1 }) {
   };
 }
 
+/**
+ * 경로요청 rpFlag 결정: 경유지(via) 기본 18, 목적지(dest) 기본 16.
+ * POI 검색/상세에서 받은 rpFlag(숫자)가 있으면 그것을 우선 사용한다.
+ */
+export function resolveRpFlag(kind, poiRpFlag) {
+  if (poiRpFlag != null && poiRpFlag !== '' && !Number.isNaN(Number(poiRpFlag))) {
+    return Number(poiRpFlag);
+  }
+  return kind === 'dest' ? 16 : 18;
+}
+
 // ---- POI detail ----------------------------------------------------------- //
 
 // POI 상세 요청 헤더(제공된 상세 샘플 기준 — 검색과 svcType/appVersion 등이 다름).
@@ -308,6 +319,7 @@ function normalizePoi(raw) {
     tel: pick(raw, TEL_KEYS) || '',
     poiId: pick(raw, ['poiId', 'id', 'poiID']),
     pkey: pick(raw, ['pkey', 'pKey', 'navSeqPkey']),
+    rpFlag: pick(raw, ['rpFlag', 'rpflag']),
     raw,
   };
 }

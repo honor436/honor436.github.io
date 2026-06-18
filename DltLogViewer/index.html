@@ -3581,7 +3581,7 @@ window._showEvCharger = function(idx) {
 window._addEvWaypoint = function(idx) {
   const wp = getEvChargerWaypoint(idx);
   if (!wp) return;
-  setWaypoint('via', wp.lat, wp.lon, wp.name);
+  setWaypoint('via', wp.lat, wp.lon, wp.name, 18); // 충전소 경유지 rpFlag = 18
   const map = getMap();
   if (map) map.closePopup();
 };

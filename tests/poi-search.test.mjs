@@ -289,3 +289,11 @@ test('derivePoiDetailUrl_keeps_custom_host', () => {
     'https://tmap-channel-aws.tmobiapi.com/tmap-channel/poi/search/findpoidetails'
   );
 });
+
+// ---- POI detail header (제공된 상세 샘플 기준: svcType 114) ---------------- //
+
+test('buildPoiDetailBody_uses_detail_header_svctype_114', () => {
+  const body = buildPoiDetailBody({ name: 'x', poiId: '1', pkey: '11' });
+  assert.equal(body.header.svcType, 114);
+  assert.equal(body.header.appVersion, '1.0.13');
+});

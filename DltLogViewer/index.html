@@ -890,6 +890,40 @@
       justify-content: center;
     }
     #error-overlay.visible { display: flex; }
+
+    /* ---- 응답 데이터 전체 보기 팝업 ---- */
+    #resp-popup-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 10001;
+      align-items: center; justify-content: center;
+    }
+    #resp-popup-overlay.visible { display: flex; }
+    #resp-popup-box {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 80%; max-width: 760px; max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    }
+    #resp-popup-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+    }
+    #resp-popup-head h3 { margin: 0; font-size: 15px; color: #e2e8f0; }
+    #resp-popup-head button {
+      padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+      background: #1e293b; color: #e2e8f0; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    #resp-popup-head button:hover { background: #334155; }
+    #resp-popup-body {
+      margin: 0; padding: 16px 18px; overflow: auto;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 12px; line-height: 1.5; color: #cbd5e1;
+      white-space: pre-wrap; word-break: break-all;
+    }
     #error-box {
       background: var(--panel);
       border: 1px solid var(--danger);
@@ -2259,6 +2293,20 @@
     <h3>오류 발생</h3>
     <pre id="error-message"></pre>
     <button id="error-close">확인</button>
+  </div>
+</div>
+
+<!-- 응답 데이터 전체 보기 팝업 -->
+<div id="resp-popup-overlay">
+  <div id="resp-popup-box">
+    <div id="resp-popup-head">
+      <h3>응답 데이터</h3>
+      <div style="display:flex;gap:6px">
+        <button id="resp-popup-copy" type="button">복사</button>
+        <button id="resp-popup-close" type="button">닫기</button>
+      </div>
+    </div>
+    <pre id="resp-popup-body"></pre>
   </div>
 </div>
 
@@ -4287,6 +4335,27 @@ tvasSaveRespBtn.addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
 });
 
+// ---- 응답 데이터 전체 보기 팝업 ---- //
+function showResponsePopup(text) {
+  const ov = document.getElementById('resp-popup-overlay');
+  const body = document.getElementById('resp-popup-body');
+  if (!ov || !body) return;
+  body.textContent = text || '(빈 응답)';
+  ov.classList.add('visible');
+}
+(function setupRespPopup() {
+  const ov = document.getElementById('resp-popup-overlay');
+  if (!ov) return;
+  const close = () => ov.classList.remove('visible');
+  document.getElementById('resp-popup-close')?.addEventListener('click', close);
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.getElementById('resp-popup-copy')?.addEventListener('click', () => {
+    const t = document.getElementById('resp-popup-body').textContent || '';
+    navigator.clipboard?.writeText(t).catch(() => {});
+  });
+})();
+
 // ---- Send request ---- //
 tvasSendBtn.addEventListener('click', async () => {
   const url = tvasUrl.value.trim();
@@ -4345,7 +4414,7 @@ tvasSendBtn.addEventListener('click', async () => {
     const elapsed = Math.round(performance.now() - t0);
 
     if (!resp.ok) {
-      setStatus(`HTTP ${resp.status} ${resp.statusText} (${elapsed}ms)`, 'error');
+      setStatus(`요청 실패: HTTP ${resp.status} ${resp.statusText} (${elapsed}ms)`, 'error');
       tvasSendBtn.disabled = false;
       return;
     }
@@ -4360,13 +4429,15 @@ tvasSendBtn.addEventListener('click', async () => {
     // 도달 가능 범위(isochrone) 는 TVAS 가 아니라 JSON 응답 → 별도 처리
     const isIsochroneReq = /isochrone/i.test(url) || segVal(tvasRouteType) === 'isochrone';
     if (isIsochroneReq) {
-      const text = new TextDecoder('utf-8').decode(rawBytes).replace(/^﻿/, '').trim();
-      let isoJson;
-      try { isoJson = JSON.parse(text); }
-      catch (e) {
+      // CP949/utf-8 자동 디코딩 + 관대한 JSON 파싱 (POI 와 동일 처리)
+      const raw = decodeTmapBody(rawBytes, resp.headers.get('content-type') || '');
+      const isoJson = coerceJson(raw);
+      if (isoJson == null) {
         tvasRespRaw.style.display = '';
-        tvasRespPre.textContent = text.slice(0, 2000);
-        setStatus(`도달 가능 범위 응답 JSON 파싱 오류: ${e.message} (${elapsed}ms)`, 'error');
+        tvasRespPre.textContent = raw;
+        const hint = extractTmapErrorHint(raw);
+        setStatus((hint || '도달 가능 범위 응답이 JSON 형식이 아닙니다') + ` (${elapsed}ms)`, 'error');
+        showResponsePopup(raw);   // 에러 시 응답 전체 팝업
         tvasSendBtn.disabled = false;
         return;
       }
@@ -4377,7 +4448,8 @@ tvasSendBtn.addEventListener('click', async () => {
       tvasRespPre.textContent = JSON.stringify(isoJson, null, 2);
       const ec = isoJson.header?.errorCode;
       if (ec && ec !== '000000') {
-        setStatus(`서버 오류 [${ec}]: ${isoJson.header?.errorMessage || 'Unknown'} (${elapsed}ms)`, 'error');
+        setStatus(`서버 오류 [${ec}]: ${isoJson.header?.errorMessage || '알 수 없음'} (${elapsed}ms)`, 'error');
+        showResponsePopup(JSON.stringify(isoJson, null, 2));   // 에러 시 응답 전체 팝업
         tvasSendBtn.disabled = false;
         return;
       }
@@ -4385,6 +4457,7 @@ tvasSendBtn.addEventListener('click', async () => {
       if (map) clearTvasRoute(map);
       const n = drawIsochrone(isoJson);
       setStatus(n ? `도달 가능 범위 ${n}개 폴리곤 표시 (${elapsed}ms)` : `도달 가능 범위 좌표가 없습니다 — 응답 확인 (${elapsed}ms)`, n ? 'ok' : 'error');
+      if (!n) showResponsePopup(JSON.stringify(isoJson, null, 2));   // 좌표 없음도 응답 팝업
       tvasSendBtn.disabled = false;
       return;
     }
@@ -4417,12 +4490,13 @@ tvasSendBtn.addEventListener('click', async () => {
       };
 
       if (json.header?.errorCode !== '000000') {
-        let errDetail = `서버 오류 [${json.header?.errorCode}]: ${json.header?.errorMessage || 'Unknown'}`;
+        let errDetail = `서버 오류 [${json.header?.errorCode}]: ${json.header?.errorMessage || '알 수 없음'}`;
         if (json.header?.errorDetailCode) errDetail += `\n상세코드: ${json.header.errorDetailCode}`;
         if (json.header?.errorDetailMessage) errDetail += `\n상세메시지: ${json.header.errorDetailMessage}`;
-        if (json.header?.sessionId) errDetail += `\nSession: ${json.header.sessionId}`;
+        if (json.header?.sessionId) errDetail += `\n세션: ${json.header.sessionId}`;
         errDetail += ` (${elapsed}ms)`;
         setStatus(errDetail, 'error');
+        showResponsePopup(JSON.stringify(json, null, 2));   // 에러 시 응답 전체 팝업
         tvasSendBtn.disabled = false;
         return;
       }
@@ -4529,10 +4603,10 @@ tvasSendBtn.addEventListener('click', async () => {
 
       // Extract first TVAS
       tvasBuffer = rawBuf.slice(tvasStart, tvasStart + tvasSizes[0]);
-      setStatus(`바이너리 응답 파싱: ${rawBuf.byteLength} bytes, TVAS ${tvasSizes[0]} bytes (${elapsed}ms)`);
+      setStatus(`바이너리 응답 파싱: ${rawBuf.byteLength}바이트, TVAS ${tvasSizes[0]}바이트 (${elapsed}ms)`);
     }
 
-    setStatus(`TVAS 파싱 중... (${tvasBuffer.byteLength} bytes)`);
+    setStatus(`TVAS 파싱 중... (${tvasBuffer.byteLength}바이트)`);
 
     let tvasResult, coords;
     try {

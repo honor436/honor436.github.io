@@ -398,8 +398,8 @@
     }
 
     /* ---- EV 파라미터 슬라이더 ---- */
-    #tvas-ev-params { display: none; }
-    #tvas-ev-params.show { display: block; }
+    #tvas-ev-params, #tvas-iso-params { display: none; }
+    #tvas-ev-params.show, #tvas-iso-params.show { display: block; }
     .ev-slider { margin-bottom: 8px; }
     .ev-slider label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
     .ev-slider input[type=range] { width: 100%; accent-color: #22c55e; cursor: pointer; }
@@ -1807,6 +1807,7 @@
       <div class="seg" id="tvas-route-type" data-value="ev">
         <button type="button" class="seg-btn active" data-value="ev">EV</button>
         <button type="button" class="seg-btn" data-value="normal">일반</button>
+        <button type="button" class="seg-btn" data-value="isochrone">Range Map</button>
       </div>
     </div>
     <div>
@@ -1835,6 +1836,22 @@
       <div class="ev-slider">
         <label>현재 도달거리 currentRange <span class="ev-auto">(자동계산)</span> <span class="ev-val" id="ev-curR-val"></span></label>
         <input type="range" id="ev-curR" min="0" max="600000" step="500" disabled>
+      </div>
+    </div>
+    <!-- Range Map 파라미터 (isochrone 일 때만) -->
+    <div id="tvas-iso-params">
+      <div class="tvas-field-label">Range Map 파라미터 (요청 데이터와 실시간 동기화)</div>
+      <div class="ev-slider">
+        <label>보조 전력 auxiliaryPower <span class="ev-val" id="iso-aux-val"></span></label>
+        <input type="range" id="iso-aux" min="0" max="10000" step="10">
+      </div>
+      <div class="ev-slider">
+        <label>등에너지선 contoursEnergy <span class="ev-val" id="iso-energy-val"></span></label>
+        <input type="range" id="iso-energy" min="0" max="100000" step="100">
+      </div>
+      <div class="ev-slider">
+        <label>등거리선 contoursMeters <span class="ev-val" id="iso-meters-val"></span></label>
+        <input type="range" id="iso-meters" min="0" max="600000" step="500">
       </div>
     </div>
     <!-- URL -->
@@ -3440,24 +3457,45 @@ function setupSeg(el, onChange) {
   });
 }
 
-// 경로 탐색 옵션(서버/EV·일반) → URL 자동 구성
+// 경로 탐색 옵션(서버/EV·일반·Range Map) → URL 자동 구성
 function syncTvasUrl() {
   if (tvasEnvSel && tvasRouteType && tvasUrl) {
-    tvasUrl.value = buildRouteUrl(segVal(tvasEnvSel), segVal(tvasRouteType) === 'ev');
+    tvasUrl.value = buildRouteUrl(segVal(tvasEnvSel), segVal(tvasRouteType));
   }
   updateEvParamsVisibility();
 }
+// 경로 타입 변경: isochrone ↔ 일반/EV 전환 시 요청 바디 교체(좌표 유지)
+let _prevRouteType = 'ev';
+function onRouteTypeChange() {
+  const t = segVal(tvasRouteType);
+  const wasIso = _prevRouteType === 'isochrone';
+  const isIso = t === 'isochrone';
+  if (isIso && !wasIso) setRouteBodyTemplate(ISOCHRONE_BODY);
+  else if (!isIso && wasIso) setRouteBodyTemplate(defaultBody);
+  _prevRouteType = t;
+  syncTvasUrl();
+}
+function setRouteBodyTemplate(tmpl) {
+  evBodyEl.value = JSON.stringify(tmpl, null, 2);
+  applyWaypointsToBody();   // departXPos/destXPos/wayPoints/angle 재적용
+}
 setupSeg(tvasEnvSel, syncTvasUrl);
-setupSeg(tvasRouteType, syncTvasUrl);
+setupSeg(tvasRouteType, onRouteTypeChange);
 
-// ---- EV 파라미터 슬라이더 ↔ 요청 데이터 양방향 동기화 ---- //
-const evParamsBox = document.getElementById('tvas-ev-params');
+// ---- 파라미터 슬라이더 ↔ 요청 데이터 양방향 동기화 (EV / Range Map) ---- //
+const evParamsBox  = document.getElementById('tvas-ev-params');
+const isoParamsBox = document.getElementById('tvas-iso-params');
 const evBodyEl = document.getElementById('tvas-body'); // tvasBody const 선언 전이라 직접 참조
-const evFields = {
+const EV_FIELDS = {
   chargedEnergy:  { slider: document.getElementById('ev-chgE'), val: document.getElementById('ev-chgE-val'), unit: 'W' },
   chargedRange:   { slider: document.getElementById('ev-chgR'), val: document.getElementById('ev-chgR-val'), unit: 'm' },
   currentEnergy:  { slider: document.getElementById('ev-curE'), val: document.getElementById('ev-curE-val'), unit: 'W' },
   currentRange:   { slider: document.getElementById('ev-curR'), val: document.getElementById('ev-curR-val'), unit: 'm' },
+};
+const ISO_FIELDS = {
+  auxiliaryPower: { slider: document.getElementById('iso-aux'),    val: document.getElementById('iso-aux-val'),    unit: 'W' },
+  contoursEnergy: { slider: document.getElementById('iso-energy'), val: document.getElementById('iso-energy-val'), unit: 'W' },
+  contoursMeters: { slider: document.getElementById('iso-meters'), val: document.getElementById('iso-meters-val'), unit: 'm' },
 };
 
 function fmtEvVal(n, unit) {
@@ -3465,48 +3503,59 @@ function fmtEvVal(n, unit) {
   return unit === 'm' ? `${v.toLocaleString()} m (${(v / 1000).toFixed(1)} km)` : `${v.toLocaleString()} W`;
 }
 
+function activeParamGroup() {
+  const t = segVal(tvasRouteType);
+  return t === 'ev' ? EV_FIELDS : t === 'isochrone' ? ISO_FIELDS : null;
+}
+
 function updateEvParamsVisibility() {
-  if (!evParamsBox) return;
-  const ev = segVal(tvasRouteType) === 'ev';
-  evParamsBox.classList.toggle('show', ev);
-  if (ev) syncEvParamsFromBody();
+  const t = segVal(tvasRouteType);
+  if (evParamsBox) evParamsBox.classList.toggle('show', t === 'ev');
+  if (isoParamsBox) isoParamsBox.classList.toggle('show', t === 'isochrone');
+  if (t === 'ev' || t === 'isochrone') syncParamsFromBody();
 }
 
 let _evSyncing = false;
-function syncEvParamsFromBody() {
-  if (!evParamsBox || _evSyncing) return;
+function syncParamsFromBody() {
+  const group = activeParamGroup();
+  if (!group || _evSyncing) return;
   let body; try { body = JSON.parse(evBodyEl.value); } catch { return; }
   _evSyncing = true;
-  for (const [key, f] of Object.entries(evFields)) {
+  for (const [key, f] of Object.entries(group)) {
     if (!f.slider) continue;
     let v = Number(body[key]);
     if (!Number.isFinite(v)) v = 0;
-    // 슬라이더 최대 자동 확장 (값이 max 초과 시)
-    if (v > Number(f.slider.max)) f.slider.max = String(v);
+    if (v > Number(f.slider.max)) f.slider.max = String(v); // 값이 max 초과 시 확장
     f.slider.value = String(v);
     if (f.val) f.val.textContent = fmtEvVal(v, f.unit);
   }
   _evSyncing = false;
 }
 
-function onEvSliderInput(changedKey) {
+function onParamSliderInput(group, changedKey) {
   if (_evSyncing) return;
   let body; try { body = JSON.parse(evBodyEl.value); } catch { return; }
-  // 드래그한 항목만 반영 (나머지 값은 그대로 유지)
-  if (changedKey && evFields[changedKey] && evFields[changedKey].slider) {
-    body[changedKey] = Number(evFields[changedKey].slider.value);
+  if (changedKey && group[changedKey] && group[changedKey].slider) {
+    body[changedKey] = Number(group[changedKey].slider.value);
   }
-  // 현재 도달거리: chargedRange × (currentEnergy / chargedEnergy) 비율 자동계산
-  body.currentRange = computeCurrentRange(body.chargedRange, body.chargedEnergy, body.currentEnergy);
+  // EV: 현재 도달거리 = chargedRange × (currentEnergy / chargedEnergy) 자동계산
+  if (group === EV_FIELDS) {
+    body.currentRange = computeCurrentRange(body.chargedRange, body.chargedEnergy, body.currentEnergy);
+  }
   evBodyEl.value = JSON.stringify(body, null, 2);
-  syncEvParamsFromBody();
+  syncParamsFromBody();
 }
 
-for (const [key, f] of Object.entries(evFields)) {
-  if (f.slider && !f.slider.disabled) f.slider.addEventListener('input', () => onEvSliderInput(key));
+for (const group of [EV_FIELDS, ISO_FIELDS]) {
+  for (const [key, f] of Object.entries(group)) {
+    if (f.slider && !f.slider.disabled) f.slider.addEventListener('input', () => onParamSliderInput(group, key));
+  }
 }
 // 요청 데이터 직접 편집 → 슬라이더 반영
-if (evBodyEl) evBodyEl.addEventListener('input', () => { if (evParamsBox && evParamsBox.classList.contains('show')) syncEvParamsFromBody(); });
+if (evBodyEl) evBodyEl.addEventListener('input', () => {
+  if ((evParamsBox && evParamsBox.classList.contains('show')) ||
+      (isoParamsBox && isoParamsBox.classList.contains('show'))) syncParamsFromBody();
+});
 const tvasHeaders    = document.getElementById('tvas-headers');
 const tvasBody       = document.getElementById('tvas-body');
 const tvasSendBtn    = document.getElementById('tvas-send-btn');
@@ -4118,6 +4167,26 @@ tvasAddHdr.addEventListener('click', () => addHeaderRow());
 
 // ---- Default body (sample) ---- //
 const defaultBody = {"addCameraTypes":["Bus","SignalSpeeding","Moving","ShoulderControl","Traffic"],"angle":130,"applyEvChargingTimeOnETA":true,"autoAddingYn":"Y","auxiliaryPower":1200,"availableAutoAddingYn":false,"chargedEnergy":70000,"chargedRange":500000,"consumptionParam":"{\"aux\":1200.0,\"batteryCapacity\":69770,\"batteryTemperature\":-30,\"chargingModeGen6\":\"PERFORMANCE\",\"csc\":[40.32,25.5,20.84,17.37,14.41,17.03,17.26,20.71,24.17,28.7,32.22],\"firstCharging\":false,\"kAcc\":2412000,\"kDec\":3600000,\"kDown\":3384000,\"kUp\":3132000,\"mass\":2580,\"vehicleId\":\"11CF\",\"vendor\":\"BMW\"}","controlRouteReqFlag":0,"currentEnergy":6970,"currentRange":47000,"dangerAreaOptions":["OccurFrequently","SharpCurveSection","MistArea","SchoolZone","TrainCrossing"],"departDirPriority":1,"departDirectionType":0,"departLinkId":0,"departMeshId":0,"departName":"충청남도 천안시 동남구 성남면","departRoadType":"None","departSrchFlag":0,"departXPos":4581514,"departYPos":1322213,"destEVChargerFlag":false,"destName":"동대구역","destPoiId":"501087","destRpFlag":16,"destSearchDetailFlag":"None","destSearchFlag":"LeaveReSearch","destXPos":4630714,"destYPos":1291586,"ecoModeFlag":0,"efficientSpeed":0,"evMobilityProviders":[],"evSocHistory":[],"gpsTraceData":"","guideImgResolutionCode":"R480x540","header":{"appLaunchCount":1,"appVersion":"3.11.260","buildNo":"311260","carrier":"","deviceId":"2-1-64f62924-13d2-3391-ad91-e935f9043d2d","modelNo":"BMW IDCEvo","osType":"AND","osVersion":"14","pushDeviceKey":"","reqTime":"20260417112835","resolution":"QUAD_HD","screenHeight":1218,"screenWidth":2560,"svcType":113,"using":"MAIN"},"hipassFlag":0,"initSrchDepartXPos":0,"initSrchDepartYPos":0,"initSrchLength":155226,"initSrchSessionId":"TPtr20260417112814767AHT","isRetry":false,"lastRid":5153744,"lastTollgateId":0,"maxCharge":69770,"minEnergy":6977,"minSocAtAutoAdding":20,"minSocAtChargingStation":20,"minSocAtDestination":10,"myEvStations":[],"pastArrivalTime":"","pastSessionId":"TPtr20260417112814767AHT","pastXpos":0,"pastYpos":0,"patternDateTime":"","pickEvStations":[],"preMapVersion":"20260407","preRids":[],"preSecs":[],"preTollgateIds":"129","radiusEntryTurnType":117,"radiusInfoType":1,"radiusLeaveTurnType":0,"radiusLinkDirection":1,"radiusLinkId":5901,"radiusMeshCode":2293816,"radiusXPos":127,"radiusYPos":36,"routePlanTypes":["Traffic_Recommend"],"searchCondData":"","serviceFlag":"Realtime","slopeFlag":0,"socketType":["DcCombo"],"speed":0,"tcRid":0,"tollCarType":"Car","tvas":"5.9","vehicleId":"11CF","vehicleMass":2580,"vendor":"BMW","version":"1.1","wayPoints":[]};
+// Range Map (isochrone) 기본 요청 데이터
+const ISOCHRONE_BODY = {
+  "auxiliaryPower": 2760,
+  "contoursEnergy": 51200,
+  "contoursMeters": 300000,
+  "departXPos": 4572802,
+  "departYPos": 1351861,
+  "slopeFlag": 0,
+  "vehicleId": "volvo_XC40",
+  "vehicleMass": 2216,
+  "version": "1.1",
+  "header": {
+    "appLaunchCount": 0, "pushDeviceKey": "", "screenHeight": 976, "screenWidth": 878,
+    "svcType": 116, "using": "MAIN", "appVersion": "2.0.0", "buildNo": "100000",
+    "carrier": "", "deviceId": "2-1-d23a0c5c-cd0c-3540-b586-558ea19f1239",
+    "modelNo": "sdk_gphone_arm64", "osType": "AND", "osVersion": "11",
+    "reqTime": "20230130103919", "resolution": "HD"
+  }
+};
+
 tvasBody.value = JSON.stringify(defaultBody, null, 2);
 updateEvParamsVisibility();
 

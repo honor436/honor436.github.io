@@ -14,13 +14,19 @@ export const ROUTE_ENVS = {
 const PORT = 9443;
 
 /**
+ * 경로 타입별 엔드포인트 URL.
  * @param {string} env  'prod' | 'stg' | 'dev'
- * @param {boolean} evMode  true=전기차(ev/route), false=일반(route)
+ * @param {string|boolean} routeType  'ev' | 'normal' | 'isochrone'
+ *   (구버전 호환: true=ev, false=normal)
  */
-export function buildRouteUrl(env, evMode) {
+export function buildRouteUrl(env, routeType) {
   const e = ROUTE_ENVS[env];
   if (!e) throw new Error('unknown route env: ' + env);
-  const path = evMode ? '/tmap-channel/rsd/ev/route' : '/tmap-channel/rsd/route';
+  if (routeType === true) routeType = 'ev';
+  else if (routeType === false) routeType = 'normal';
+  const path = routeType === 'isochrone' ? '/tmap-channel/rsd/route/isochrone'
+             : routeType === 'ev'        ? '/tmap-channel/rsd/ev/route'
+             :                             '/tmap-channel/rsd/route';
   return `https://${e.host}:${PORT}${path}`;
 }
 

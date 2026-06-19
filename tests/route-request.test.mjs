@@ -58,3 +58,17 @@ test('computeCurrentRange_full_ratio', () => {
 test('computeCurrentRange_zero_charged_energy_is_0', () => {
   assert.equal(computeCurrentRange(40000, 0, 1000), 0);
 });
+
+// ---- Range Map (isochrone) 경로 타입 ------------------------------------- //
+
+test('buildRouteUrl_isochrone_stg', () => {
+  assert.equal(
+    buildRouteUrl('stg', 'isochrone'),
+    'https://ntmapstg.tmap.co.kr:9443/tmap-channel/rsd/route/isochrone'
+  );
+});
+
+test('buildRouteUrl_string_routeType_ev_and_normal', () => {
+  assert.equal(buildRouteUrl('dev', 'ev'), 'https://ntmapdev.tmap.co.kr:9443/tmap-channel/rsd/ev/route');
+  assert.equal(buildRouteUrl('prod', 'normal'), 'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route');
+});

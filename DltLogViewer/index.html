@@ -2427,7 +2427,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
-import { buildRouteUrl, computeCurrentRange, extractIsochroneRings } from './js/route-request.js';
+import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3519,8 +3519,13 @@ function onRouteTypeChange() {
   const t = segVal(tvasRouteType);
   const wasIso = _prevRouteType === 'isochrone';
   const isIso = t === 'isochrone';
-  if (isIso && !wasIso) setRouteBodyTemplate(ISOCHRONE_BODY);
-  else if (!isIso && wasIso) setRouteBodyTemplate(defaultBody);
+  if (isIso && !wasIso) {
+    // EV/일반 바디의 배터리 정보(currentEnergy/currentRange)를 isochrone 에 자동 반영
+    let evBody = null; try { evBody = JSON.parse(evBodyEl.value); } catch {}
+    setRouteBodyTemplate(applyEvBatteryToIsochrone(ISOCHRONE_BODY, evBody));
+  } else if (!isIso && wasIso) {
+    setRouteBodyTemplate(defaultBody);
+  }
   _prevRouteType = t;
   syncTvasUrl();
 }

@@ -50,3 +50,16 @@ export function extractIsochroneRings(json) {
   if (!Array.isArray(coords)) return [];
   return coords.filter(ring => Array.isArray(ring) && ring.length > 0);
 }
+
+/**
+ * EV 배터리 정보를 도달 가능 범위(isochrone) 요청 바디에 반영.
+ * EV 현재 잔량(currentEnergy) → contoursEnergy, 현재 도달거리(currentRange) → contoursMeters.
+ */
+export function applyEvBatteryToIsochrone(isoBody, evBody) {
+  const out = { ...(isoBody || {}) };
+  const ce = Number(evBody && evBody.currentEnergy);
+  const cm = Number(evBody && evBody.currentRange);
+  if (Number.isFinite(ce)) out.contoursEnergy = ce;
+  if (Number.isFinite(cm)) out.contoursMeters = cm;
+  return out;
+}

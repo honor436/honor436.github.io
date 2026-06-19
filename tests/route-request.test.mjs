@@ -92,3 +92,23 @@ test('extractIsochroneRings_empty_for_missing', () => {
   assert.deepEqual(extractIsochroneRings({}), []);
   assert.deepEqual(extractIsochroneRings({ isochrone: { geometry: {} } }), []);
 });
+
+// ---- applyEvBatteryToIsochrone (EV 배터리 → isochrone 반영) --------------- //
+//
+// EV 현재 배터리(currentEnergy) → contoursEnergy, 현재 도달거리(currentRange) → contoursMeters.
+import { applyEvBatteryToIsochrone } from '../DltLogViewer/js/route-request.js';
+
+test('applyEvBatteryToIsochrone_maps_current_energy_and_range', () => {
+  const iso = { contoursEnergy: 1, contoursMeters: 2, vehicleId: 'volvo_XC40' };
+  const out = applyEvBatteryToIsochrone(iso, { currentEnergy: 51200, currentRange: 300000 });
+  assert.equal(out.contoursEnergy, 51200);
+  assert.equal(out.contoursMeters, 300000);
+  assert.equal(out.vehicleId, 'volvo_XC40');
+});
+
+test('applyEvBatteryToIsochrone_keeps_iso_when_ev_missing', () => {
+  const iso = { contoursEnergy: 51200, contoursMeters: 300000 };
+  const out = applyEvBatteryToIsochrone(iso, {});
+  assert.equal(out.contoursEnergy, 51200);
+  assert.equal(out.contoursMeters, 300000);
+});

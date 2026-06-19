@@ -4218,15 +4218,18 @@ function nowReqTime() {
     String(d.getSeconds()).padStart(2,'0');
 }
 
+// HTTP 요청 헤더 (NDDS 메시지 구조 스펙 기준)
+// - Content-Type/Accept 필수, Requester=CLIENT_SSL 시 Client_ReqTime/Client_MDN 필수
+// - Connection 등 스펙 외/금지 헤더는 보내지 않음
 const DEFAULT_HEADERS = [
+  ['Content-Type', 'application/json'],
   ['Accept', 'application/octet-stream'],
-  ['CIH', '582079726'],
+  ['Requester', 'CLIENT_SSL'],
   ['Client_ReqTime', () => nowReqTime()],
-  ['Connection', 'close'],
-  ['Content-Type', 'application/json; charset=UTF-8'],
+  ['Client_MDN', '01012345678'],
   ['Network-Type', 'WIFI'],
   ['Nonce', '858416984'],
-  ['Requester', 'CLIENT_SSL'],
+  ['CIH', '582079726'],
 ];
 
 function addHeaderRow(key = '', value = '') {

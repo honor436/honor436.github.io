@@ -1910,6 +1910,7 @@
     <div class="tvas-actions">
       <button id="tvas-send-btn">요청 전송</button>
       <button id="tvas-clear-btn" class="tvas-sub-btn">지우기</button>
+      <button id="tvas-view-resp-btn" class="tvas-sub-btn" style="display:none">응답 전체 보기</button>
       <button id="tvas-save-resp-btn" class="tvas-sub-btn" style="display:none">응답 저장</button>
     </div>
     <div id="tvas-status"></div>
@@ -3640,6 +3641,13 @@ const tvasSummary    = document.getElementById('tvas-result-summary');
 const tvasRespRaw    = document.getElementById('tvas-response-raw');
 const tvasRespPre    = document.getElementById('tvas-response-pre');
 const tvasSaveRespBtn = document.getElementById('tvas-save-resp-btn');
+const tvasViewRespBtn = document.getElementById('tvas-view-resp-btn');
+let lastRawResponseText = '';   // 응답 원문(디코딩된 전체 텍스트)
+function markRawResponse(text) {
+  lastRawResponseText = text || '';
+  if (tvasViewRespBtn) tvasViewRespBtn.style.display = lastRawResponseText ? '' : 'none';
+}
+if (tvasViewRespBtn) tvasViewRespBtn.addEventListener('click', () => showResponsePopup(lastRawResponseText));
 const tvasWpBar      = document.getElementById('tvas-waypoints-bar');
 const tvasLayerToggles = document.getElementById('tvas-layer-toggles');
 
@@ -4306,6 +4314,8 @@ tvasClearBtn.addEventListener('click', () => {
   tvasRespRaw.style.display = 'none';
   tvasRespPre.textContent = '';
   tvasSaveRespBtn.style.display = 'none';
+  if (tvasViewRespBtn) tvasViewRespBtn.style.display = 'none';
+  lastRawResponseText = '';
   tvasLayerToggles.style.display = 'none';
   lastResponseJson = null;
   lastBinaryResponse = null;
@@ -4431,25 +4441,25 @@ tvasSendBtn.addEventListener('click', async () => {
     if (isIsochroneReq) {
       // CP949/utf-8 자동 디코딩 + 관대한 JSON 파싱 (POI 와 동일 처리)
       const raw = decodeTmapBody(rawBytes, resp.headers.get('content-type') || '');
+      markRawResponse(raw);                 // 응답 원문(헤더+본문) 전체 보관
+      lastResponseJson = null;
+      lastBinaryResponse = null;
+      tvasSaveRespBtn.style.display = '';
+      tvasRespRaw.style.display = '';
+      tvasRespPre.textContent = raw;        // 원문 전체 표시(파싱 결과가 아닌 서버 원문)
       const isoJson = coerceJson(raw);
       if (isoJson == null) {
-        tvasRespRaw.style.display = '';
-        tvasRespPre.textContent = raw;
         const hint = extractTmapErrorHint(raw);
         setStatus((hint || '도달 가능 범위 응답이 JSON 형식이 아닙니다') + ` (${elapsed}ms)`, 'error');
-        showResponsePopup(raw);   // 에러 시 응답 전체 팝업
+        showResponsePopup(raw);             // 에러 시 응답 전체 팝업
         tvasSendBtn.disabled = false;
         return;
       }
       lastResponseJson = isoJson;
-      lastBinaryResponse = null;
-      tvasSaveRespBtn.style.display = '';
-      tvasRespRaw.style.display = '';
-      tvasRespPre.textContent = JSON.stringify(isoJson, null, 2);
       const ec = isoJson.header?.errorCode;
       if (ec && ec !== '000000') {
         setStatus(`서버 오류 [${ec}]: ${isoJson.header?.errorMessage || '알 수 없음'} (${elapsed}ms)`, 'error');
-        showResponsePopup(JSON.stringify(isoJson, null, 2));   // 에러 시 응답 전체 팝업
+        showResponsePopup(raw);             // 에러 시 응답 전체 팝업(원문)
         tvasSendBtn.disabled = false;
         return;
       }
@@ -4457,7 +4467,7 @@ tvasSendBtn.addEventListener('click', async () => {
       if (map) clearTvasRoute(map);
       const n = drawIsochrone(isoJson);
       setStatus(n ? `도달 가능 범위 ${n}개 폴리곤 표시 (${elapsed}ms)` : `도달 가능 범위 좌표가 없습니다 — 응답 확인 (${elapsed}ms)`, n ? 'ok' : 'error');
-      if (!n) showResponsePopup(JSON.stringify(isoJson, null, 2));   // 좌표 없음도 응답 팝업
+      if (!n) showResponsePopup(raw);        // 좌표 없음도 응답 원문 팝업
       tvasSendBtn.disabled = false;
       return;
     }
@@ -4468,6 +4478,7 @@ tvasSendBtn.addEventListener('click', async () => {
     if (isJson) {
       // JSON response — parse and extract tvases
       const text = new TextDecoder('utf-8').decode(rawBytes);
+      markRawResponse(text);   // 응답 원문 전체 보관(전체 보기/팝업용)
       json = JSON.parse(text);
       lastResponseJson = json;
       lastBinaryResponse = null;
@@ -4540,6 +4551,7 @@ tvasSendBtn.addEventListener('click', async () => {
       lastBinaryResponse = rawBuf;
       lastResponseJson = null;
       tvasSaveRespBtn.style.display = '';
+      markRawResponse(`(바이너리 응답 ${rawBuf.byteLength}바이트 — '응답 저장'으로 다운로드)`);
 
       const dv = new DataView(rawBuf);
       const decUtf = new TextDecoder('utf-8');

@@ -4406,15 +4406,9 @@ tvasSendBtn.addEventListener('click', async () => {
     return;
   }
 
-  // Auto-fill reqTime
-  if (body.header && !body.header.reqTime) {
-    const now = new Date();
-    body.header.reqTime = now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, '0') +
-      String(now.getDate()).padStart(2, '0') +
-      String(now.getHours()).padStart(2, '0') +
-      String(now.getMinutes()).padStart(2, '0') +
-      String(now.getSeconds()).padStart(2, '0');
+  // reqTime 은 항상 현재 시간으로 생성(고정값 덮어씀)
+  if (body.header) {
+    body.header.reqTime = nowReqTime();
   }
 
   const bodyStr = JSON.stringify(body);

@@ -23,3 +23,13 @@ export function buildRouteUrl(env, evMode) {
   const path = evMode ? '/tmap-channel/rsd/ev/route' : '/tmap-channel/rsd/route';
   return `https://${e.host}:${PORT}${path}`;
 }
+
+/**
+ * 현재 도달거리(currentRange) = 80% 도달거리 × (현재 잔량 / 80% 전력).
+ * chargedEnergy 가 0 이하이면 0.
+ */
+export function computeCurrentRange(chargedRange, chargedEnergy, currentEnergy) {
+  const cr = Number(chargedRange), ce = Number(chargedEnergy), cur = Number(currentEnergy);
+  if (!(ce > 0) || !Number.isFinite(cr) || !Number.isFinite(cur)) return 0;
+  return Math.round(cr * cur / ce);
+}

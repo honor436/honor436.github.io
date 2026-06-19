@@ -40,3 +40,21 @@ test('buildRouteUrl_ev_dev', () => {
 test('buildRouteUrl_unknown_env_throws', () => {
   assert.throws(() => buildRouteUrl('qa', true));
 });
+
+// ---- computeCurrentRange (비율 기반) -------------------------------------- //
+//
+// 현재 도달거리 = 80% 도달거리 × (현재 잔량 / 80% 전력). chargedEnergy 0 이면 0.
+import { computeCurrentRange } from '../DltLogViewer/js/route-request.js';
+
+test('computeCurrentRange_scales_by_energy_ratio', () => {
+  assert.equal(computeCurrentRange(37600, 55816, 6970), 4695);
+});
+
+test('computeCurrentRange_full_ratio', () => {
+  assert.equal(computeCurrentRange(40000, 50000, 50000), 40000);
+  assert.equal(computeCurrentRange(40000, 50000, 25000), 20000);
+});
+
+test('computeCurrentRange_zero_charged_energy_is_0', () => {
+  assert.equal(computeCurrentRange(40000, 0, 1000), 0);
+});

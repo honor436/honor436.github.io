@@ -369,6 +369,44 @@
     }
     #ruler-badge.visible { display: block; }
 
+    /* ---- 세그먼트 토글 (경로 타입 / 서버) ---- */
+    .seg {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: rgba(15,23,42,0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .seg-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 7px 6px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .seg-btn:hover { color: var(--text); background: rgba(148,163,184,0.1); }
+    .seg-btn.active {
+      color: #06243a;
+      background: linear-gradient(135deg, #38bdf8, #22d3ee);
+      box-shadow: 0 1px 6px rgba(56,189,248,0.4);
+    }
+
+    /* ---- EV 파라미터 슬라이더 ---- */
+    #tvas-ev-params { display: none; }
+    #tvas-ev-params.show { display: block; }
+    .ev-slider { margin-bottom: 8px; }
+    .ev-slider label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .ev-slider input[type=range] { width: 100%; accent-color: #22c55e; cursor: pointer; }
+    .ev-slider input[type=range]:disabled { accent-color: #64748b; cursor: default; opacity: .8; }
+    .ev-val { color: #4ade80; font-weight: 700; font-size: 11px; }
+    .ev-auto { color: #f59e0b; font-size: 10px; }
+
     /* ---- 출발 방위각 설정 안내 툴팁 ---- */
     .leaflet-tooltip.depart-hint {
       background: #16a34a;
@@ -1763,19 +1801,44 @@
         <span style="color:var(--muted);font-size:11px">설정된 지점이 없습니다</span>
       </div>
     </div>
-    <!-- 경로 탐색 옵션: 서버 / 경로 타입 -->
+    <!-- 경로 탐색 옵션: 경로 타입 / 서버 (세그먼트 토글) -->
     <div>
-      <div class="tvas-field-label">경로 탐색 옵션</div>
-      <div style="display:flex;gap:8px">
-        <select id="tvas-env" style="flex:1" title="경로 서버">
-          <option value="prod">상용</option>
-          <option value="stg" selected>준상용</option>
-          <option value="dev">개발</option>
-        </select>
-        <select id="tvas-route-type" style="flex:1" title="경로 타입">
-          <option value="ev" selected>전기차</option>
-          <option value="normal">일반</option>
-        </select>
+      <div class="tvas-field-label">경로 타입</div>
+      <div class="seg" id="tvas-route-type" data-value="ev">
+        <button type="button" class="seg-btn active" data-value="ev">EV</button>
+        <button type="button" class="seg-btn" data-value="normal">일반</button>
+      </div>
+    </div>
+    <div>
+      <div class="tvas-field-label">서버</div>
+      <div class="seg" id="tvas-env" data-value="stg">
+        <button type="button" class="seg-btn" data-value="prod">상용</button>
+        <button type="button" class="seg-btn active" data-value="stg">준상용</button>
+        <button type="button" class="seg-btn" data-value="dev">개발</button>
+      </div>
+    </div>
+    <!-- EV 파라미터 조절 (전기차 경로일 때만) -->
+    <div id="tvas-ev-params">
+      <div class="tvas-field-label">EV 파라미터 (요청 데이터와 실시간 동기화)</div>
+      <div class="ev-slider">
+        <label>보조 전력 auxiliaryPower <span class="ev-val" id="ev-aux-val"></span></label>
+        <input type="range" id="ev-aux" min="0" max="10000" step="50">
+      </div>
+      <div class="ev-slider">
+        <label>80% 충전 전력 chargedEnergy <span class="ev-val" id="ev-chgE-val"></span></label>
+        <input type="range" id="ev-chgE" min="0" max="100000" step="100">
+      </div>
+      <div class="ev-slider">
+        <label>80% 도달거리 chargedRange <span class="ev-val" id="ev-chgR-val"></span></label>
+        <input type="range" id="ev-chgR" min="0" max="600000" step="500">
+      </div>
+      <div class="ev-slider">
+        <label>현재 잔량 currentEnergy <span class="ev-val" id="ev-curE-val"></span></label>
+        <input type="range" id="ev-curE" min="0" max="100000" step="100">
+      </div>
+      <div class="ev-slider">
+        <label>현재 도달거리 currentRange <span class="ev-auto">(자동계산)</span> <span class="ev-val" id="ev-curR-val"></span></label>
+        <input type="range" id="ev-curR" min="0" max="600000" step="500" disabled>
       </div>
     </div>
     <!-- URL -->
@@ -2302,7 +2365,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
-import { buildRouteUrl } from './js/route-request.js';
+import { buildRouteUrl, computeCurrentRange } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3368,14 +3431,87 @@ mgUpdatePlaybackUI();
 const tvasUrl        = document.getElementById('tvas-url');
 const tvasEnvSel     = document.getElementById('tvas-env');
 const tvasRouteType  = document.getElementById('tvas-route-type');
-// 경로 탐색 옵션(서버/전기차·일반) → URL 자동 구성
+// 세그먼트 토글 값 읽기 + 클릭 핸들러
+const segVal = el => (el ? el.dataset.value : '');
+function setupSeg(el, onChange) {
+  if (!el) return;
+  el.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+      el.dataset.value = btn.dataset.value;
+      onChange();
+    });
+  });
+}
+
+// 경로 탐색 옵션(서버/EV·일반) → URL 자동 구성
 function syncTvasUrl() {
   if (tvasEnvSel && tvasRouteType && tvasUrl) {
-    tvasUrl.value = buildRouteUrl(tvasEnvSel.value, tvasRouteType.value === 'ev');
+    tvasUrl.value = buildRouteUrl(segVal(tvasEnvSel), segVal(tvasRouteType) === 'ev');
   }
+  updateEvParamsVisibility();
 }
-if (tvasEnvSel) tvasEnvSel.addEventListener('change', syncTvasUrl);
-if (tvasRouteType) tvasRouteType.addEventListener('change', syncTvasUrl);
+setupSeg(tvasEnvSel, syncTvasUrl);
+setupSeg(tvasRouteType, syncTvasUrl);
+
+// ---- EV 파라미터 슬라이더 ↔ 요청 데이터 양방향 동기화 ---- //
+const evParamsBox = document.getElementById('tvas-ev-params');
+const evBodyEl = document.getElementById('tvas-body'); // tvasBody const 선언 전이라 직접 참조
+const evFields = {
+  auxiliaryPower: { slider: document.getElementById('ev-aux'),  val: document.getElementById('ev-aux-val'),  unit: 'W' },
+  chargedEnergy:  { slider: document.getElementById('ev-chgE'), val: document.getElementById('ev-chgE-val'), unit: 'W' },
+  chargedRange:   { slider: document.getElementById('ev-chgR'), val: document.getElementById('ev-chgR-val'), unit: 'm' },
+  currentEnergy:  { slider: document.getElementById('ev-curE'), val: document.getElementById('ev-curE-val'), unit: 'W' },
+  currentRange:   { slider: document.getElementById('ev-curR'), val: document.getElementById('ev-curR-val'), unit: 'm' },
+};
+
+function fmtEvVal(n, unit) {
+  const v = Number(n) || 0;
+  return unit === 'm' ? `${v.toLocaleString()} m (${(v / 1000).toFixed(1)} km)` : `${v.toLocaleString()} W`;
+}
+
+function updateEvParamsVisibility() {
+  if (!evParamsBox) return;
+  const ev = segVal(tvasRouteType) === 'ev';
+  evParamsBox.classList.toggle('show', ev);
+  if (ev) syncEvParamsFromBody();
+}
+
+let _evSyncing = false;
+function syncEvParamsFromBody() {
+  if (!evParamsBox || _evSyncing) return;
+  let body; try { body = JSON.parse(evBodyEl.value); } catch { return; }
+  _evSyncing = true;
+  for (const [key, f] of Object.entries(evFields)) {
+    if (!f.slider) continue;
+    let v = Number(body[key]);
+    if (!Number.isFinite(v)) v = 0;
+    // 슬라이더 최대 자동 확장 (값이 max 초과 시)
+    if (v > Number(f.slider.max)) f.slider.max = String(v);
+    f.slider.value = String(v);
+    if (f.val) f.val.textContent = fmtEvVal(v, f.unit);
+  }
+  _evSyncing = false;
+}
+
+function onEvSliderInput(changedKey) {
+  if (_evSyncing) return;
+  let body; try { body = JSON.parse(evBodyEl.value); } catch { return; }
+  // 드래그한 항목만 반영 (나머지 값은 그대로 유지)
+  if (changedKey && evFields[changedKey] && evFields[changedKey].slider) {
+    body[changedKey] = Number(evFields[changedKey].slider.value);
+  }
+  // 현재 도달거리: chargedRange × (currentEnergy / chargedEnergy) 비율 자동계산
+  body.currentRange = computeCurrentRange(body.chargedRange, body.chargedEnergy, body.currentEnergy);
+  evBodyEl.value = JSON.stringify(body, null, 2);
+  syncEvParamsFromBody();
+}
+
+for (const [key, f] of Object.entries(evFields)) {
+  if (f.slider && !f.slider.disabled) f.slider.addEventListener('input', () => onEvSliderInput(key));
+}
+// 요청 데이터 직접 편집 → 슬라이더 반영
+if (evBodyEl) evBodyEl.addEventListener('input', () => { if (evParamsBox && evParamsBox.classList.contains('show')) syncEvParamsFromBody(); });
 const tvasHeaders    = document.getElementById('tvas-headers');
 const tvasBody       = document.getElementById('tvas-body');
 const tvasSendBtn    = document.getElementById('tvas-send-btn');
@@ -3988,6 +4124,7 @@ tvasAddHdr.addEventListener('click', () => addHeaderRow());
 // ---- Default body (sample) ---- //
 const defaultBody = {"addCameraTypes":["Bus","SignalSpeeding","Moving","ShoulderControl","Traffic"],"angle":130,"applyEvChargingTimeOnETA":true,"autoAddingYn":"Y","auxiliaryPower":1200,"availableAutoAddingYn":false,"chargedEnergy":55816,"chargedRange":37600,"consumptionParam":"{\"aux\":1200.0,\"batteryCapacity\":69770,\"batteryTemperature\":-30,\"chargingModeGen6\":\"PERFORMANCE\",\"csc\":[40.32,25.5,20.84,17.37,14.41,17.03,17.26,20.71,24.17,28.7,32.22],\"firstCharging\":false,\"kAcc\":2412000,\"kDec\":3600000,\"kDown\":3384000,\"kUp\":3132000,\"mass\":2580,\"vehicleId\":\"11CF\",\"vendor\":\"BMW\"}","controlRouteReqFlag":0,"currentEnergy":6970,"currentRange":47000,"dangerAreaOptions":["OccurFrequently","SharpCurveSection","MistArea","SchoolZone","TrainCrossing"],"departDirPriority":1,"departDirectionType":0,"departLinkId":0,"departMeshId":0,"departName":"충청남도 천안시 동남구 성남면","departRoadType":"None","departSrchFlag":0,"departXPos":4581514,"departYPos":1322213,"destEVChargerFlag":false,"destName":"동대구역","destPoiId":"501087","destRpFlag":16,"destSearchDetailFlag":"None","destSearchFlag":"LeaveReSearch","destXPos":4630714,"destYPos":1291586,"ecoModeFlag":0,"efficientSpeed":0,"evMobilityProviders":[],"evSocHistory":[],"gpsTraceData":"","guideImgResolutionCode":"R480x540","header":{"appLaunchCount":1,"appVersion":"3.11.260","buildNo":"311260","carrier":"","deviceId":"2-1-64f62924-13d2-3391-ad91-e935f9043d2d","modelNo":"BMW IDCEvo","osType":"AND","osVersion":"14","pushDeviceKey":"","reqTime":"20260417112835","resolution":"QUAD_HD","screenHeight":1218,"screenWidth":2560,"svcType":113,"using":"MAIN"},"hipassFlag":0,"initSrchDepartXPos":0,"initSrchDepartYPos":0,"initSrchLength":155226,"initSrchSessionId":"TPtr20260417112814767AHT","isRetry":false,"lastRid":5153744,"lastTollgateId":0,"maxCharge":69770,"minEnergy":6977,"minSocAtAutoAdding":20,"minSocAtChargingStation":20,"minSocAtDestination":10,"myEvStations":[],"pastArrivalTime":"","pastSessionId":"TPtr20260417112814767AHT","pastXpos":0,"pastYpos":0,"patternDateTime":"","pickEvStations":[],"preMapVersion":"20260407","preRids":[],"preSecs":[],"preTollgateIds":"129","radiusEntryTurnType":117,"radiusInfoType":1,"radiusLeaveTurnType":0,"radiusLinkDirection":1,"radiusLinkId":5901,"radiusMeshCode":2293816,"radiusXPos":127,"radiusYPos":36,"routePlanTypes":["Traffic_Recommend"],"searchCondData":"","serviceFlag":"Realtime","slopeFlag":0,"socketType":["DcCombo"],"speed":0,"tcRid":0,"tollCarType":"Car","tvas":"5.9","vehicleId":"11CF","vehicleMass":2580,"vendor":"BMW","version":"1.1","wayPoints":[]};
 tvasBody.value = JSON.stringify(defaultBody, null, 2);
+updateEvParamsVisibility();
 
 // ---- Prettify ---- //
 tvasPrettify.addEventListener('click', () => {
@@ -4001,9 +4138,32 @@ tvasPrettify.addEventListener('click', () => {
 });
 
 // ---- Clear ---- //
+// 출발/경유/목적지 + 방위각 화살표/안내 전부 제거
+function clearAllWaypoints() {
+  const map = getMap();
+  ['depart', 'dest'].forEach(t => {
+    if (map && wpMarkers[t]) map.removeLayer(wpMarkers[t]);
+    wpMarkers[t] = null;
+    routeWaypoints[t] = null;
+  });
+  if (wpMarkers.vias) wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
+  wpMarkers.vias = [];
+  routeWaypoints.vias = [];
+  if (map && departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
+  if (map && departHintTip) { map.removeLayer(departHintTip); departHintTip = null; }
+  updateWpBar();
+}
+
 tvasClearBtn.addEventListener('click', () => {
   const map = getMap();
+  // 1) 지도의 경로 시각화 제거
   if (map) clearTvasRoute(map);
+  // 2) 출발/경유/목적지 + 방위각 화살표 제거
+  clearAllWaypoints();
+  // 3) 경로 요청 데이터 기본값으로 초기화
+  tvasBody.value = JSON.stringify(defaultBody, null, 2);
+  updateEvParamsVisibility();
+  // 4) 응답/상태 초기화
   tvasSummary.innerHTML = '';
   tvasRespRaw.style.display = 'none';
   tvasRespPre.textContent = '';
@@ -4012,7 +4172,7 @@ tvasClearBtn.addEventListener('click', () => {
   lastResponseJson = null;
   lastBinaryResponse = null;
   lastCoords = null;
-  setStatus('');
+  setStatus('초기화되었습니다.');
 });
 
 // ---- Save response ---- //

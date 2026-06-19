@@ -4357,6 +4357,38 @@ tvasSendBtn.addEventListener('click', async () => {
     let json = null;
     let respInfo = {};
 
+    // 도달 가능 범위(isochrone) 는 TVAS 가 아니라 JSON 응답 → 별도 처리
+    const isIsochroneReq = /isochrone/i.test(url) || segVal(tvasRouteType) === 'isochrone';
+    if (isIsochroneReq) {
+      const text = new TextDecoder('utf-8').decode(rawBytes).replace(/^﻿/, '').trim();
+      let isoJson;
+      try { isoJson = JSON.parse(text); }
+      catch (e) {
+        tvasRespRaw.style.display = '';
+        tvasRespPre.textContent = text.slice(0, 2000);
+        setStatus(`도달 가능 범위 응답 JSON 파싱 오류: ${e.message} (${elapsed}ms)`, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+      lastResponseJson = isoJson;
+      lastBinaryResponse = null;
+      tvasSaveRespBtn.style.display = '';
+      tvasRespRaw.style.display = '';
+      tvasRespPre.textContent = JSON.stringify(isoJson, null, 2);
+      const ec = isoJson.header?.errorCode;
+      if (ec && ec !== '000000') {
+        setStatus(`서버 오류 [${ec}]: ${isoJson.header?.errorMessage || 'Unknown'} (${elapsed}ms)`, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+      const map = getMap();
+      if (map) clearTvasRoute(map);
+      const n = drawIsochrone(isoJson);
+      setStatus(n ? `도달 가능 범위 ${n}개 폴리곤 표시 (${elapsed}ms)` : `도달 가능 범위 좌표가 없습니다 — 응답 확인 (${elapsed}ms)`, n ? 'ok' : 'error');
+      tvasSendBtn.disabled = false;
+      return;
+    }
+
     // Auto-detect: if first byte is '{' (0x7B) it's JSON, otherwise binary
     const isJson = rawBytes.length > 0 && rawBytes[0] === 0x7B;
 

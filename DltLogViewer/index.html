@@ -3634,19 +3634,13 @@ window._addEvWaypoint = function(idx) {
   async function runSearch(url, bodyObj, headerText) {
     if (bodyObj && bodyObj.header && !bodyObj.header.reqTime) bodyObj.header.reqTime = nowReqTime();
     if (headerText == null) headerText = headersTa.value;
-    const { headers, skipped } = parseHeaderText(headerText);
+    const { headers } = parseHeaderText(headerText);
     // 항상 편집 필드에 반영 → 사용자가 보고 수정 가능
     urlInput.value = url;
     headersTa.value = headerText;
     bodyTa.value = JSON.stringify(bodyObj, null, 2);
 
-    // 인증 헤더 누락 경고 (검색 실패의 주원인)
-    const missingAuth = skipped.filter(k => /^(AccessKey|AccessToken)$/i.test(k));
-    if (missingAuth.length) {
-      setPoiStatus(`⚠ ${missingAuth.join(', ')} 미입력 — 채널이 거부할 수 있습니다(⚙에서 입력)`, 'error');
-    } else {
-      setPoiStatus('검색 중...');
-    }
+    setPoiStatus('검색 중...');
     resultsEl.innerHTML = '';
     searchBtn.disabled = true;
     try {

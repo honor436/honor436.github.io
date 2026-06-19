@@ -3395,6 +3395,8 @@ window._removeWp = function(type, idx) {
   } else {
     routeWaypoints[type] = null;
     if (map && wpMarkers[type]) { map.removeLayer(wpMarkers[type]); wpMarkers[type] = null; }
+    // 출발지 제거 시 방위각 화살표도 제거
+    if (type === 'depart' && map && departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
   }
   updateWpBar();
 };
@@ -3436,13 +3438,12 @@ function setWaypoint(type, lat, lon, name, rpFlag) {
   } else {
     applyWaypointsToBody();
   }
-  // 출발지 설정 시: 마우스로 방위각 지정 모드 시작
-  if (type === 'depart') startDepartHeading(lat, lon);
+  // 출발지 설정 시: 출발 아이콘을 드래그하면 방위각 설정 가능
+  if (type === 'depart' && wpMarkers.depart) enableDepartHeadingDrag(wpMarkers.depart, lat, lon);
 }
 
 // ---- 출발 방위각 드래그 설정 ---- //
 let departHeadingArrow = null;
-let departHeadingHandlers = null;
 
 function ensureHeadingBadge() {
   let b = document.getElementById('depart-heading-badge');
@@ -3474,46 +3475,44 @@ function drawHeadingArrow(map, lat, lon, cursorLatLng, brg, locked) {
   departHeadingArrow = L.layerGroup([line, head]).addTo(map);
 }
 
-function stopDepartHeading(commit) {
+// 출발지 아이콘을 끌어 당기는 방향으로 화살표 → 놓으면 그 방위각 확정.
+function enableDepartHeadingDrag(marker, lat, lon) {
   const map = getMap();
-  if (departHeadingHandlers && map) {
-    map.off('mousemove', departHeadingHandlers.onMove);
-    map.off('click', departHeadingHandlers.onClick);
-    document.removeEventListener('keydown', departHeadingHandlers.onKey);
-  }
-  departHeadingHandlers = null;
-  const badge = document.getElementById('depart-heading-badge');
-  if (badge) badge.style.display = 'none';
-  if (!commit && departHeadingArrow && map) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
-}
+  if (!map || !marker) return;
+  marker.on('mousedown', (down) => {
+    L.DomEvent.stop(down.originalEvent);
+    map.dragging.disable();
+    const badge = ensureHeadingBadge();
+    badge.style.display = 'block';
+    badge.textContent = '끌어서 출발 방위각 설정 → 놓으면 확정';
+    let lastLL = null;
 
-function startDepartHeading(lat, lon) {
-  const map = getMap();
-  if (!map) return;
-  stopDepartHeading(false);
-  const badge = ensureHeadingBadge();
-  badge.style.display = 'block';
-  badge.textContent = '마우스를 움직여 출발 방위각 설정 → 클릭하여 확정 (Esc 취소)';
+    const onMove = (mv) => {
+      lastLL = mv.latlng;
+      const brg = bearingDeg(lat, lon, mv.latlng.lat, mv.latlng.lng);
+      drawHeadingArrow(map, lat, lon, mv.latlng, brg, false);
+      badge.textContent = `출발 방위각 ${Math.round(brg)}° (놓으면 확정)`;
+    };
+    const finish = (ll) => {
+      map.off('mousemove', onMove);
+      map.off('mouseup', onMapUp);
+      document.removeEventListener('mouseup', onDocUp, true);
+      map.dragging.enable();
+      badge.style.display = 'none';
+      if (ll) {
+        const brg = Math.round(bearingDeg(lat, lon, ll.lat, ll.lng));
+        if (routeWaypoints.depart) routeWaypoints.depart.angle = brg;
+        drawHeadingArrow(map, lat, lon, ll, brg, true);
+        applyWaypointsToBody();
+      }
+    };
+    const onMapUp = (up) => finish(up.latlng || lastLL);
+    const onDocUp = () => finish(lastLL);
 
-  const onMove = (e) => {
-    const brg = bearingDeg(lat, lon, e.latlng.lat, e.latlng.lng);
-    drawHeadingArrow(map, lat, lon, e.latlng, brg, false);
-    badge.textContent = `출발 방위각 ${Math.round(brg)}° — 클릭하여 확정 (Esc 취소)`;
-  };
-  const onClick = (e) => {
-    L.DomEvent.stop(e);
-    const brg = Math.round(bearingDeg(lat, lon, e.latlng.lat, e.latlng.lng));
-    if (routeWaypoints.depart) routeWaypoints.depart.angle = brg;
-    drawHeadingArrow(map, lat, lon, e.latlng, brg, true);
-    stopDepartHeading(true);
-    applyWaypointsToBody();
-  };
-  const onKey = (e) => { if (e.key === 'Escape') stopDepartHeading(false); };
-
-  map.on('mousemove', onMove);
-  map.on('click', onClick);
-  document.addEventListener('keydown', onKey);
-  departHeadingHandlers = { onMove, onClick, onKey };
+    map.on('mousemove', onMove);
+    map.on('mouseup', onMapUp);
+    document.addEventListener('mouseup', onDocUp, true);
+  });
 }
 
 function applyWaypointsToBody() {

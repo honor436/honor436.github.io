@@ -4380,13 +4380,17 @@ tvasSendBtn.addEventListener('click', async () => {
   });
 
   // Collect headers
-  const headers = {};
+  let headers = {};
   tvasHeaders.querySelectorAll('.tvas-header-row').forEach(row => {
     const inputs = row.querySelectorAll('input');
     const k = inputs[0].value.trim();
     const v = inputs[1].value.trim();
     if (k && v) headers[k] = v;
   });
+  // 도달 가능 범위(isochrone)는 EV/일반과 달리 Accept/Content-Type 만 전송
+  if (/isochrone/i.test(url) || segVal(tvasRouteType) === 'isochrone') {
+    headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+  }
 
   // Parse body
   let body;

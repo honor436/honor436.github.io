@@ -369,6 +369,21 @@
     }
     #ruler-badge.visible { display: block; }
 
+    /* ---- 출발 방위각 설정 안내 툴팁 ---- */
+    .leaflet-tooltip.depart-hint {
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+      animation: departHintPulse 1s ease-in-out infinite alternate;
+    }
+    .leaflet-tooltip.depart-hint.leaflet-tooltip-top::before { border-top-color: #16a34a; }
+    @keyframes departHintPulse { from { opacity: .8; } to { opacity: 1; } }
+
     /* ---- Google-Maps style POI search box ---- */
     #poi-search-box {
       position: absolute;
@@ -1748,6 +1763,21 @@
         <span style="color:var(--muted);font-size:11px">설정된 지점이 없습니다</span>
       </div>
     </div>
+    <!-- 경로 탐색 옵션: 서버 / 경로 타입 -->
+    <div>
+      <div class="tvas-field-label">경로 탐색 옵션</div>
+      <div style="display:flex;gap:8px">
+        <select id="tvas-env" style="flex:1" title="경로 서버">
+          <option value="prod">상용</option>
+          <option value="stg" selected>준상용</option>
+          <option value="dev">개발</option>
+        </select>
+        <select id="tvas-route-type" style="flex:1" title="경로 타입">
+          <option value="ev" selected>전기차</option>
+          <option value="normal">일반</option>
+        </select>
+      </div>
+    </div>
     <!-- URL -->
     <div>
       <div class="tvas-field-label">URL</div>
@@ -2272,6 +2302,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
+import { buildRouteUrl } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3335,6 +3366,16 @@ mgUpdatePlaybackUI();
 
 // ---- DOM refs ---- //
 const tvasUrl        = document.getElementById('tvas-url');
+const tvasEnvSel     = document.getElementById('tvas-env');
+const tvasRouteType  = document.getElementById('tvas-route-type');
+// 경로 탐색 옵션(서버/전기차·일반) → URL 자동 구성
+function syncTvasUrl() {
+  if (tvasEnvSel && tvasRouteType && tvasUrl) {
+    tvasUrl.value = buildRouteUrl(tvasEnvSel.value, tvasRouteType.value === 'ev');
+  }
+}
+if (tvasEnvSel) tvasEnvSel.addEventListener('change', syncTvasUrl);
+if (tvasRouteType) tvasRouteType.addEventListener('change', syncTvasUrl);
 const tvasHeaders    = document.getElementById('tvas-headers');
 const tvasBody       = document.getElementById('tvas-body');
 const tvasSendBtn    = document.getElementById('tvas-send-btn');
@@ -3438,8 +3479,25 @@ function setWaypoint(type, lat, lon, name, rpFlag) {
   } else {
     applyWaypointsToBody();
   }
-  // 출발지 설정 시: 출발 아이콘을 드래그하면 방위각 설정 가능
-  if (type === 'depart' && wpMarkers.depart) enableDepartHeadingDrag(wpMarkers.depart, lat, lon);
+  // 출발지 설정 시: 출발 아이콘을 드래그하면 방위각 설정 가능 + 안내 잠깐 표시
+  if (type === 'depart' && wpMarkers.depart) {
+    enableDepartHeadingDrag(wpMarkers.depart, lat, lon);
+    showDepartHint(lat, lon);
+  }
+}
+
+// 출발지 아이콘 주변에 방위각 설정 방법을 잠깐 안내.
+let departHintTip = null;
+function showDepartHint(lat, lon) {
+  const map = getMap();
+  if (!map) return;
+  if (departHintTip) { map.removeLayer(departHintTip); departHintTip = null; }
+  departHintTip = L.tooltip({ permanent: true, direction: 'top', offset: [0, -30],
+    className: 'depart-hint', interactive: false })
+    .setLatLng([lat, lon])
+    .setContent('🧭 출발 아이콘을 끌어 방위각을 설정하세요')
+    .addTo(map);
+  setTimeout(() => { if (map && departHintTip) { map.removeLayer(departHintTip); departHintTip = null; } }, 4500);
 }
 
 // ---- 출발 방위각 드래그 설정 ---- //

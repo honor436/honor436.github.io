@@ -84,6 +84,20 @@ export function wgs84ToSkCoord(lat, lon) {
   return [Math.round(bLon * 36000), Math.round(bLat * 36000)];
 }
 
+// ---- Bearing (compass heading) ------------------------------------------- //
+
+/**
+ * 두 WGS84 점 사이의 나침반 방위각(도). 북=0, 동=90, 남=180, 서=270.
+ * 출발지에서 마우스 위치로의 각도(출발 방위각) 계산에 사용.
+ */
+export function bearingDeg(lat1, lon1, lat2, lon2) {
+  const rad = Math.PI / 180;
+  const φ1 = lat1 * rad, φ2 = lat2 * rad, Δλ = (lon2 - lon1) * rad;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
 // ---- Affine/quadratic regression fallback -------------------------------- //
 
 function affineFeatures(x, y) { return [x, y, 1.0]; }

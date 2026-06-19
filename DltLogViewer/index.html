@@ -2271,7 +2271,7 @@ catCbs.forEach(cb => {
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
-import { wgs84ToSkCoord, skCoordToWgs84 } from './js/coordinate.js';
+import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3436,6 +3436,84 @@ function setWaypoint(type, lat, lon, name, rpFlag) {
   } else {
     applyWaypointsToBody();
   }
+  // 출발지 설정 시: 마우스로 방위각 지정 모드 시작
+  if (type === 'depart') startDepartHeading(lat, lon);
+}
+
+// ---- 출발 방위각 드래그 설정 ---- //
+let departHeadingArrow = null;
+let departHeadingHandlers = null;
+
+function ensureHeadingBadge() {
+  let b = document.getElementById('depart-heading-badge');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'depart-heading-badge';
+    b.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(34,197,94,.95);color:#06240f;font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;z-index:1200;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+    (document.getElementById('map-wrap') || document.body).appendChild(b);
+  }
+  return b;
+}
+
+function drawHeadingArrow(map, lat, lon, cursorLatLng, brg, locked) {
+  if (departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
+  const startPt = map.latLngToContainerPoint([lat, lon]);
+  const curPt = map.latLngToContainerPoint(cursorLatLng);
+  const dx = curPt.x - startPt.x, dy = curPt.y - startPt.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const fixed = 90; // 화살표 길이(px) 고정
+  const endLatLng = map.containerPointToLatLng(L.point(startPt.x + dx / len * fixed, startPt.y + dy / len * fixed));
+  const color = locked ? '#16a34a' : '#22c55e';
+  const line = L.polyline([[lat, lon], endLatLng], { color, weight: 4, opacity: 0.95 });
+  // ▲(북쪽) 를 방위각만큼 시계방향 회전 → 진행 방향 화살촉
+  const head = L.marker(endLatLng, {
+    interactive: false, zIndexOffset: 3000,
+    icon: L.divIcon({ className: '', iconSize: [24, 24], iconAnchor: [12, 12],
+      html: `<div style="transform:rotate(${brg}deg);font-size:22px;line-height:24px;text-align:center;color:${color};text-shadow:0 0 2px rgba(0,0,0,.5)">▲</div>` }),
+  });
+  departHeadingArrow = L.layerGroup([line, head]).addTo(map);
+}
+
+function stopDepartHeading(commit) {
+  const map = getMap();
+  if (departHeadingHandlers && map) {
+    map.off('mousemove', departHeadingHandlers.onMove);
+    map.off('click', departHeadingHandlers.onClick);
+    document.removeEventListener('keydown', departHeadingHandlers.onKey);
+  }
+  departHeadingHandlers = null;
+  const badge = document.getElementById('depart-heading-badge');
+  if (badge) badge.style.display = 'none';
+  if (!commit && departHeadingArrow && map) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
+}
+
+function startDepartHeading(lat, lon) {
+  const map = getMap();
+  if (!map) return;
+  stopDepartHeading(false);
+  const badge = ensureHeadingBadge();
+  badge.style.display = 'block';
+  badge.textContent = '마우스를 움직여 출발 방위각 설정 → 클릭하여 확정 (Esc 취소)';
+
+  const onMove = (e) => {
+    const brg = bearingDeg(lat, lon, e.latlng.lat, e.latlng.lng);
+    drawHeadingArrow(map, lat, lon, e.latlng, brg, false);
+    badge.textContent = `출발 방위각 ${Math.round(brg)}° — 클릭하여 확정 (Esc 취소)`;
+  };
+  const onClick = (e) => {
+    L.DomEvent.stop(e);
+    const brg = Math.round(bearingDeg(lat, lon, e.latlng.lat, e.latlng.lng));
+    if (routeWaypoints.depart) routeWaypoints.depart.angle = brg;
+    drawHeadingArrow(map, lat, lon, e.latlng, brg, true);
+    stopDepartHeading(true);
+    applyWaypointsToBody();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') stopDepartHeading(false); };
+
+  map.on('mousemove', onMove);
+  map.on('click', onClick);
+  document.addEventListener('keydown', onKey);
+  departHeadingHandlers = { onMove, onClick, onKey };
 }
 
 function applyWaypointsToBody() {
@@ -3445,6 +3523,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.depart.lat, routeWaypoints.depart.lon);
       body.departXPos = sk[0];
       body.departYPos = sk[1];
+      // 출발 방위각(드래그로 설정) → angle
+      if (routeWaypoints.depart.angle != null) body.angle = routeWaypoints.depart.angle;
     }
     if (routeWaypoints.dest) {
       const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);

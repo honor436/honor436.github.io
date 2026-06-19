@@ -6,7 +6,33 @@ import {
   besselToWgs84,
   fitAffineTransform,
   applyAffineTransform,
+  bearingDeg,
 } from '../DltLogViewer/js/coordinate.js';
+
+// ---- bearingDeg (출발 방위각) -------------------------------------------- //
+//
+// 두 WGS84 점 사이의 나침반 방위각(북=0, 시계방향, 0~360).
+
+test('bearingDeg_north_is_0', () => {
+  assert.equal(Math.round(bearingDeg(37.0, 127.0, 38.0, 127.0)), 0);
+});
+
+test('bearingDeg_east_is_90', () => {
+  assert.equal(Math.round(bearingDeg(37.0, 127.0, 37.0, 128.0)), 90);
+});
+
+test('bearingDeg_south_is_180', () => {
+  assert.equal(Math.round(bearingDeg(38.0, 127.0, 37.0, 127.0)), 180);
+});
+
+test('bearingDeg_west_is_270', () => {
+  assert.equal(Math.round(bearingDeg(37.0, 128.0, 37.0, 127.0)), 270);
+});
+
+test('bearingDeg_is_in_0_360_range', () => {
+  const b = bearingDeg(37.5, 127.0, 37.4, 126.9);
+  assert.ok(b >= 0 && b < 360);
+});
 
 // ---- skCoordToWgs84 ------------------------------------------------------ //
 

@@ -1804,7 +1804,7 @@
       <span class="ac-label">DLT 분석 횟수</span>
       <span id="bottom-analysis-count" class="ac-value">0</span>
     </div>
-    <div id="version-label">v2026.04.12 · build 28 (v3-TVAS)</div>
+    <div id="version-label">v3-TVAS · 빌드 -</div>
   </div>
 </aside>
 
@@ -5185,6 +5185,12 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
 
   return html;
 }
+</script>
+<!-- 버전 라벨: 빌드(배포) 날짜 자동 표시 -->
+<script type="module">
+  import { formatBuildDate } from './js/build-info.js';
+  const vl = document.getElementById('version-label');
+  if (vl) vl.textContent = `v3-TVAS · 빌드 ${formatBuildDate(document.lastModified)}`;
 </script>
 </body>
 </html>

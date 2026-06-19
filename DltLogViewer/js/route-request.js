@@ -39,3 +39,14 @@ export function computeCurrentRange(chargedRange, chargedEnergy, currentEnergy) 
   if (!(ce > 0) || !Number.isFinite(cr) || !Number.isFinite(cur)) return 0;
   return Math.round(cr * cur / ce);
 }
+
+/**
+ * 도달 가능 범위(isochrone) 응답에서 GeoJSON Polygon 링 배열 추출.
+ * isochrone.geometry.coordinates = int[][][] (Polygon: 링들의 배열, 각 링 = [x,y] 좌표쌍 배열).
+ * 좌표는 SK 정규화(8자리). 반환: [[ [x,y], ... ], ...]
+ */
+export function extractIsochroneRings(json) {
+  const coords = json && json.isochrone && json.isochrone.geometry && json.isochrone.geometry.coordinates;
+  if (!Array.isArray(coords)) return [];
+  return coords.filter(ring => Array.isArray(ring) && ring.length > 0);
+}

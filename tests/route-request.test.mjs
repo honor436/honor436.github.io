@@ -72,3 +72,23 @@ test('buildRouteUrl_string_routeType_ev_and_normal', () => {
   assert.equal(buildRouteUrl('dev', 'ev'), 'https://ntmapdev.tmap.co.kr:9443/tmap-channel/rsd/ev/route');
   assert.equal(buildRouteUrl('prod', 'normal'), 'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route');
 });
+
+// ---- extractIsochroneRings (도달 가능 범위 GeoJSON Polygon) --------------- //
+//
+// 응답 isochrone.geometry(Polygon).coordinates(int[][][]) → 링 배열.
+import { extractIsochroneRings } from '../DltLogViewer/js/route-request.js';
+
+test('extractIsochroneRings_returns_polygon_rings', () => {
+  const json = { isochrone: { type: 'Feature', geometry: { type: 'Polygon',
+    coordinates: [ [ [45720000,15600000],[45730000,15600000],[45730000,15610000],[45720000,15600000] ] ] } } };
+  const rings = extractIsochroneRings(json);
+  assert.equal(rings.length, 1);
+  assert.equal(rings[0].length, 4);
+  assert.deepEqual(rings[0][0], [45720000, 15600000]);
+});
+
+test('extractIsochroneRings_empty_for_missing', () => {
+  assert.deepEqual(extractIsochroneRings(null), []);
+  assert.deepEqual(extractIsochroneRings({}), []);
+  assert.deepEqual(extractIsochroneRings({ isochrone: { geometry: {} } }), []);
+});

@@ -2378,7 +2378,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
-import { buildRouteUrl, computeCurrentRange } from './js/route-request.js';
+import { buildRouteUrl, computeCurrentRange, extractIsochroneRings } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3479,6 +3479,31 @@ function setRouteBodyTemplate(tmpl) {
   evBodyEl.value = JSON.stringify(tmpl, null, 2);
   applyWaypointsToBody();   // departXPos/destXPos/wayPoints/angle 재적용
 }
+
+// ---- 도달 가능 범위(isochrone) GeoJSON Polygon 시각화 ---- //
+let isochroneLayer = null;
+function clearIsochrone() {
+  const map = getMap();
+  if (map && isochroneLayer) { map.removeLayer(isochroneLayer); }
+  isochroneLayer = null;
+}
+function drawIsochrone(json) {
+  const map = getMap();
+  if (!map) return 0;
+  clearIsochrone();
+  const rings = extractIsochroneRings(json);
+  // SK 정규화 좌표 [x,y] → WGS84 [lat,lon]
+  const latlngs = rings
+    .map(ring => ring.map(([x, y]) => skCoordToWgs84(x, y)).filter(Boolean))
+    .filter(r => r.length >= 2);
+  if (!latlngs.length) return 0;
+  isochroneLayer = L.polygon(latlngs, {
+    color: '#16a34a', weight: 3, opacity: 0.95,
+    fillColor: '#22c55e', fillOpacity: 0.15,
+  }).addTo(map);
+  try { map.fitBounds(isochroneLayer.getBounds(), { padding: [30, 30] }); } catch {}
+  return latlngs.length;
+}
 setupSeg(tvasEnvSel, syncTvasUrl);
 setupSeg(tvasRouteType, onRouteTypeChange);
 
@@ -4222,6 +4247,7 @@ tvasClearBtn.addEventListener('click', () => {
   const map = getMap();
   // 1) 지도의 경로 시각화 제거
   if (map) clearTvasRoute(map);
+  clearIsochrone();
   // 2) 출발/경유/목적지 + 방위각 화살표 제거
   clearAllWaypoints();
   // 3) 경로 요청 데이터 기본값으로 초기화
@@ -4365,6 +4391,16 @@ tvasSendBtn.addEventListener('click', async () => {
         if (json.header?.sessionId) errDetail += `\nSession: ${json.header.sessionId}`;
         errDetail += ` (${elapsed}ms)`;
         setStatus(errDetail, 'error');
+        tvasSendBtn.disabled = false;
+        return;
+      }
+
+      // 도달 가능 범위(isochrone) 응답 → GeoJSON Polygon 그리기 (TVAS 아님)
+      if (json.isochrone) {
+        const map = getMap();
+        if (map) clearTvasRoute(map);
+        const n = drawIsochrone(json);
+        setStatus(n ? `도달 가능 범위 ${n}개 폴리곤 표시 (${elapsed}ms)` : '도달 가능 범위 좌표가 없습니다.', n ? 'ok' : 'error');
         tvasSendBtn.disabled = false;
         return;
       }

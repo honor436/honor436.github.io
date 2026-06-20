@@ -110,6 +110,45 @@ function isochroneConsumptionParam() {
 }
 
 /**
+ * 경로 타입(ev/normal/isochrone) 전환 시 표시할 요청 바디를 계산한다.
+ *
+ * 사용자가 설정한 EV 배터리/도달범위 값이 메뉴(타입) 이동 후에도 유지되도록:
+ * - 같은 스키마(ev↔normal)면 현재 바디를 그대로 둔다(body=null = 변경 없음).
+ * - 스키마가 바뀌면(iso↔route) 떠나는 종류의 현재 바디를 saved 에 저장하고,
+ *   들어가는 종류의 저장본이 있으면 그것을 복원한다(사용자 설정 보존).
+ * - 저장본이 없을 때만 기본 템플릿을 쓰며, route→iso 최초 전환 시 EV 배터리를
+ *   isochrone 에 반영한다.
+ *
+ * @param {{ prevType:string, nextType:string, currentBody:object,
+ *   saved:{route:?object, isochrone:?object}, evEdited:boolean,
+ *   defaultBody:object, isochroneBody:object }} opts
+ * @returns {{ body: object|null, saved: {route:?object, isochrone:?object} }}
+ *   body=null 이면 현재 바디 유지(교체하지 않음).
+ */
+export function resolveRouteTypeSwitch(opts) {
+  const { prevType, nextType, currentBody, saved, evEdited, defaultBody, isochroneBody } = opts;
+  const kind = t => (t === 'isochrone' ? 'isochrone' : 'route');
+  const prevKind = kind(prevType);
+  const nextKind = kind(nextType);
+  const nextSaved = { route: saved.route, isochrone: saved.isochrone };
+  if (prevKind === nextKind) {
+    return { body: null, saved: nextSaved }; // 스키마 동일 → 변경 없음
+  }
+  // 떠나는 종류의 현재 바디 저장(사용자 설정 보존)
+  nextSaved[prevKind] = currentBody;
+  // 들어가는 종류: 저장본 있으면 복원
+  if (nextSaved[nextKind]) {
+    return { body: nextSaved[nextKind], saved: nextSaved };
+  }
+  // 저장본 없음 → 기본 템플릿
+  if (nextKind === 'isochrone') {
+    const tmpl = evEdited ? applyEvBatteryToIsochrone(isochroneBody, currentBody) : isochroneBody;
+    return { body: tmpl, saved: nextSaved };
+  }
+  return { body: defaultBody, saved: nextSaved };
+}
+
+/**
  * 도달 가능 거리 조회(isochrone) 전송 헤더 보정.
  * 인증 헤더(AccessKey/AccessToken/CIH/Nonce/requestHashToken/Client_ReqTime/
  * Requester 등)는 그대로 유지하고, 응답이 JSON 이므로 Accept/Content-Type 만

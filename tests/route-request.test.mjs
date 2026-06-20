@@ -186,3 +186,74 @@ test('resolveIsochroneHeaders_does_not_mutate_input', () => {
   assert.equal(input.Accept, 'application/octet-stream');
   assert.notEqual(out, input);
 });
+
+// ---- resolveRouteTypeSwitch (경로 타입 전환 시 설정 값 유지) --------------- //
+//
+// 경로 타입(ev/normal/isochrone)을 바꿔도 사용자가 설정한 EV 배터리/도달범위
+// 값이 유지되어야 한다. 같은 스키마(ev↔normal)면 현재 바디 그대로, 스키마가
+// 바뀌면(iso↔route) 직전에 저장한 해당 종류의 바디를 복원한다.
+import { resolveRouteTypeSwitch } from '../DltLogViewer/js/route-request.js';
+
+const DEF = { chargedEnergy: 70000, chargedRange: 500000, currentEnergy: 6970, currentRange: 47000 };
+const ISO = { contoursEnergy: 56000, contoursMeters: 300000, auxiliaryPower: 1200 };
+
+test('resolveRouteTypeSwitch_same_kind_keeps_current_body', () => {
+  const r = resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'normal', currentBody: { chargedEnergy: 1 },
+    saved: { route: null, isochrone: null }, evEdited: false,
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(r.body, null); // 변경 없음(현재 유지)
+});
+
+test('resolveRouteTypeSwitch_route_to_iso_first_time_uses_template', () => {
+  const r = resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'isochrone', currentBody: { ...DEF },
+    saved: { route: null, isochrone: null }, evEdited: false,
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(r.body.contoursEnergy, 56000);
+  assert.equal(r.body.contoursMeters, 300000);
+  assert.deepEqual(r.saved.route, DEF); // 떠난 EV 바디 저장
+});
+
+test('resolveRouteTypeSwitch_route_to_iso_applies_ev_battery_when_edited', () => {
+  const editedEv = { ...DEF, currentEnergy: 51200, currentRange: 280000 };
+  const r = resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'isochrone', currentBody: editedEv,
+    saved: { route: null, isochrone: null }, evEdited: true,
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(r.body.contoursEnergy, 51200);
+  assert.equal(r.body.contoursMeters, 280000);
+});
+
+test('resolveRouteTypeSwitch_iso_to_route_restores_saved_ev_edits', () => {
+  // 사용자가 EV 배터리를 바꿔둔 바디가 저장돼 있으면, 기본값이 아니라 그걸 복원
+  const editedEv = { ...DEF, chargedEnergy: 12345 };
+  const r = resolveRouteTypeSwitch({
+    prevType: 'isochrone', nextType: 'ev', currentBody: { ...ISO },
+    saved: { route: editedEv, isochrone: null }, evEdited: true,
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(r.body.chargedEnergy, 12345); // 사용자 설정 유지
+  assert.deepEqual(r.saved.isochrone, ISO);  // 떠난 iso 바디 저장
+});
+
+test('resolveRouteTypeSwitch_iso_to_route_no_saved_uses_default', () => {
+  const r = resolveRouteTypeSwitch({
+    prevType: 'isochrone', nextType: 'ev', currentBody: { ...ISO },
+    saved: { route: null, isochrone: null }, evEdited: false,
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.deepEqual(r.body, DEF);
+});
+
+test('resolveRouteTypeSwitch_does_not_mutate_saved_input', () => {
+  const saved = { route: null, isochrone: null };
+  resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'isochrone', currentBody: { ...DEF },
+    saved, evEdited: false, defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(saved.route, null); // 원본 불변
+});

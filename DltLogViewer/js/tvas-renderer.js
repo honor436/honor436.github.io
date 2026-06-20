@@ -479,8 +479,9 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0,
   // Create separate layer groups
   Object.keys(tvasLayers).forEach(k => { tvasLayers[k] = L.layerGroup(); });
 
+  const routeMode = opts.routeMode || 'traffic';
   if (resolvedCoords.length > 0) {
-    renderRoutePolylines(tvasLayers.route, resolvedCoords, routeItems);
+    renderRoutePolylines(tvasLayers.route, resolvedCoords, routeItems, roads, routeMode);
     renderEndpoints(tvasLayers.route, resolvedCoords, header);
     renderGuidancePoints(tvasLayers.guidance, resolvedCoords, guidancePoints, directionNames, intersectionNames);
     renderDangerAreas(tvasLayers.danger, resolvedCoords, dangerAreas);
@@ -708,12 +709,43 @@ export function buildRoadNameLabels(coords, roadNames) {
   return labels;
 }
 
-function renderRoutePolylines(lg, coords, items) {
+// RO4 모드: 각 RO4 구간을 클릭 가능한 폴리라인으로 그리고, 클릭 시 해당 구간을
+// 두껍게 + 다른 색으로 강조 표시한다. 교통정보(혼잡도) 색은 칠하지 않는다.
+function renderRo4ClickableSegments(lg, coords, roads) {
+  const base = { color: '#3b82f6', weight: 4, opacity: 0.8 };
+  const highlight = { color: '#f59e0b', weight: 10, opacity: 1 };
+  const segs = buildRo4Segments(coords, roads);
+  const lines = [];
+  for (const seg of segs) {
+    if (seg.latlngs.length < 2) continue;
+    const pl = L.polyline(seg.latlngs, { ...base }).bindPopup(buildRo4SegmentPopup(seg), { maxWidth: 320 });
+    pl.on('click', () => {
+      lines.forEach(l => l.setStyle(base));
+      pl.setStyle(highlight);
+      pl.bringToFront();
+    });
+    pl.addTo(lg);
+    lines.push(pl);
+  }
+}
+
+function renderRoutePolylines(lg, coords, items, roads, mode = 'traffic') {
   // Base polyline connecting ALL VX points (ensures no gaps between items)
   const allLatLngs = coords.map(c => [c.lat, c.lon]);
   L.polyline(allLatLngs, { color: '#a855f7', weight: 3, opacity: 0.35 }).addTo(lg);
 
-  // Per-item colored segments by 혼잡도 with informational popup
+  // RO4 모드: 구간 클릭 강조 (교통정보 미표시)
+  if (mode === 'ro4') {
+    renderRo4ClickableSegments(lg, coords, roads);
+    return;
+  }
+  // plain 모드: 교통정보 없이 단색 경로선만
+  if (mode !== 'traffic') {
+    L.polyline(allLatLngs, { color: '#3b82f6', weight: 4, opacity: 0.7 }).addTo(lg);
+    return;
+  }
+
+  // traffic 모드: 구간별 혼잡도 색 + 정보 팝업 (기존 동작)
   for (const item of items) {
     const start = item.startVxIdx;
     const end   = Math.min(item.endVxIdx, coords.length - 1);
@@ -780,32 +812,83 @@ const FACILITY_CODE_NAMES = {
   6: '철도건널목', 7: '댐/방파제', 90: '한강교량',
 };
 
+const _num = v => (Number.isFinite(Number(v)) ? Number(v).toLocaleString() : '-');
+
+/**
+ * RO4 구간(road) 도로 정보 HTML (도로종류/링크/시설/에너지/거리/차로/속도/고도).
+ * 방전 팝업과 RO4 구간 팝업이 공유한다. road 없으면 빈 문자열.
+ */
+export function buildRo4InfoHtml(road) {
+  if (!road) return '';
+  const rt = ROAD_TYPE_NAMES[road.roadType] ?? road.roadType;
+  const lt = LINK_TYPE_NAMES[road.linkType] ?? road.linkType;
+  const fc = FACILITY_CODE_NAMES[road.facilityCode] ?? road.facilityCode;
+  return (
+    `<b>RO4 구간 정보</b>` +
+    `<br>도로종류: ${rt}` +
+    `<br>링크종류: ${lt}` +
+    `<br>시설: ${fc}` +
+    `<br>구간 에너지: ${_num(road.energyConsumption)} Wh` +
+    `<br>구간거리: ${_num(road.roadLength)} m` +
+    `<br>차로수: ${_num(road.laneCount)} · 제한속도: ${_num(road.speedLimit)} km/h` +
+    `<br>고도: ${_num(road.elevation)} · lastVxIdx: ${road.lastVxIdx}`
+  );
+}
+
+/**
+ * 경로선 표시 모드 결정. RO4 가 켜져 있으면 'ro4'(교통정보 표시 안 함),
+ * 아니면 교통정보가 켜져 있으면 'traffic', 둘 다 꺼져 있으면 'plain'.
+ */
+export function routeLineMode(trafficOn, ro4On) {
+  if (ro4On) return 'ro4';
+  if (trafficOn) return 'traffic';
+  return 'plain';
+}
+
+/**
+ * RO4 구간들을 연속된 lastVxIdx 경계로 잘라 경로선 세그먼트로 만든다.
+ * 각 세그먼트: { index, road, startVxIdx, endVxIdx, latlngs:[[lat,lon],...] }.
+ */
+export function buildRo4Segments(coords, roads) {
+  if (!Array.isArray(coords) || coords.length === 0 || !Array.isArray(roads)) return [];
+  const out = [];
+  let prevEnd = 0;
+  for (let i = 0; i < roads.length; i++) {
+    const road = roads[i];
+    const end = Math.min(Math.max(road.lastVxIdx | 0, 0), coords.length - 1);
+    const start = Math.min(prevEnd, end);
+    if (end > start) {
+      const latlngs = [];
+      for (let v = start; v <= end; v++) latlngs.push([coords[v].lat, coords[v].lon]);
+      out.push({ index: i, road, startVxIdx: start, endVxIdx: end, latlngs });
+    }
+    prevEnd = end;
+  }
+  return out;
+}
+
+/** RO4 구간 클릭 팝업 HTML. */
+export function buildRo4SegmentPopup(seg) {
+  if (!seg) return '';
+  let html = `<b>RO4 구간 #${(seg.index ?? 0) + 1}</b><br>VX: ${seg.startVxIdx}~${seg.endVxIdx}`;
+  const info = buildRo4InfoHtml(seg.road);
+  if (info) html += `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(148,163,184,.4)">` + info;
+  return html;
+}
+
 /**
  * 배터리 방전 마커 팝업 HTML. 방전 결과(d)와 해당 RO4 구간(road),
  * 현재 배터리(currentEnergy)를 받아 구간 에너지/도로 정보를 함께 보여준다.
  */
 export function buildBatteryDepletionPopup(d, road, currentEnergy) {
   const battery = Number(currentEnergy);
-  const num = v => (Number.isFinite(Number(v)) ? Number(v).toLocaleString() : '-');
   let html =
     `<b>⚠ 배터리 방전 예상 지점</b>` +
     `<br>현재 배터리: ${Number.isFinite(battery) ? battery.toLocaleString() : '-'} W` +
-    `<br>누적 소모: ${num(d.cumEnergy)} Wh` +
+    `<br>누적 소모: ${_num(d.cumEnergy)} Wh` +
     `<br>구간 #${d.segmentIndex + 1} · VX ${d.vxIdx}`;
   if (road) {
-    const rt = ROAD_TYPE_NAMES[road.roadType] ?? road.roadType;
-    const lt = LINK_TYPE_NAMES[road.linkType] ?? road.linkType;
-    const fc = FACILITY_CODE_NAMES[road.facilityCode] ?? road.facilityCode;
-    html +=
-      `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(148,163,184,.4)">` +
-      `<b>RO4 구간 정보</b>` +
-      `<br>도로종류: ${rt}` +
-      `<br>링크종류: ${lt}` +
-      `<br>시설: ${fc}` +
-      `<br>구간 에너지: ${num(road.energyConsumption)} Wh` +
-      `<br>구간거리: ${num(road.roadLength)} m` +
-      `<br>차로수: ${num(road.laneCount)} · 제한속도: ${num(road.speedLimit)} km/h` +
-      `<br>고도: ${num(road.elevation)} · lastVxIdx: ${road.lastVxIdx}`;
+    html += `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(148,163,184,.4)">` + buildRo4InfoHtml(road);
   }
   return html;
 }

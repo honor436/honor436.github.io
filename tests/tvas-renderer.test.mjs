@@ -680,3 +680,53 @@ test('buildBatteryDepletionPopup_safe_without_road', () => {
   const html = buildBatteryDepletionPopup({ segmentIndex: 0, vxIdx: 1, cumEnergy: 100 }, null, 50);
   assert.match(html, /배터리 방전/);
 });
+
+// ---- routeLineMode / buildRo4Segments (경로선 모드: 교통정보 vs RO4) ------- //
+import { routeLineMode, buildRo4Segments, buildRo4SegmentPopup } from '../DltLogViewer/js/tvas-renderer.js';
+
+test('routeLineMode_ro4_takes_precedence_then_traffic_then_plain', () => {
+  assert.equal(routeLineMode(true, false), 'traffic');
+  assert.equal(routeLineMode(true, true), 'ro4');   // RO4 우선 (교통정보 표시 안 함)
+  assert.equal(routeLineMode(false, true), 'ro4');
+  assert.equal(routeLineMode(false, false), 'plain');
+});
+
+const mkCoords = n => Array.from({ length: n }, (_, i) => ({ lat: 37 + i * 0.001, lon: 127 + i * 0.001 }));
+
+test('buildRo4Segments_splits_by_consecutive_lastVxIdx', () => {
+  const coords = mkCoords(10);
+  const roads = [
+    { lastVxIdx: 3, roadType: 0, energyConsumption: 100 },
+    { lastVxIdx: 7, roadType: 2, energyConsumption: 200 },
+    { lastVxIdx: 9, roadType: 1, energyConsumption: 50 },
+  ];
+  const segs = buildRo4Segments(coords, roads);
+  assert.equal(segs.length, 3);
+  assert.deepEqual([segs[0].startVxIdx, segs[0].endVxIdx], [0, 3]);
+  assert.deepEqual([segs[1].startVxIdx, segs[1].endVxIdx], [3, 7]);
+  assert.deepEqual([segs[2].startVxIdx, segs[2].endVxIdx], [7, 9]);
+  assert.equal(segs[0].latlngs.length, 4); // 0..3 inclusive
+  assert.equal(segs[0].road.roadType, 0);
+  assert.equal(segs[0].index, 0);
+});
+
+test('buildRo4Segments_clamps_and_skips_invalid', () => {
+  const coords = mkCoords(5);
+  const roads = [{ lastVxIdx: 99, roadType: 0 }]; // 좌표 범위 초과 → 클램프
+  const segs = buildRo4Segments(coords, roads);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].endVxIdx, 4);
+  assert.deepEqual(buildRo4Segments(null, roads), []);
+  assert.deepEqual(buildRo4Segments(coords, null), []);
+});
+
+test('buildRo4SegmentPopup_shows_segment_and_ro4_info', () => {
+  const seg = { index: 1, startVxIdx: 3, endVxIdx: 7,
+    road: { roadType: 2, linkType: 1, facilityCode: 0, roadLength: 800, laneCount: 2, speedLimit: 80, energyConsumption: 200, elevation: 3, lastVxIdx: 7 } };
+  const html = buildRo4SegmentPopup(seg);
+  assert.match(html, /RO4 구간 #2/);
+  assert.match(html, /3~7/);     // VX 범위
+  assert.match(html, /국도/);     // roadType 2
+  assert.match(html, /800/);     // roadLength
+  assert.match(html, /200/);     // energyConsumption
+});

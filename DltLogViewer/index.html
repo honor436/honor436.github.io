@@ -1919,6 +1919,8 @@
     <div id="tvas-layer-toggles" style="display:none">
       <span class="tvas-ltog all-on" id="tvas-ltog-all">전체</span>
       <span class="tvas-ltog on" data-tl="route">경로</span>
+      <span class="tvas-ltog on" data-rmode="traffic">교통정보</span>
+      <span class="tvas-ltog" data-rmode="ro4">RO4</span>
       <span class="tvas-ltog on" data-tl="guidance">안내점</span>
       <span class="tvas-ltog on" data-tl="danger">위험지역</span>
       <span class="tvas-ltog on" data-tl="tollgate">톨게이트</span>
@@ -2426,7 +2428,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch, buildIsoBodyFromEvBattery } from './js/route-request.js';
@@ -3678,6 +3680,8 @@ const tvasLayerToggles = document.getElementById('tvas-layer-toggles');
 
 let lastResponseJson = null;
 let lastCoords = null;  // 마지막 파싱된 좌표 (VX 클릭 이동용)
+let lastTvasResult = null;       // 경로선 모드(교통정보/RO4) 변경 시 재렌더용
+let lastReqCurrentEnergy = null; // 재렌더 시 방전 위치 계산용
 
 // ---- Waypoint state (from map long-click) ---- //
 const routeWaypoints = { depart: null, dest: null, vias: [] };  // vias = 경유지 배열
@@ -3950,6 +3954,36 @@ tvasLayerToggles.querySelectorAll('.tvas-ltog[data-tl]').forEach(btn => {
     const indivBtns = tvasLayerToggles.querySelectorAll('.tvas-ltog[data-tl]');
     const allOn = [...indivBtns].every(b => b.classList.contains('on'));
     tvasLtogAll.classList.toggle('all-on', allOn);
+  });
+});
+
+// 현재 토글 상태(data-tl on/off)를 지도 레이어에 적용 — 경로탐색 후에도 유지.
+function applyPersistedLayerToggles() {
+  const map = getMap();
+  if (!map) return;
+  tvasLayerToggles.querySelectorAll('.tvas-ltog[data-tl]').forEach(b =>
+    toggleTvasLayer(map, b.dataset.tl, b.classList.contains('on')));
+}
+// 경로선 모드(교통정보/RO4) 토글 상태 → 렌더 모드.
+function currentRouteMode() {
+  const tr = tvasLayerToggles.querySelector('.tvas-ltog[data-rmode="traffic"]');
+  const r4 = tvasLayerToggles.querySelector('.tvas-ltog[data-rmode="ro4"]');
+  return routeLineMode(!!(tr && tr.classList.contains('on')), !!(r4 && r4.classList.contains('on')));
+}
+// 경로선 모드 변경 시 마지막 결과로 경로만 다시 그린다(토글 상태 유지).
+function rerenderRouteLayers() {
+  const map = getMap();
+  if (!map || !lastTvasResult || !lastCoords) return;
+  renderTvasRoute(map, lastTvasResult, lastCoords, 0, { currentEnergy: lastReqCurrentEnergy, routeMode: currentRouteMode() });
+  applyPersistedLayerToggles();
+}
+// 교통정보 / RO4 는 상호 배타 모드 토글: 켜면 다른 모드는 끈다.
+tvasLayerToggles.querySelectorAll('.tvas-ltog[data-rmode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const turningOn = !btn.classList.contains('on');
+    tvasLayerToggles.querySelectorAll('.tvas-ltog[data-rmode]').forEach(o => o.classList.remove('on'));
+    if (turningOn) btn.classList.add('on');
+    rerenderRouteLayers();
   });
 });
 
@@ -4683,15 +4717,19 @@ tvasSendBtn.addEventListener('click', async () => {
     // 요청 바디의 현재 배터리(currentEnergy)를 전달 → RO4 누적 에너지로 방전 위치 표시
     let reqCurrentEnergy = null;
     try { reqCurrentEnergy = JSON.parse(tvasBody.value).currentEnergy; } catch {}
-    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy });
+    // 경로선 모드(교통정보/RO4)는 이전 선택 유지
+    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy, routeMode: currentRouteMode() });
 
-    // Save coords for VX click navigation
+    // Save coords for VX click navigation + 모드 변경 시 재렌더용 상태 보관
     lastCoords = coords;
+    lastTvasResult = tvasResult;
+    lastReqCurrentEnergy = reqCurrentEnergy;
 
-    // Show layer toggles
+    // Show layer toggles — 이전에 켜고 끈 레이어 on/off 상태를 그대로 유지
     tvasLayerToggles.style.display = 'flex';
-    tvasLayerToggles.querySelectorAll('.tvas-ltog[data-tl]').forEach(b => b.classList.add('on'));
-    tvasLtogAll.classList.add('all-on');
+    applyPersistedLayerToggles();
+    const _allOn = [...tvasLayerToggles.querySelectorAll('.tvas-ltog[data-tl]')].every(b => b.classList.contains('on'));
+    tvasLtogAll.classList.toggle('all-on', _allOn);
 
     // Summary + section details
     tvasSummary.innerHTML = buildSummaryHtml(summary, elapsed, tvasResult, coords, respInfo);

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DLT Log Viewer — 사용 설명서</title>
-  <meta name="description" content="DLT Log Viewer 사용 설명서: 폴더 선택, 지도 레이어, SHP, 경로 요청, 좌표 검색, 줄자 사용법.">
+  <title>내비 데이터 뷰어 — 사용 설명서</title>
+  <meta name="description" content="내비 데이터 뷰어 사용 설명서: 폴더 선택, 지도 레이어, SHP, 경로 요청, 좌표 검색, 줄자 사용법.">
   <style>
     :root {
       --bg: #0b1220;
@@ -346,7 +346,7 @@
     <div class="crumbs">
       <a href="../">honor436</a>
       <span class="sep">/</span>
-      <a href="./">DLT Log Viewer</a>
+      <a href="./">내비 데이터 뷰어</a>
       <span class="sep">/</span>
       <span class="cur">사용 설명서</span>
     </div>
@@ -380,13 +380,13 @@
   </aside>
 
   <article class="content">
-    <h1>DLT Log Viewer</h1>
+    <h1>내비 데이터 뷰어</h1>
     <p class="subtitle">차량 단말에서 수집된 DLT 바이너리 로그를 브라우저에서 파싱하고, GPS 궤적·경로 요청·음성 안내를 지도에 시각화하는 도구입니다.</p>
 
     <!-- ========= 개요 ========= -->
     <section class="sec" id="intro">
       <h2>개요</h2>
-      <p>DLT Log Viewer는 다음 정보를 DLT 로그에서 자동으로 추출하고 시각화합니다.</p>
+      <p>내비 데이터 뷰어는 다음 정보를 DLT 로그에서 자동으로 추출하고 시각화합니다.</p>
       <ul>
         <li><b>위치 데이터</b> — GPS 원시값, DR_GPS 추측항법, MM GPS Pos, MM Match Pos</li>
         <li><b>경로 요청</b> — RpLog REQ/RES 매칭 + 멀티-청크 JSON 파싱 + SessionID</li>
@@ -443,7 +443,7 @@
     <section class="sec" id="quickstart">
       <h2>빠른 시작</h2>
       <ol class="steps">
-        <li><a href="./">DLT Log Viewer</a> 페이지를 엽니다.</li>
+        <li><a href="./">내비 데이터 뷰어</a> 페이지를 엽니다.</li>
         <li>왼쪽 하단의 <b>DLT GPS Log</b> 패널에서 <b>폴더 선택</b> 버튼을 누르고, <code>.dlt</code> 파일이 있는 폴더를 선택합니다. (하위 디렉토리 자동 탐색)</li>
         <li>파싱이 끝나면 지도에 GPS·MM 포인트가 표시되고, 우측 통계 카드에 개수가 집계됩니다.</li>
         <li>좌측 <b>레이어 토글</b>에서 표시할 데이터를 켜고/끄면서 관찰합니다.</li>

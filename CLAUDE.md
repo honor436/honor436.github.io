@@ -1,4 +1,4 @@
-# DLT GPS + SHP Network Viewer
+# 내비 데이터 뷰어 (Navi Data Viewer)
 
 ## 프로젝트 개요
 
@@ -44,7 +44,7 @@ Node 18+의 내장 `node:test` 러너를 사용한다. 외부 테스트 프레�
 
 ```
 honor436.github.io/
-├── DltLogViewer/                # DLT Log Viewer 서비스 (독립)
+├── DltLogViewer/                # 내비 데이터 뷰어 서비스 (독립)
 │   ├── index.html               # 메인 진입점
 │   └── js/                      # 프로덕션 코드 (ES modules)
 │       ├── dlt-parser.js

@@ -2427,7 +2427,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
-import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone } from './js/route-request.js';
+import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -4401,9 +4401,10 @@ tvasSendBtn.addEventListener('click', async () => {
     const v = inputs[1].value.trim();
     if (k && v) headers[k] = v;
   });
-  // 도달 가능 범위(isochrone)는 EV/일반과 달리 Accept/Content-Type 만 전송
+  // 도달 가능 범위(isochrone): 인증 헤더(AccessKey/AccessToken/CIH/...)는 그대로
+  // 두고 응답이 JSON 이므로 Accept/Content-Type 만 application/json 으로 보정.
   if (/isochrone/i.test(url) || segVal(tvasRouteType) === 'isochrone') {
-    headers = { 'Accept': 'application/json', 'Content-Type': 'application/json; charset=UTF-8' };
+    headers = resolveIsochroneHeaders(headers);
   }
 
   // Parse body

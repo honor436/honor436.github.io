@@ -151,3 +151,38 @@ test('buildIsochroneBody_header_reqTime_empty_svcType_113', () => {
   assert.equal(body.header.svcType, 113);
   assert.equal(body.header.using, 'MAIN');
 });
+
+// ---- resolveIsochroneHeaders (지도화면 전송 헤더 보정) --------------------- //
+//
+// 과거 버그: 지도화면 isochrone 전송 시 인증 헤더(AccessKey/AccessToken/CIH/...)
+// 를 전부 버리고 Accept/Content-Type 만 보내 서버가 거부했다.
+// 인증 헤더는 유지하고 응답 포맷(JSON)에 맞춰 Accept 만 보정해야 한다.
+import { resolveIsochroneHeaders } from '../DltLogViewer/js/route-request.js';
+
+test('resolveIsochroneHeaders_keeps_auth_headers_and_forces_json_accept', () => {
+  const input = {
+    Accept: 'application/octet-stream',
+    'Content-Type': 'application/json; charset=UTF-8',
+    AccessKey: 'AK', AccessToken: 'AT', CIH: '582079726',
+    Nonce: '858416984', requestHashToken: '1988490197',
+    Client_ReqTime: '20260620141840', Requester: 'CLIENT_SSL',
+  };
+  const out = resolveIsochroneHeaders(input);
+  assert.equal(out.AccessKey, 'AK');
+  assert.equal(out.AccessToken, 'AT');
+  assert.equal(out.CIH, '582079726');
+  assert.equal(out.Nonce, '858416984');
+  assert.equal(out.requestHashToken, '1988490197');
+  assert.equal(out.Requester, 'CLIENT_SSL');
+  assert.equal(out.Client_ReqTime, '20260620141840');
+  // 응답이 JSON 이므로 Accept 는 application/json 으로 보정
+  assert.equal(out.Accept, 'application/json');
+  assert.equal(out['Content-Type'], 'application/json; charset=UTF-8');
+});
+
+test('resolveIsochroneHeaders_does_not_mutate_input', () => {
+  const input = { Accept: 'application/octet-stream', AccessKey: 'AK' };
+  const out = resolveIsochroneHeaders(input);
+  assert.equal(input.Accept, 'application/octet-stream');
+  assert.notEqual(out, input);
+});

@@ -110,6 +110,23 @@ function isochroneConsumptionParam() {
 }
 
 /**
+ * 도달 가능 거리 조회(isochrone) 전송 헤더 보정.
+ * 인증 헤더(AccessKey/AccessToken/CIH/Nonce/requestHashToken/Client_ReqTime/
+ * Requester 등)는 그대로 유지하고, 응답이 JSON 이므로 Accept/Content-Type 만
+ * application/json 으로 맞춘다.
+ *
+ * 과거 버그: 이 단계에서 인증 헤더를 전부 버리고 Accept/Content-Type 만 보내
+ * 서버가 요청을 거부했다(지도화면 도달 가능 조회 에러). 인증 헤더를 유지한다.
+ */
+export function resolveIsochroneHeaders(headers) {
+  return {
+    ...(headers || {}),
+    'Accept': 'application/json',
+    'Content-Type': 'application/json; charset=UTF-8',
+  };
+}
+
+/**
  * 도달 가능 거리 조회(isochrone) 요청 바디 생성.
  * consumptionParam 은 stringified JSON 으로 담긴다.
  */

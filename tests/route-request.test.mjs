@@ -113,6 +113,39 @@ test('applyEvBatteryToIsochrone_keeps_iso_when_ev_missing', () => {
   assert.equal(out.contoursMeters, 300000);
 });
 
+test('applyEvBatteryToIsochrone_copies_consumptionParam_from_ev', () => {
+  const iso = { contoursEnergy: 1, contoursMeters: 2, consumptionParam: 'ISO_OLD' };
+  const out = applyEvBatteryToIsochrone(iso, { currentEnergy: 100, currentRange: 200, consumptionParam: 'EV_CP' });
+  assert.equal(out.consumptionParam, 'EV_CP'); // EV 경로의 consumptionParam 동일 적용
+});
+
+test('applyEvBatteryToIsochrone_keeps_iso_consumptionParam_when_ev_missing', () => {
+  const iso = { consumptionParam: 'ISO_CP' };
+  const out = applyEvBatteryToIsochrone(iso, { currentEnergy: 100 });
+  assert.equal(out.consumptionParam, 'ISO_CP');
+});
+
+test('applyEvBatteryToIsochrone_copies_vehicle_fields_from_ev', () => {
+  const iso = { slopeFlag: 1, vehicleId: 'RV11', vehicleMass: 2000, vendor: 'X' };
+  const out = applyEvBatteryToIsochrone(iso, {
+    currentEnergy: 100, currentRange: 200,
+    slopeFlag: 0, vehicleId: '11CF', vehicleMass: 2580, vendor: 'BMW',
+  });
+  assert.equal(out.slopeFlag, 0);
+  assert.equal(out.vehicleId, '11CF');
+  assert.equal(out.vehicleMass, 2580);
+  assert.equal(out.vendor, 'BMW');
+});
+
+test('applyEvBatteryToIsochrone_keeps_iso_vehicle_fields_when_ev_missing', () => {
+  const iso = { slopeFlag: 1, vehicleId: 'RV11', vehicleMass: 2000, vendor: 'BMW' };
+  const out = applyEvBatteryToIsochrone(iso, { currentEnergy: 100 });
+  assert.equal(out.slopeFlag, 1);
+  assert.equal(out.vehicleId, 'RV11');
+  assert.equal(out.vehicleMass, 2000);
+  assert.equal(out.vendor, 'BMW');
+});
+
 // ---- buildIsochroneBody (도달 가능 거리 조회 요청 바디) -------------------- //
 //
 // 제공된 샘플(BMW RV11) 기준 isochrone 요청 바디. consumptionParam 은

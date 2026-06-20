@@ -51,9 +51,14 @@ export function extractIsochroneRings(json) {
   return coords.filter(ring => Array.isArray(ring) && ring.length > 0);
 }
 
+// EV 경로 → 도달 가능 범위로 그대로 가져올 차량/소비 관련 필드.
+export const EV_ISOCHRONE_SHARED_FIELDS = ['consumptionParam', 'slopeFlag', 'vehicleId', 'vehicleMass', 'vendor'];
+
 /**
  * EV 배터리 정보를 도달 가능 범위(isochrone) 요청 바디에 반영.
  * EV 현재 잔량(currentEnergy) → contoursEnergy, 현재 도달거리(currentRange) → contoursMeters.
+ * 또한 EV 경로의 consumptionParam·slopeFlag·vehicleId·vehicleMass·vendor 를
+ * 그대로 가져와 동일하게 적용한다(EV 바디에 값이 있을 때만).
  */
 export function applyEvBatteryToIsochrone(isoBody, evBody) {
   const out = { ...(isoBody || {}) };
@@ -61,6 +66,9 @@ export function applyEvBatteryToIsochrone(isoBody, evBody) {
   const cm = Number(evBody && evBody.currentRange);
   if (Number.isFinite(ce)) out.contoursEnergy = ce;
   if (Number.isFinite(cm)) out.contoursMeters = cm;
+  for (const k of EV_ISOCHRONE_SHARED_FIELDS) {
+    if (evBody && evBody[k] != null) out[k] = evBody[k];
+  }
   return out;
 }
 

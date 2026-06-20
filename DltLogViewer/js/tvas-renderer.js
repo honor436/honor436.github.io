@@ -769,6 +769,47 @@ function renderEndpoints(lg, coords, header) {
   }).bindPopup(`<b>${esc(dstName)}</b><br>SK: (${last.skX}, ${last.skY})<br>WGS84: ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}`).addTo(lg);
 }
 
+// RO4 링크종류/시설 코드 → 명칭 (도로 정보 섹션과 동일 기준).
+const LINK_TYPE_NAMES = {
+  0: '미조사', 1: '본선(비분리)', 2: '본선(분리)', 3: '연결로(JC)', 4: '교차점내',
+  5: '연결로(IC)', 7: 'SA', 8: '로터리', 9: '유턴', 10: 'P턴', 12: '졸음쉼터',
+  13: '회전교차로', 14: '교차로내',
+};
+const FACILITY_CODE_NAMES = {
+  0: '일반', 1: '교량', 2: '터널', 3: '고가', 4: '지하도로', 5: '교차로통과',
+  6: '철도건널목', 7: '댐/방파제', 90: '한강교량',
+};
+
+/**
+ * 배터리 방전 마커 팝업 HTML. 방전 결과(d)와 해당 RO4 구간(road),
+ * 현재 배터리(currentEnergy)를 받아 구간 에너지/도로 정보를 함께 보여준다.
+ */
+export function buildBatteryDepletionPopup(d, road, currentEnergy) {
+  const battery = Number(currentEnergy);
+  const num = v => (Number.isFinite(Number(v)) ? Number(v).toLocaleString() : '-');
+  let html =
+    `<b>⚠ 배터리 방전 예상 지점</b>` +
+    `<br>현재 배터리: ${Number.isFinite(battery) ? battery.toLocaleString() : '-'} W` +
+    `<br>누적 소모: ${num(d.cumEnergy)} Wh` +
+    `<br>구간 #${d.segmentIndex + 1} · VX ${d.vxIdx}`;
+  if (road) {
+    const rt = ROAD_TYPE_NAMES[road.roadType] ?? road.roadType;
+    const lt = LINK_TYPE_NAMES[road.linkType] ?? road.linkType;
+    const fc = FACILITY_CODE_NAMES[road.facilityCode] ?? road.facilityCode;
+    html +=
+      `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(148,163,184,.4)">` +
+      `<b>RO4 구간 정보</b>` +
+      `<br>도로종류: ${rt}` +
+      `<br>링크종류: ${lt}` +
+      `<br>시설: ${fc}` +
+      `<br>구간 에너지: ${num(road.energyConsumption)} Wh` +
+      `<br>구간거리: ${num(road.roadLength)} m` +
+      `<br>차로수: ${num(road.laneCount)} · 제한속도: ${num(road.speedLimit)} km/h` +
+      `<br>고도: ${num(road.elevation)} · lastVxIdx: ${road.lastVxIdx}`;
+  }
+  return html;
+}
+
 // 배터리 방전 예상 위치: RO4 누적 에너지 소모가 현재 배터리를 넘어서는 지점에 마커.
 function renderBatteryDepletion(lg, coords, roads, currentEnergy) {
   if (!lg || !coords || coords.length === 0) return;
@@ -785,12 +826,7 @@ function renderBatteryDepletion(lg, coords, roads, currentEnergy) {
   L.marker([c.lat, c.lon], {
     icon: L.divIcon({ className: '', html, iconSize: [30, 42], iconAnchor: [15, 15] }),
     zIndexOffset: 1200,
-  }).bindPopup(
-    `<b>⚠ 배터리 방전 예상 지점</b><br>` +
-    `현재 배터리: ${Number(currentEnergy).toLocaleString()} W<br>` +
-    `누적 소모: ${d.cumEnergy.toLocaleString()} W<br>` +
-    `구간 #${d.segmentIndex + 1} · VX ${d.vxIdx}`
-  ).addTo(lg);
+  }).bindPopup(buildBatteryDepletionPopup(d, roads[d.segmentIndex], currentEnergy)).addTo(lg);
 }
 
 function renderGuidancePoints(lg, coords, guidancePoints, directionNames, intersectionNames) {

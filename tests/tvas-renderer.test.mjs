@@ -656,3 +656,27 @@ test('findBatteryDepletion_null_for_invalid_input', () => {
   assert.equal(findBatteryDepletion([{ lastVxIdx: 1, energyConsumption: 9000 }], 0), null);
   assert.equal(findBatteryDepletion([{ lastVxIdx: 1, energyConsumption: 9000 }], -10), null);
 });
+
+// ---- buildBatteryDepletionPopup (방전 마커 팝업에 RO4 구간 정보) ----------- //
+import { buildBatteryDepletionPopup } from '../DltLogViewer/js/tvas-renderer.js';
+
+test('buildBatteryDepletionPopup_includes_ro4_segment_fields', () => {
+  const d = { segmentIndex: 2, vxIdx: 20, cumEnergy: 9000 };
+  const road = { lastVxIdx: 20, linkType: 2, roadType: 0, facilityCode: 2,
+    elevation: 5, roadLength: 1200, laneCount: 3, speedLimit: 100, energyConsumption: 4000 };
+  const html = buildBatteryDepletionPopup(d, road, 7000);
+  assert.match(html, /배터리 방전/);
+  assert.match(html, /7,000/);        // 현재 배터리
+  assert.match(html, /9,000/);        // 누적 소모
+  assert.match(html, /고속국도/);      // roadType 0
+  assert.match(html, /1,200/);        // roadLength
+  assert.match(html, /100/);          // speedLimit
+  assert.match(html, /4,000/);        // energyConsumption
+  assert.match(html, /터널/);          // facilityCode 2
+  assert.match(html, /RO4/);          // 섹션 라벨
+});
+
+test('buildBatteryDepletionPopup_safe_without_road', () => {
+  const html = buildBatteryDepletionPopup({ segmentIndex: 0, vxIdx: 1, cumEnergy: 100 }, null, 50);
+  assert.match(html, /배터리 방전/);
+});

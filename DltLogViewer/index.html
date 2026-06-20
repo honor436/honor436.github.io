@@ -3515,14 +3515,19 @@ function syncTvasUrl() {
 }
 // 경로 타입 변경: isochrone ↔ 일반/EV 전환 시 요청 바디 교체(좌표 유지)
 let _prevRouteType = 'ev';
+let _evBatteryEdited = false;   // EV 배터리 슬라이더를 실제로 조작했는지
 function onRouteTypeChange() {
   const t = segVal(tvasRouteType);
   const wasIso = _prevRouteType === 'isochrone';
   const isIso = t === 'isochrone';
   if (isIso && !wasIso) {
-    // EV/일반 바디의 배터리 정보(currentEnergy/currentRange)를 isochrone 에 자동 반영
-    let evBody = null; try { evBody = JSON.parse(evBodyEl.value); } catch {}
-    setRouteBodyTemplate(applyEvBatteryToIsochrone(ISOCHRONE_BODY, evBody));
+    // EV 배터리를 사용자가 변경한 경우에만 isochrone 에 반영, 아니면 기본 샘플 그대로
+    let tmpl = ISOCHRONE_BODY;
+    if (_evBatteryEdited) {
+      let evBody = null; try { evBody = JSON.parse(evBodyEl.value); } catch {}
+      tmpl = applyEvBatteryToIsochrone(ISOCHRONE_BODY, evBody);
+    }
+    setRouteBodyTemplate(tmpl);
   } else if (!isIso && wasIso) {
     setRouteBodyTemplate(defaultBody);
   }
@@ -3620,6 +3625,7 @@ function onParamSliderInput(group, changedKey) {
   // EV: 현재 도달거리 = chargedRange × (currentEnergy / chargedEnergy) 자동계산
   if (group === EV_FIELDS) {
     body.currentRange = computeCurrentRange(body.chargedRange, body.chargedEnergy, body.currentEnergy);
+    _evBatteryEdited = true;   // EV 배터리 변경됨 → isochrone 전환 시 반영
   }
   evBodyEl.value = JSON.stringify(body, null, 2);
   syncParamsFromBody();
@@ -4255,22 +4261,25 @@ tvasAddHdr.addEventListener('click', () => addHeaderRow());
 const defaultBody = {"addCameraTypes":["Bus","SignalSpeeding","Moving","ShoulderControl","Traffic"],"angle":130,"applyEvChargingTimeOnETA":true,"autoAddingYn":"Y","auxiliaryPower":1200,"availableAutoAddingYn":false,"chargedEnergy":70000,"chargedRange":500000,"consumptionParam":"{\"aux\":1200.0,\"batteryCapacity\":69770,\"batteryTemperature\":-30,\"chargingModeGen6\":\"PERFORMANCE\",\"csc\":[40.32,25.5,20.84,17.37,14.41,17.03,17.26,20.71,24.17,28.7,32.22],\"firstCharging\":false,\"kAcc\":2412000,\"kDec\":3600000,\"kDown\":3384000,\"kUp\":3132000,\"mass\":2580,\"vehicleId\":\"11CF\",\"vendor\":\"BMW\"}","controlRouteReqFlag":0,"currentEnergy":6970,"currentRange":47000,"dangerAreaOptions":["OccurFrequently","SharpCurveSection","MistArea","SchoolZone","TrainCrossing"],"departDirPriority":1,"departDirectionType":0,"departLinkId":0,"departMeshId":0,"departName":"충청남도 천안시 동남구 성남면","departRoadType":"None","departSrchFlag":0,"departXPos":4581514,"departYPos":1322213,"destEVChargerFlag":false,"destName":"동대구역","destPoiId":"501087","destRpFlag":16,"destSearchDetailFlag":"None","destSearchFlag":"LeaveReSearch","destXPos":4630714,"destYPos":1291586,"ecoModeFlag":0,"efficientSpeed":0,"evMobilityProviders":[],"evSocHistory":[],"gpsTraceData":"","guideImgResolutionCode":"R480x540","header":{"appLaunchCount":1,"appVersion":"3.11.260","buildNo":"311260","carrier":"","deviceId":"2-1-64f62924-13d2-3391-ad91-e935f9043d2d","modelNo":"BMW IDCEvo","osType":"AND","osVersion":"14","pushDeviceKey":"","reqTime":"20260417112835","resolution":"QUAD_HD","screenHeight":1218,"screenWidth":2560,"svcType":113,"using":"MAIN"},"hipassFlag":0,"initSrchDepartXPos":0,"initSrchDepartYPos":0,"initSrchLength":155226,"initSrchSessionId":"TPtr20260417112814767AHT","isRetry":false,"lastRid":5153744,"lastTollgateId":0,"maxCharge":69770,"minEnergy":6977,"minSocAtAutoAdding":20,"minSocAtChargingStation":20,"minSocAtDestination":10,"myEvStations":[],"pastArrivalTime":"","pastSessionId":"TPtr20260417112814767AHT","pastXpos":0,"pastYpos":0,"patternDateTime":"","pickEvStations":[],"preMapVersion":"20260407","preRids":[],"preSecs":[],"preTollgateIds":"129","radiusEntryTurnType":117,"radiusInfoType":1,"radiusLeaveTurnType":0,"radiusLinkDirection":1,"radiusLinkId":5901,"radiusMeshCode":2293816,"radiusXPos":127,"radiusYPos":36,"routePlanTypes":["Traffic_Recommend"],"searchCondData":"","serviceFlag":"Realtime","slopeFlag":0,"socketType":["DcCombo"],"speed":0,"tcRid":0,"tollCarType":"Car","tvas":"5.9","vehicleId":"11CF","vehicleMass":2580,"vendor":"BMW","version":"1.1","wayPoints":[]};
 // Range Map (isochrone) 기본 요청 데이터
 const ISOCHRONE_BODY = {
-  "auxiliaryPower": 2760,
-  "contoursEnergy": 51200,
+  "auxiliaryPower": 1200,
+  "consumptionParam": '{"aux":1200.0,"batteryCapacity":80000,"batteryTemperature":0,"chargingModeGen6":"PERFORMANCE","csc":[20.46,12.3,12.2,11.7,13.5,15.2,18.2,20.2,23.0,27.0,31.9],"firstCharging":false,"kAcc":2412000,"kDec":3600000,"kDown":3384000,"kUp":3132000,"mass":2000,"vehicleId":"RV11","vendor":"BMW"}',
+  "contoursEnergy": 56000,
   "contoursMeters": 300000,
-  "departXPos": 4572802,
-  "departYPos": 1351861,
-  "slopeFlag": 0,
-  "vehicleId": "volvo_XC40",
-  "vehicleMass": 2216,
-  "version": "1.1",
+  "departXPos": 4575789,
+  "departYPos": 1345346,
+  "efficientSpeed": 0,
   "header": {
-    "appLaunchCount": 0, "pushDeviceKey": "", "screenHeight": 976, "screenWidth": 878,
-    "svcType": 116, "using": "MAIN", "appVersion": "2.0.0", "buildNo": "100000",
-    "carrier": "", "deviceId": "2-1-d23a0c5c-cd0c-3540-b586-558ea19f1239",
-    "modelNo": "sdk_gphone_arm64", "osType": "AND", "osVersion": "11",
-    "reqTime": "20230130103919", "resolution": "HD"
-  }
+    "appLaunchCount": 1, "appVersion": "3.20.403", "buildNo": "320403", "carrier": "SKT",
+    "deviceId": "0-1-c42f91826d949fef2f2b5006e2f8404127e13189656dcec41311b1c4dce78430",
+    "modelNo": "BMW Flavoured AOSP on arm64 Emulator", "osType": "AND", "osVersion": "14",
+    "pushDeviceKey": "", "reqTime": "20260620141840", "resolution": "QXGA",
+    "screenHeight": 1660, "screenWidth": 1752, "svcType": 113, "using": "MAIN"
+  },
+  "slopeFlag": 1,
+  "vehicleId": "RV11",
+  "vehicleMass": 2000,
+  "vendor": "BMW",
+  "version": "1.1"
 };
 
 tvasBody.value = JSON.stringify(defaultBody, null, 2);
@@ -4394,7 +4403,7 @@ tvasSendBtn.addEventListener('click', async () => {
   });
   // 도달 가능 범위(isochrone)는 EV/일반과 달리 Accept/Content-Type 만 전송
   if (/isochrone/i.test(url) || segVal(tvasRouteType) === 'isochrone') {
-    headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+    headers = { 'Accept': 'application/json', 'Content-Type': 'application/json; charset=UTF-8' };
   }
 
   // Parse body

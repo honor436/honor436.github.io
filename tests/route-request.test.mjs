@@ -112,3 +112,42 @@ test('applyEvBatteryToIsochrone_keeps_iso_when_ev_missing', () => {
   assert.equal(out.contoursEnergy, 51200);
   assert.equal(out.contoursMeters, 300000);
 });
+
+// ---- buildIsochroneBody (도달 가능 거리 조회 요청 바디) -------------------- //
+//
+// 제공된 샘플(BMW RV11) 기준 isochrone 요청 바디. consumptionParam 은
+// stringified JSON, header.reqTime 은 전송 시 채우도록 비워둔다.
+import { buildIsochroneBody } from '../DltLogViewer/js/route-request.js';
+
+test('buildIsochroneBody_has_contours_and_depart_fields', () => {
+  const body = buildIsochroneBody();
+  assert.equal(body.contoursEnergy, 56000);
+  assert.equal(body.contoursMeters, 300000);
+  assert.equal(body.departXPos, 4575789);
+  assert.equal(body.departYPos, 1345346);
+  assert.equal(body.auxiliaryPower, 1200);
+  assert.equal(body.slopeFlag, 1);
+  assert.equal(body.vehicleId, 'RV11');
+  assert.equal(body.vehicleMass, 2000);
+  assert.equal(body.vendor, 'BMW');
+  assert.equal(body.version, '1.1');
+});
+
+test('buildIsochroneBody_consumptionParam_is_stringified_json', () => {
+  const body = buildIsochroneBody();
+  assert.equal(typeof body.consumptionParam, 'string');
+  const cp = JSON.parse(body.consumptionParam);
+  assert.equal(cp.batteryCapacity, 80000);
+  assert.equal(cp.mass, 2000);
+  assert.equal(cp.vehicleId, 'RV11');
+  assert.equal(cp.vendor, 'BMW');
+  assert.equal(cp.chargingModeGen6, 'PERFORMANCE');
+  assert.ok(Array.isArray(cp.csc) && cp.csc.length === 11);
+});
+
+test('buildIsochroneBody_header_reqTime_empty_svcType_113', () => {
+  const body = buildIsochroneBody();
+  assert.equal(body.header.reqTime, '');
+  assert.equal(body.header.svcType, 113);
+  assert.equal(body.header.using, 'MAIN');
+});

@@ -82,3 +82,27 @@ test('REQUEST_TYPES_poi_search_and_detail_are_implemented', () => {
   assert.notEqual(getRequestType('findpois').implemented, false);
   assert.notEqual(getRequestType('findpoidetails').implemented, false);
 });
+
+// ---- 도달 가능 거리 조회 (isochrone) -------------------------------------- //
+//
+// 새 메뉴: 도달 가능 거리 조회 → /tmap-channel/rsd/route/isochrone
+
+test('REQUEST_TYPES_includes_isochrone_reachable_distance', () => {
+  const t = getRequestType('isochrone');
+  assert.ok(t, '도달 가능 거리 조회 메뉴가 등록되어 있어야 한다');
+  assert.equal(t.label, '도달 가능 거리 조회');
+  assert.equal(t.path, '/tmap-channel/rsd/route/isochrone');
+  assert.equal(t.method, 'POST');
+  assert.notEqual(t.implemented, false);
+});
+
+test('REQUEST_TYPES_isochrone_sample_body_matches_contours_request', () => {
+  const body = getRequestType('isochrone').sampleBody();
+  assert.equal(body.contoursEnergy, 56000);
+  assert.equal(body.contoursMeters, 300000);
+  assert.equal(body.departXPos, 4575789);
+  assert.equal(body.departYPos, 1345346);
+  assert.equal(typeof body.consumptionParam, 'string');
+  assert.equal(JSON.parse(body.consumptionParam).batteryCapacity, 80000);
+  assert.equal(body.header.reqTime, '');
+});

@@ -1887,6 +1887,7 @@
         <label>등거리선 contoursMeters <span class="ev-val" id="iso-meters-val"></span></label>
         <input type="range" id="iso-meters" min="0" max="600000" step="500">
       </div>
+      <button type="button" id="iso-import-ev" class="tvas-sub-btn" style="width:100%;margin-top:4px">EV 경로 데이터 가져오기</button>
     </div>
     <!-- URL -->
     <div>
@@ -2427,7 +2428,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
-import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch } from './js/route-request.js';
+import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch, buildIsoBodyFromEvBattery } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
@@ -3642,6 +3643,16 @@ for (const group of [EV_FIELDS, ISO_FIELDS]) {
 if (evBodyEl) evBodyEl.addEventListener('input', () => {
   if ((evParamsBox && evParamsBox.classList.contains('show')) ||
       (isoParamsBox && isoParamsBox.classList.contains('show'))) syncParamsFromBody();
+});
+// "EV 경로 데이터 가져오기": EV 경로에 설정된 현재 배터리(currentEnergy/currentRange)를
+// 도달 가능 범위 바디(contoursEnergy/contoursMeters)에 적용한다.
+const isoImportEvBtn = document.getElementById('iso-import-ev');
+if (isoImportEvBtn) isoImportEvBtn.addEventListener('click', () => {
+  let isoBody; try { isoBody = JSON.parse(evBodyEl.value); } catch { isoBody = ISOCHRONE_BODY; }
+  const merged = buildIsoBodyFromEvBattery(isoBody, _savedRouteBodies.route, defaultBody);
+  evBodyEl.value = JSON.stringify(merged, null, 2);
+  syncParamsFromBody();
+  setStatus(`EV 경로 현재 배터리 적용 — contoursEnergy=${merged.contoursEnergy.toLocaleString()} W, contoursMeters=${merged.contoursMeters.toLocaleString()} m`, 'ok');
 });
 const tvasHeaders    = document.getElementById('tvas-headers');
 const tvasBody       = document.getElementById('tvas-body');

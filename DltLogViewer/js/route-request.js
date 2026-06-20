@@ -64,6 +64,15 @@ export function applyEvBatteryToIsochrone(isoBody, evBody) {
   return out;
 }
 
+/**
+ * "EV 경로 데이터 가져오기": EV 경로 바디의 현재 배터리(currentEnergy/
+ * currentRange)를 isochrone 바디에 적용한 결과를 반환한다.
+ * 저장된 EV 바디(evBody)가 없으면 fallbackEvBody 를 사용한다.
+ */
+export function buildIsoBodyFromEvBattery(isoBody, evBody, fallbackEvBody) {
+  return applyEvBatteryToIsochrone(isoBody, evBody || fallbackEvBody);
+}
+
 // ---- 도달 가능 거리 조회(isochrone) 요청 바디 ----------------------------- //
 //
 // 제공된 샘플(BMW RV11) 기준. consumptionParam 은 차량 소비 모델 JSON 을

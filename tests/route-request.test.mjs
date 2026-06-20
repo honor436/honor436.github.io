@@ -257,3 +257,23 @@ test('resolveRouteTypeSwitch_does_not_mutate_saved_input', () => {
   });
   assert.equal(saved.route, null); // 원본 불변
 });
+
+// ---- buildIsoBodyFromEvBattery ("EV 경로 데이터 가져오기" 버튼) ------------ //
+//
+// EV 경로 바디의 현재 배터리(currentEnergy/currentRange)를 isochrone 바디의
+// contoursEnergy/contoursMeters 로 가져와 적용. 저장된 EV 바디가 없으면 fallback.
+import { buildIsoBodyFromEvBattery } from '../DltLogViewer/js/route-request.js';
+
+test('buildIsoBodyFromEvBattery_uses_saved_ev_current_battery', () => {
+  const ev = { ...DEF, currentEnergy: 41000, currentRange: 230000 };
+  const out = buildIsoBodyFromEvBattery(ISO, ev, DEF);
+  assert.equal(out.contoursEnergy, 41000);
+  assert.equal(out.contoursMeters, 230000);
+  assert.equal(out.auxiliaryPower, 1200); // 기존 iso 값 유지
+});
+
+test('buildIsoBodyFromEvBattery_falls_back_when_no_saved_ev', () => {
+  const out = buildIsoBodyFromEvBattery(ISO, null, DEF);
+  assert.equal(out.contoursEnergy, DEF.currentEnergy); // 6970
+  assert.equal(out.contoursMeters, DEF.currentRange);  // 47000
+});

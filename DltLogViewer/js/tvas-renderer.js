@@ -36,6 +36,7 @@ let tvasLayers = {
   rpLink: null,        // RP 링크 (RD5)
   truck: null,         // 화물차 제한구간
   complexIntersection: null, // 복잡교차로 (MC4)
+  batteryDepletion: null,    // 배터리 방전 예상 위치 (RO4 누적 에너지)
 };
 
 // ---- Color schemes -------------------------------------------------------- //
@@ -463,14 +464,14 @@ export function laneIconHtml(tl) {
 
 // ---- Main render function ------------------------------------------------- //
 
-export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0) {
+export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0, opts = {}) {
   clearTvasRoute(map);
 
   const { header, guidancePoints, dangerAreas, tollGates, restAreas,
           directionNames, intersectionNames, laneGuidance, evChargers, routeSummary,
           waypoints, incidents, congestion, forcedReroute,
           trafficInfo, cityBoundary, highwayMode, rpLinks,
-          truckWidth, truckHeight, truckWeight, complexIntersections } = tvasResult;
+          truckWidth, truckHeight, truckWeight, complexIntersections, roads } = tvasResult;
   const routeItems = (routeSummary && routeSummary.items) ? routeSummary.items : [];
   const summaryRoadNames = (routeSummary && routeSummary.roadNames) ? routeSummary.roadNames : [];
   const rpLinkItems = (rpLinks && rpLinks.items) ? rpLinks.items : [];
@@ -502,6 +503,7 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0)
     if (complexIntersections && complexIntersections.items && complexIntersections.items.length > 0) {
       renderComplexIntersections(tvasLayers.complexIntersection, resolvedCoords, complexIntersections);
     }
+    renderBatteryDepletion(tvasLayers.batteryDepletion, resolvedCoords, roads, opts.currentEnergy);
   }
 
   // Add all layers to map
@@ -617,6 +619,29 @@ export function buildIntersectionNameLabels(coords, names) {
  * Returns `[{latlngs, item}]`; skips invalid/reversed/single-point ranges.
  * endVxIdx is clamped to coords.length-1.
  */
+/**
+ * RO4(roads) 각 구간의 에너지 소모량(energyConsumption)을 누적해, 현재 배터리
+ * 에너지(currentEnergy)를 처음으로 넘어서는 구간을 배터리 방전 위치로 반환한다.
+ * @param {Array<{lastVxIdx:number, energyConsumption:number}>} roads  RO4 구간들
+ * @param {number} currentEnergy  현재 배터리 에너지(W)
+ * @returns {{ segmentIndex:number, vxIdx:number, cumEnergy:number }|null}
+ *   배터리가 경로 전체를 커버하면(방전 없음) null.
+ */
+export function findBatteryDepletion(roads, currentEnergy) {
+  const battery = Number(currentEnergy);
+  if (!Array.isArray(roads) || roads.length === 0) return null;
+  if (!Number.isFinite(battery) || battery <= 0) return null;
+  let cum = 0;
+  for (let i = 0; i < roads.length; i++) {
+    const e = Number(roads[i] && roads[i].energyConsumption);
+    if (Number.isFinite(e)) cum += e;
+    if (cum >= battery) {
+      return { segmentIndex: i, vxIdx: roads[i].lastVxIdx, cumEnergy: cum };
+    }
+  }
+  return null;
+}
+
 export function buildRangeSegments(coords, items) {
   if (!coords || coords.length === 0) return [];
   if (!items || items.length === 0) return [];
@@ -742,6 +767,30 @@ function renderEndpoints(lg, coords, header) {
   L.marker([last.lat, last.lon], {
     icon: L.divIcon({ className: '', html: destIconHtml(), iconSize: [28, 28], iconAnchor: [14, 14] }), zIndexOffset: 1000,
   }).bindPopup(`<b>${esc(dstName)}</b><br>SK: (${last.skX}, ${last.skY})<br>WGS84: ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}`).addTo(lg);
+}
+
+// 배터리 방전 예상 위치: RO4 누적 에너지 소모가 현재 배터리를 넘어서는 지점에 마커.
+function renderBatteryDepletion(lg, coords, roads, currentEnergy) {
+  if (!lg || !coords || coords.length === 0) return;
+  const d = findBatteryDepletion(roads, currentEnergy);
+  if (!d) return;
+  const idx = Math.min(Math.max(d.vxIdx | 0, 0), coords.length - 1);
+  const c = coords[idx];
+  if (!c) return;
+  const html =
+    `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto">
+       <div style="background:#dc2626;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;font-size:15px;box-shadow:0 1px 5px rgba(0,0,0,.45)">🪫</div>
+       <div style="background:#dc2626;color:#fff;font-size:9px;font-weight:800;padding:0 5px;border-radius:5px;margin-top:1px;white-space:nowrap">방전</div>
+     </div>`;
+  L.marker([c.lat, c.lon], {
+    icon: L.divIcon({ className: '', html, iconSize: [30, 42], iconAnchor: [15, 15] }),
+    zIndexOffset: 1200,
+  }).bindPopup(
+    `<b>⚠ 배터리 방전 예상 지점</b><br>` +
+    `현재 배터리: ${Number(currentEnergy).toLocaleString()} W<br>` +
+    `누적 소모: ${d.cumEnergy.toLocaleString()} W<br>` +
+    `구간 #${d.segmentIndex + 1} · VX ${d.vxIdx}`
+  ).addTo(lg);
 }
 
 function renderGuidancePoints(lg, coords, guidancePoints, directionNames, intersectionNames) {

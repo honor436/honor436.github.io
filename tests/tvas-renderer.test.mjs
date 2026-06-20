@@ -611,3 +611,48 @@ test('buildRpLinkPopup notes Super Cruise only when flagged', () => {
   assert.match(on, /Super Cruise/i);
   assert.doesNotMatch(off, /Super Cruise/i);
 });
+
+// ---- findBatteryDepletion (RO4 구간 에너지 → 배터리 방전 위치) ------------- //
+//
+// RO4(roads) 각 구간의 energyConsumption 을 누적하다가 현재 배터리 에너지
+// (currentEnergy)를 넘어서는 구간의 lastVxIdx 를 방전 위치로 본다.
+import { findBatteryDepletion } from '../DltLogViewer/js/tvas-renderer.js';
+
+test('findBatteryDepletion_returns_segment_where_cumulative_exceeds_battery', () => {
+  const roads = [
+    { lastVxIdx: 5,  energyConsumption: 2000 },  // cum 2000
+    { lastVxIdx: 12, energyConsumption: 3000 },  // cum 5000
+    { lastVxIdx: 20, energyConsumption: 4000 },  // cum 9000 >= 7000 → 여기
+    { lastVxIdx: 30, energyConsumption: 1000 },
+  ];
+  const d = findBatteryDepletion(roads, 7000);
+  assert.equal(d.segmentIndex, 2);
+  assert.equal(d.vxIdx, 20);
+  assert.equal(d.cumEnergy, 9000);
+});
+
+test('findBatteryDepletion_null_when_battery_covers_whole_route', () => {
+  const roads = [
+    { lastVxIdx: 5, energyConsumption: 2000 },
+    { lastVxIdx: 12, energyConsumption: 3000 },
+  ];
+  assert.equal(findBatteryDepletion(roads, 100000), null);
+});
+
+test('findBatteryDepletion_accumulates_with_regen_negative', () => {
+  const roads = [
+    { lastVxIdx: 5,  energyConsumption: 5000 },   // cum 5000
+    { lastVxIdx: 10, energyConsumption: -2000 },  // cum 3000 (회생제동)
+    { lastVxIdx: 15, energyConsumption: 5000 },   // cum 8000 >= 6000 → 여기
+  ];
+  const d = findBatteryDepletion(roads, 6000);
+  assert.equal(d.segmentIndex, 2);
+  assert.equal(d.vxIdx, 15);
+});
+
+test('findBatteryDepletion_null_for_invalid_input', () => {
+  assert.equal(findBatteryDepletion([], 5000), null);
+  assert.equal(findBatteryDepletion(null, 5000), null);
+  assert.equal(findBatteryDepletion([{ lastVxIdx: 1, energyConsumption: 9000 }], 0), null);
+  assert.equal(findBatteryDepletion([{ lastVxIdx: 1, energyConsumption: 9000 }], -10), null);
+});

@@ -1939,6 +1939,7 @@
       <span class="tvas-ltog on" data-tl="rpLink">RP링크</span>
       <span class="tvas-ltog on" data-tl="truck">화물차</span>
       <span class="tvas-ltog on" data-tl="complexIntersection">복잡교차로</span>
+      <span class="tvas-ltog on" data-tl="batteryDepletion">배터리방전</span>
     </div>
     <!-- Result -->
     <div id="tvas-result-summary"></div>
@@ -4679,7 +4680,10 @@ tvasSendBtn.addEventListener('click', async () => {
       return;
     }
 
-    const { summary } = renderTvasRoute(map, tvasResult, coords, 0);
+    // 요청 바디의 현재 배터리(currentEnergy)를 전달 → RO4 누적 에너지로 방전 위치 표시
+    let reqCurrentEnergy = null;
+    try { reqCurrentEnergy = JSON.parse(tvasBody.value).currentEnergy; } catch {}
+    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy });
 
     // Save coords for VX click navigation
     lastCoords = coords;

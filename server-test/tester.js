@@ -10,6 +10,7 @@
 'use strict';
 
 import { buildPoiSearchBody, buildPoiDetailBody } from '../DltLogViewer/js/poi-search.js';
+import { buildIsochroneBody } from '../DltLogViewer/js/route-request.js';
 
 // 환경 → 호스트. 라벨은 UI 드롭다운에 그대로 노출.
 export const TEST_ENVS = {
@@ -53,6 +54,13 @@ export const REQUEST_TYPES = [
     method: 'POST',
     path: '/tmap-channel/poi/detailinfo/findpoidetailinfoforauto',
     sampleBody: () => buildPoiDetailBody({ name: 'EV충전소 행당대림아파트', poiId: '10185460', pkey: '1018546001' }),
+  },
+  {
+    id: 'isochrone',
+    label: '도달 가능 거리 조회',
+    method: 'POST',
+    path: '/tmap-channel/rsd/route/isochrone',
+    sampleBody: buildIsochroneBody,
   },
   {
     id: 'poisbyroute',

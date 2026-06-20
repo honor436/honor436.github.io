@@ -63,3 +63,70 @@ export function applyEvBatteryToIsochrone(isoBody, evBody) {
   if (Number.isFinite(cm)) out.contoursMeters = cm;
   return out;
 }
+
+// ---- 도달 가능 거리 조회(isochrone) 요청 바디 ----------------------------- //
+//
+// 제공된 샘플(BMW RV11) 기준. consumptionParam 은 차량 소비 모델 JSON 을
+// 문자열로 직렬화해 담는다(서버 규약). header.reqTime 은 전송 시 채우도록 비워둔다.
+
+// isochrone 요청 헤더(샘플 기준 — svcType 113, BMW 에뮬레이터).
+function isochroneHeader() {
+  return {
+    appLaunchCount: 1,
+    appVersion: '3.20.403',
+    buildNo: '320403',
+    carrier: 'SKT',
+    deviceId: '0-1-c42f91826d949fef2f2b5006e2f8404127e13189656dcec41311b1c4dce78430',
+    modelNo: 'BMW Flavoured AOSP on arm64 Emulator',
+    osType: 'AND',
+    osVersion: '14',
+    pushDeviceKey: '',
+    reqTime: '',
+    resolution: 'QXGA',
+    screenHeight: 1660,
+    screenWidth: 1752,
+    svcType: 113,
+    using: 'MAIN',
+  };
+}
+
+// 차량 소비 모델 파라미터(consumptionParam 의 원본 객체).
+function isochroneConsumptionParam() {
+  return {
+    aux: 1200.0,
+    batteryCapacity: 80000,
+    batteryTemperature: 0,
+    chargingModeGen6: 'PERFORMANCE',
+    csc: [20.46, 12.3, 12.2, 11.7, 13.5, 15.2, 18.2, 20.2, 23.0, 27.0, 31.9],
+    firstCharging: false,
+    kAcc: 2412000,
+    kDec: 3600000,
+    kDown: 3384000,
+    kUp: 3132000,
+    mass: 2000,
+    vehicleId: 'RV11',
+    vendor: 'BMW',
+  };
+}
+
+/**
+ * 도달 가능 거리 조회(isochrone) 요청 바디 생성.
+ * consumptionParam 은 stringified JSON 으로 담긴다.
+ */
+export function buildIsochroneBody() {
+  return {
+    auxiliaryPower: 1200,
+    consumptionParam: JSON.stringify(isochroneConsumptionParam()),
+    contoursEnergy: 56000,
+    contoursMeters: 300000,
+    departXPos: 4575789,
+    departYPos: 1345346,
+    efficientSpeed: 0,
+    slopeFlag: 1,
+    vehicleId: 'RV11',
+    vehicleMass: 2000,
+    vendor: 'BMW',
+    version: '1.1',
+    header: isochroneHeader(),
+  };
+}

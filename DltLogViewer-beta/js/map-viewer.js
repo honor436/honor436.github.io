@@ -1,0 +1,614 @@
+/**
+ * TMAP map rendering using Leaflet + TMAP tile layer.
+ * Renders location, map-matching, route request, and TTS layers.
+ */
+
+'use strict';
+
+import { formatTimestamp, preparePayloadForDisplayExport } from './extractor.js';
+import { wgs84ToSkCoord } from './coordinate.js';
+
+let map = null;
+let layers = {};
+let routeAnchorLayer = null;
+let coordLayer = null;
+
+// ---- Waypoint state (출발/경유/목적지 설정) -------------------------------- //
+const routeWaypoints = { depart: null, dest: null, vias: [] };
+let wpMarkers = { depart: null, dest: null, vias: [] };
+
+function wpIconHtml(label, color, sub) {
+  return '<div style="display:flex;flex-direction:column;align-items:center">' +
+    '<div style="width:36px;height:36px;line-height:36px;text-align:center;background:'+color+';color:#fff;border-radius:50%;font-size:16px;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.5);border:3px solid #fff">'+label+'</div>' +
+    (sub ? '<div style="margin-top:2px;padding:1px 6px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:600;border-radius:8px;white-space:nowrap">'+sub+'</div>' : '') +
+    '</div>';
+}
+
+function addViaMarker(lat, lon, idx) {
+  if (!map) return;
+  const marker = L.marker([lat, lon], {
+    icon: L.divIcon({ className: '', html: wpIconHtml('W'+(idx+1), '#f59e0b', '경유'+(idx+1)), iconSize: [36, 52], iconAnchor: [18, 26] }),
+    zIndexOffset: 1500,
+  }).bindPopup(`<b>경유지 ${idx+1}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  wpMarkers.vias[idx] = marker;
+}
+
+function setWaypoint(type, lat, lon) {
+  if (type === 'via') {
+    if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
+    routeWaypoints.vias.push({ lat, lon });
+    addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
+  } else {
+    routeWaypoints[type] = { lat, lon };
+    if (!map) return;
+    if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
+    const label = type === 'depart' ? 'S' : 'E';
+    const color = type === 'depart' ? '#22c55e' : '#ef4444';
+    const subLabel = type === 'depart' ? '출발' : '도착';
+    wpMarkers[type] = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
+      zIndexOffset: 2000,
+    }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+  }
+  updateWpBar();
+}
+
+function removeWp(type, idx) {
+  if (type === 'via') {
+    routeWaypoints.vias.splice(idx, 1);
+    if (map && wpMarkers.vias[idx]) map.removeLayer(wpMarkers.vias[idx]);
+    wpMarkers.vias.splice(idx, 1);
+    wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
+    wpMarkers.vias = [];
+    routeWaypoints.vias.forEach((v, i) => addViaMarker(v.lat, v.lon, i));
+  } else {
+    routeWaypoints[type] = null;
+    if (map && wpMarkers[type]) { map.removeLayer(wpMarkers[type]); wpMarkers[type] = null; }
+  }
+  updateWpBar();
+}
+
+function updateWpBar() {
+  const bar = document.getElementById('wp-bar');
+  if (!bar) return;
+  let html = '';
+  if (routeWaypoints.depart) {
+    const d = routeWaypoints.depart;
+    html += `<span class="wp-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">S ${d.lat.toFixed(5)},${d.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('depart')">&times;</span></span> `;
+  }
+  routeWaypoints.vias.forEach((v, i) => {
+    html += `<span class="wp-badge" style="background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">W${i+1} ${v.lat.toFixed(5)},${v.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('via',${i})">&times;</span></span> `;
+  });
+  if (routeWaypoints.dest) {
+    const d = routeWaypoints.dest;
+    html += `<span class="wp-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px">E ${d.lat.toFixed(5)},${d.lon.toFixed(5)} <span style="cursor:pointer;font-size:14px" onclick="window._removeWp('dest')">&times;</span></span> `;
+  }
+  if (!html) html = '<span style="color:#8b95a1;font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
+  bar.innerHTML = html;
+  bar.style.display = '';
+}
+
+// Expose for inline onclick handlers
+window._removeWp = removeWp;
+
+// ---- Ruler state ---------------------------------------------------------- //
+let rulerLayer = null;
+let rulerActive = false;
+let rulerStart = null;   // L.LatLng of first click
+let rulerOnStateChange = null;  // callback(state: 'off'|'ready'|'start')
+
+export function getMap() { return map; }
+export function getRouteWaypoints() { return routeWaypoints; }
+
+// ---- Popup HTML helpers -------------------------------------------------- //
+
+function esc(s) {
+  return String(s ?? 'N/A')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function field(label, value) {
+  const text = (value == null || value === '') ? 'N/A' :
+    Array.isArray(value) ? (value.length ? value.join(', ') : 'N/A') : String(value);
+  return `<div><b>${esc(label)}:</b> ${esc(text)}</div>`;
+}
+
+function routePopupHtml(rr) {
+  // 전체 JSON 파싱 성공 → 정리된 형태로 표시, 실패 → 원본 그대로 + 경고 배지
+  let payloadPretty, parseWarning = '';
+  if (rr.payloadFull) {
+    const cleaned = preparePayloadForDisplayExport(rr.payloadFull);
+    payloadPretty = JSON.stringify(cleaned, null, 2);
+  } else if (rr.payloadParseError && rr.rawReqBuffer) {
+    payloadPretty = rr.rawReqBuffer;
+    parseWarning = `<div style="background:#fef3c7;color:#92400e;padding:6px 8px;border-radius:6px;font-size:11px;margin:4px 0;border:1px solid #f59e0b">
+      <b>⚠ JSON 파싱 실패</b> — 원본 그대로 표시<br>
+      <span style="font-size:10px;color:#b45309">${esc(rr.payloadParseError)}</span>
+    </div>`;
+  } else {
+    const displayPayload = rr.payload ? preparePayloadForDisplayExport(rr.payload) : null;
+    payloadPretty = displayPayload ? JSON.stringify(displayPayload, null, 2) : 'N/A';
+  }
+  const statusColor = rr.responseStatus === 'SUCCESS' ? '#5eead4' :
+    rr.responseStatus === 'FAILED' ? '#f87171' : '#94a3b8';
+  const respDetail = [
+    rr.responseTimeMs != null ? `${rr.responseTimeMs}ms` : null,
+    rr.responseSize   != null ? `size: ${rr.responseSize}` : null,
+  ].filter(Boolean).join(', ');
+
+  return `
+    <div class="route-popup">
+      <div class="route-banner">
+        <div><b>Route ID</b><br><span style="font-size:15px;font-weight:700;color:#a78bfa">${esc(rr.rpLabel || 'N/A')}</span></div>
+        <div><b>Response</b><br><span style="font-size:17px;font-weight:700;color:${statusColor}">${esc(rr.responseStatus || 'UNKNOWN')}</span></div>
+        <div><b>Session ID</b><br><span style="font-size:12px;font-weight:700;word-break:break-all">${esc(rr.sessionId || 'N/A')}</span></div>
+      </div>
+      ${field('Log File', rr.filePath)}
+      ${field('Response', respDetail ? `${rr.responseStatus || 'UNKNOWN'} (${respDetail})` : rr.responseStatus || 'UNKNOWN')}
+      ${field('Endpoint', rr.endpoint)}
+      ${field('ReqTime', rr.reqTime)}
+      ${field('REQ Log Time', formatTimestamp(rr.reqTimestamp))}
+      ${field('GPS at REQ (WGS84)', rr.requestLat != null ? `${rr.requestLat.toFixed(6)}, ${rr.requestLon.toFixed(6)}` : null)}
+      ${field('GPS Source', rr.requestSourceType)}
+      ${field('GPS Log Time', formatTimestamp(rr.requestLocationTime))}
+      ${field('Departure', rr.departName)}
+      ${field('Departure SK', `${rr.departX}, ${rr.departY}`)}
+      ${field('Departure WGS84', rr.departLat != null ? `${rr.departLat.toFixed(6)}, ${rr.departLon.toFixed(6)}` : null)}
+      ${field('Destination', rr.destName)}
+      ${field('Destination SK', `${rr.destX}, ${rr.destY}`)}
+      ${field('Destination WGS84', rr.destLat != null ? `${rr.destLat.toFixed(6)}, ${rr.destLon.toFixed(6)}` : null)}
+      ${field('CameraTypes', rr.cameraTypes)}
+      ${field('DangerAreaOptions', rr.dangerAreaOptions)}
+      ${field('RoutePlanTypes', rr.routePlanTypes)}
+      ${field('angle', rr.angle)}
+      ${field('applyEvChargingTimeOnETA', rr.applyEvChargingTimeOnETA)}
+      ${field('autoAddingYn', rr.autoAdding)}
+      ${field('availableAutoAddingYn', rr.availableAutoAdding)}
+      ${field('currentEnergy', rr.currentEnergy)}
+      ${field('currentRange', rr.currentRange)}
+      ${field('chargedEnergy', rr.chargedEnergy)}
+      ${field('chargedRange', rr.chargedRange)}
+      ${field('minSocAtAutoAdding', rr.minSocAutoAdding)}
+      ${field('minSocAtChargingStation', rr.minSocChargingStation)}
+      ${field('minSocAtDestination', rr.minSocDestination)}
+      ${field('maxCharge', rr.maxCharge)}
+      ${field('minEnergy', rr.minEnergy)}
+      ${field('vehicleId', rr.vehicleId)}
+      ${field('vendor', rr.vendor)}
+      ${field('version', rr.version)}
+      ${field('AppVersion', rr.appVersion)}
+      ${field('BuildNo', rr.buildNo)}
+      ${field('OSVersion', rr.osVersion)}
+      ${field('ModelNo', rr.modelNo)}
+      ${field('WaypointCount', rr.waypointCount)}
+      ${parseWarning}
+      <details ${rr.payloadFull ? '' : 'open'}><summary>Request Payload</summary><pre>${esc(payloadPretty)}</pre></details>
+    </div>`;
+}
+
+function ttsPopupHtml(entry) {
+  return `
+    <div>
+      ${field('Type', '음성안내')}
+      ${field('Log File', entry.filePath)}
+      ${field('Log Time', formatTimestamp(entry.timestamp))}
+      ${field('Status', entry.status)}
+      ${field('RequestId', entry.requestId)}
+      ${field('GPS Source', entry.requestSourceType)}
+      ${field('GPS Time', formatTimestamp(entry.requestLocationTime))}
+      ${field('GPS WGS84', entry.requestLat != null ? `${entry.requestLat.toFixed(6)}, ${entry.requestLon.toFixed(6)}` : null)}
+      ${field('Script', entry.script)}
+    </div>`;
+}
+
+// ---- SVG icons ----------------------------------------------------------- //
+
+const ttsIconHtml = `<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="#f97316" stroke="#7c2d12" stroke-width="1.5"/><path d="M8 15V11H11L14.5 8.5V17.5L11 15H8Z" fill="#fff"/><path d="M16.5 10.5C17.7 11.6 17.7 14.4 16.5 15.5" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><path d="M18.8 8.7C20.9 10.7 20.9 15.3 18.8 17.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+const coordIconHtml = `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="#ef4444" stroke="#7f1d1d" stroke-width="1.5"/><line x1="14" y1="3" x2="14" y2="11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="17" x2="14" y2="25" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="14" x2="11" y2="14" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="14" x2="25" y2="14" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="14" cy="14" r="3" fill="#fff"/></svg>`;
+const routeIconHtml = `<svg width="30" height="36" viewBox="0 0 30 36"><path d="M15 2C9.48 2 5 6.48 5 12C5 19.2 15 34 15 34C15 34 25 19.2 25 12C25 6.48 20.52 2 15 2Z" fill="#0f766e" stroke="#134e4a" stroke-width="1.6"/><path d="M10.5 12.5C12 10.1 14.2 8.8 18.4 8.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M18 6.9L20.7 8.8L18 10.7" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="1.9" fill="#fff"/><circle cx="18" cy="17" r="1.9" fill="#fff"/></svg>`;
+const departIconHtml = `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M7 4H9V24H7Z" fill="#14532d"/><path d="M9 5H21L17.2 9.2L21 13.4H9Z" fill="#22c55e" stroke="#166534" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+const destIconHtml = `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M7 4H9V24H7Z" fill="#7f1d1d"/><path d="M9 5H21L17.2 9.2L21 13.4H9Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+const waypointIconHtml = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="#f59e0b" stroke="#92400e" stroke-width="1.5"/><path d="M7.2 11H14.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M11 7.2V14.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+
+function divIcon(html, size, anchor, popupAnchor) {
+  return L.divIcon({ className: '', html, iconSize: size, iconAnchor: anchor, popupAnchor });
+}
+
+// ---- Map init ------------------------------------------------------------ //
+
+/**
+ * Initialise the Leaflet map with TMAP tiles.
+ * @param {string} containerId  DOM element id
+ * @param {[number,number]} center  [lat, lon]
+ */
+export function initMap(containerId, center = [37.5665, 126.9780]) {
+  if (map) { map.remove(); map = null; }
+
+  map = L.map(containerId, { preferCanvas: true, maxZoom: 19, attributionControl: false }).setView(center, 15);
+
+  // Notify listeners that the map was (re)created
+  window.dispatchEvent(new CustomEvent('map-init'));
+
+  L.tileLayer('https://tlpimg1.tmap.co.kr/tms/1.0.0/hd_tile/{z}/{x}/{-y}.png', {
+    minZoom: 5, maxZoom: 19,
+    attribution: 'TMAP',
+  }).addTo(map);
+
+  // ---- Zoom level display (next to +/- buttons) ----------------------------
+  const ZoomDisplay = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd(m) {
+      const el = L.DomUtil.create('div', 'leaflet-zoom-display');
+      el.style.cssText = [
+        'background:white',
+        'color:#333',
+        'width:26px',
+        'height:26px',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'font-size:12px',
+        'font-weight:700',
+        'font-family:Arial,sans-serif',
+        'border-radius:2px',
+        'border:2px solid rgba(0,0,0,0.2)',
+        'margin-top:1px',
+        'pointer-events:none',
+        'box-shadow:0 1px 5px rgba(0,0,0,0.4)',
+        'line-height:1',
+      ].join(';');
+      const update = () => { el.textContent = m.getZoom(); };
+      update();
+      m.on('zoomend', update);
+      return el;
+    },
+  });
+  new ZoomDisplay().addTo(map);
+
+  // Fallback OSM tile layer (shown if TMAP tiles fail)
+  // Uncomment below to switch to OSM:
+  // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  //   attribution: '© OpenStreetMap contributors'
+  // }).addTo(map);
+
+  layers = {
+    gps: L.layerGroup().addTo(map),
+    drGps: L.layerGroup().addTo(map),
+    mmGps: L.layerGroup().addTo(map),
+    mmMatch: L.layerGroup().addTo(map),
+    routeRequest: L.layerGroup().addTo(map),
+    tts: L.layerGroup().addTo(map),
+  };
+  routeAnchorLayer = L.layerGroup().addTo(map);
+  coordLayer = L.layerGroup().addTo(map);
+
+  map.on('click', e => {
+    if (rulerActive) { handleRulerClick(e); return; }
+    clearRouteAnchors();
+  });
+
+  // NOTE: contextmenu (우클릭 출발지/목적지 설정) 핸들러는 index.html 의 인라인 스크립트가
+  // setupMapContextMenu() 에서 단독으로 설정합니다. 여기서 중복 등록하면 DLT 분석으로
+  // 맵이 재생성될 때 두 핸들러가 같이 붙어 인라인 setWaypoint 가 무시되는 버그가 발생합니다.
+
+  rulerLayer = L.layerGroup().addTo(map);
+
+  return map;
+}
+
+// ---- Ruler / distance measurement ---------------------------------------- //
+
+function formatDistance(meters) {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(2)} km`;
+}
+
+function handleRulerClick(e) {
+  const latlng = e.latlng;
+  if (!rulerStart) {
+    // First click — start marker
+    rulerStart = latlng;
+    L.circleMarker(latlng, {
+      radius: 6, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 1, weight: 2,
+    }).bindTooltip('시작', { permanent: true, direction: 'top', offset: [0, -8],
+      className: 'ruler-tooltip' }).addTo(rulerLayer);
+    if (rulerOnStateChange) rulerOnStateChange('start');
+  } else {
+    // Second click — end marker + line + distance label
+    const dist = rulerStart.distanceTo(latlng);
+    L.circleMarker(latlng, {
+      radius: 6, color: '#f59e0b', fillColor: '#fff', fillOpacity: 1, weight: 2,
+    }).bindTooltip('종료', { permanent: true, direction: 'top', offset: [0, -8],
+      className: 'ruler-tooltip' }).addTo(rulerLayer);
+    L.polyline([rulerStart, latlng], {
+      color: '#f59e0b', weight: 2, dashArray: '5 4', opacity: 0.9,
+    }).addTo(rulerLayer);
+    const mid = L.latLng(
+      (rulerStart.lat + latlng.lat) / 2,
+      (rulerStart.lng + latlng.lng) / 2,
+    );
+    // Small permanent label positioned to the right of midpoint
+    L.marker(mid, { opacity: 0, interactive: false })
+      .bindTooltip(`📏 ${formatDistance(dist)}`, {
+        permanent: true, direction: 'right', offset: [8, 0],
+        className: 'ruler-dist-label',
+      }).addTo(rulerLayer);
+    rulerStart = null;
+    if (rulerOnStateChange) rulerOnStateChange('ready');
+  }
+}
+
+export function setRulerMode(active, onStateChange) {
+  rulerActive = active;
+  if (onStateChange) rulerOnStateChange = onStateChange;
+  rulerStart = null;
+  if (rulerOnStateChange) rulerOnStateChange(active ? 'ready' : 'off');
+}
+
+export function clearRuler() {
+  if (rulerLayer) rulerLayer.clearLayers();
+  rulerStart = null;
+  if (rulerActive && rulerOnStateChange) rulerOnStateChange('ready');
+}
+
+export function getLayerGroup(name) { return layers[name] || null; }
+
+export function setMapCenter(lat, lon, zoom = 15) {
+  if (map) map.setView([lat, lon], zoom);
+}
+
+// ---- Coordinate marker --------------------------------------------------- //
+
+/**
+ * Add a coordinate search result marker to the map.
+ * Initialises the map first if it hasn't been loaded yet.
+ */
+export function addCoordMarker(lat, lon, popupHtml) {
+  if (!map) initMap('map', [lat, lon]);
+  const icon = divIcon(coordIconHtml, [28, 28], [14, 14], [0, -16]);
+  L.marker([lat, lon], { icon })
+    .bindPopup(popupHtml, { maxWidth: 300 })
+    .addTo(coordLayer)
+    .openPopup();
+  map.setView([lat, lon], Math.max(map.getZoom(), 15));
+}
+
+export function clearCoordMarkers() {
+  if (coordLayer) coordLayer.clearLayers();
+}
+
+// ---- Route anchor helpers ------------------------------------------------ //
+
+function clearRouteAnchors() {
+  if (routeAnchorLayer) routeAnchorLayer.clearLayers();
+}
+
+function addAnchor(lat, lon, iconHtml, iconSize, popupLabel) {
+  if (lat == null || lon == null) return null;
+  const icon = divIcon(iconHtml, iconSize, [iconSize[0] * 0.3, iconSize[1] * 0.85], [0, -iconSize[1] * 0.7]);
+  const marker = L.marker([lat, lon], { icon });
+  marker.bindPopup(popupLabel);
+  marker.addTo(routeAnchorLayer);
+  return [lat, lon];
+}
+
+function showRouteAnchors(rr) {
+  clearRouteAnchors();
+  const polyPoints = [];
+
+  const dp = addAnchor(rr.departLat, rr.departLon, departIconHtml, [28, 28],
+    `<b>Departure</b><br>${esc(rr.departName || 'Departure')}`);
+  if (dp) polyPoints.push(dp);
+
+  for (let i = 0; i < (rr.waypoints || []).length; i++) {
+    const wp = rr.waypoints[i];
+    const p = addAnchor(wp.lat, wp.lon, waypointIconHtml, [22, 22],
+      `<b>Waypoint ${i + 1}</b><br>${esc(wp.name || 'Waypoint')}`);
+    if (p) polyPoints.push(p);
+  }
+
+  const dp2 = addAnchor(rr.destLat, rr.destLon, destIconHtml, [28, 28],
+    `<b>Destination</b><br>${esc(rr.destName || 'Destination')}`);
+  if (dp2) polyPoints.push(dp2);
+
+  if (polyPoints.length >= 2) {
+    L.polyline(polyPoints, { color: '#14b8a6', weight: 3, opacity: 0.9, dashArray: '6 6' })
+      .addTo(routeAnchorLayer);
+  }
+}
+
+// ---- Render all logs ----------------------------------------------------- //
+
+/**
+ * Render extracted logs on the map.
+ * Clears previous layers first.
+ */
+export function renderLogs(locationLogs, mmLogs, routeRequests, ttsLogs) {
+  if (!map) return;
+
+  // Clear existing layers
+  for (const lg of Object.values(layers)) lg.clearLayers();
+  clearRouteAnchors();
+
+  // Sort by timestamp
+  const sortByTime = (arr, tsKey = 'timestamp', seqKey = 'sequence') =>
+    [...arr].sort((a, b) => {
+      const ta = a[tsKey] ? a[tsKey].getTime() : Infinity;
+      const tb = b[tsKey] ? b[tsKey].getTime() : Infinity;
+      return ta !== tb ? ta - tb : (a[seqKey] || 0) - (b[seqKey] || 0);
+    });
+
+  const sortedLoc = sortByTime(locationLogs);
+  const sortedMm = sortByTime(mmLogs);
+  const sortedRoute = sortByTime(routeRequests);
+  const sortedTts = sortByTime(ttsLogs);
+
+  // GPS track polyline
+  const trackPoints = sortedLoc.map(p => [p.lat, p.lon]);
+  if (trackPoints.length > 1) {
+    L.polyline(trackPoints, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
+  }
+
+  // Location markers
+  sortedLoc.forEach((p, idx) => {
+    const color = p.sourceType === 'gps' ? '#2563eb' : '#64748b';
+    const layer = p.sourceType === 'gps' ? layers.gps : layers.drGps;
+    const popup = `<b>#${idx + 1}</b><br>
+      <b>Source:</b> ${esc(p.sourceType?.toUpperCase())}<br>
+      <b>Bearing:</b> ${p.bearing?.toFixed(2)}°<br>
+      <b>Log Time:</b> ${esc(formatTimestamp(p.timestamp))}<br>
+      <b>ET:</b> ${esc(p.et || 'N/A')}<br>
+      <b>Lat/Lon:</b> ${p.lat?.toFixed(6)}, ${p.lon?.toFixed(6)}`;
+    L.circleMarker([p.lat, p.lon], {
+      radius: 5, color, weight: 2, fillColor: color, fillOpacity: 0.75
+    }).bindPopup(popup).addTo(layer);
+  });
+
+  // Map-matching markers
+  sortedMm.forEach((p, idx) => {
+    const isGps = p.sourceType === 'mm_gps';
+    const color = isGps ? '#06b6d4' : '#22c55e';
+    const layer = isGps ? layers.mmGps : layers.mmMatch;
+    const d = p.details || {};
+    const popup = `<b>MM #${idx + 1}</b><br>
+      <b>Source:</b> ${esc(p.sourceType?.toUpperCase())}<br>
+      <b>Log Time:</b> ${esc(formatTimestamp(p.timestamp))}<br>
+      <b>GPS Source:</b> ${esc(d.gpsSource)}<br>
+      <b>State:</b> ${esc(d.state)}<br>
+      <b>SupportDR:</b> ${esc(d.supportDr)}<br>
+      <b>HDOP:</b> ${esc(d.hdop)}<br>
+      <b>Speed:</b> ${esc(d.speed)}<br>
+      <b>Score:</b> ${esc(d.score)}<br>
+      <b>NumOfMatchesInDR:</b> ${esc(d.numMatchesInDr)}<br>
+      <b>isOpenSkyDRMode:</b> ${esc(d.openSkyDrMode)}<br>
+      <b>Dist:</b> ${esc(d.distance)}<br>
+      <b>vIndex:</b> ${esc(d.vIndex)}<br>
+      <b>fB:</b> ${esc(d.fB)}<br>
+      <b>Lat/Lon:</b> ${p.lat?.toFixed(6)}, ${p.lon?.toFixed(6)}`;
+    L.circleMarker([p.lat, p.lon], {
+      radius: 4, color, weight: 2, fillColor: color, fillOpacity: 0.9
+    }).bindPopup(popup).addTo(layer);
+  });
+
+  // MM GPS Pos → Match Pos 편차 연결선
+  const mmPairMap = new Map();
+  sortedMm.forEach(p => {
+    if (!mmPairMap.has(p.details)) mmPairMap.set(p.details, {});
+    const pair = mmPairMap.get(p.details);
+    if (p.sourceType === 'mm_gps')        pair.gps   = p;
+    else if (p.sourceType === 'mm_match') pair.match = p;
+  });
+  for (const { gps, match } of mmPairMap.values()) {
+    if (gps && match) {
+      L.polyline([[gps.lat, gps.lon], [match.lat, match.lon]], {
+        color: '#a855f7',
+        weight: 1.5,
+        opacity: 0.7,
+        dashArray: '3 4',
+      }).addTo(layers.mmMatch);
+    }
+  }
+
+  // Route request markers — 같은 좌표(rounded 6자리) 그룹화 + 갯수 배지
+  const routeGroups = new Map();   // key="lat_lon" → { lat, lon, items: [{rr, idx}] }
+  sortedRoute.forEach((rr, idx) => {
+    const lat = rr.requestLat, lon = rr.requestLon;
+    if (lat == null || lon == null) return;
+    const key = `${lat.toFixed(6)}_${lon.toFixed(6)}`;
+    if (!routeGroups.has(key)) routeGroups.set(key, { lat, lon, items: [] });
+    routeGroups.get(key).items.push({ rr, idx });
+  });
+
+  for (const { lat, lon, items } of routeGroups.values()) {
+    const count = items.length;
+    // count > 1 이면 아이콘 우상단에 빨강 배지 표시
+    const iconHtml = count > 1
+      ? `<div style="position:relative;width:30px;height:36px">${routeIconHtml}
+           <div style="position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;line-height:18px;padding:0 4px;background:#ef4444;color:#fff;border:2px solid #fff;border-radius:9px;font-size:10px;font-weight:800;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.5)">${count}</div>
+         </div>`
+      : routeIconHtml;
+    const iconSize = count > 1 ? [36, 40] : [30, 36];
+    const iconAnchor = count > 1 ? [18, 38] : [15, 34];
+    const marker = L.marker([lat, lon], { icon: divIcon(iconHtml, iconSize, iconAnchor, [0, -34]) });
+
+    let popupHtml;
+    if (count === 1) {
+      const { rr, idx } = items[0];
+      popupHtml = `<b>Route #${idx + 1}</b>${routePopupHtml(rr)}`;
+      marker.on('click', () => showRouteAnchors(rr));
+    } else {
+      // 다중: 탭으로 전환 가능한 팝업
+      const tabId = `rgrp_${lat.toFixed(4)}_${lon.toFixed(4)}`.replace(/[^a-z0-9_]/gi, '_');
+      const tabStyle = (active, sc) =>
+        `padding:3px 8px;border-radius:6px 6px 0 0;cursor:pointer;font-size:11px;font-weight:600;` +
+        `border:1px solid #cbd5e1;border-bottom:${active ? '2px solid '+sc : 'none'};` +
+        `background:#fff;color:${active ? sc : '#64748b'};margin-bottom:${active ? '-1px' : '0'}`;
+      const tabs = items.map(({ rr, idx }, i) => {
+        const status = rr.responseStatus || 'UNKNOWN';
+        const sc = status === 'SUCCESS' ? '#0f766e' : status === 'FAILED' ? '#dc2626' : '#64748b';
+        return `<span class="${tabId}-tab" data-i="${i}" data-sc="${sc}" style="${tabStyle(i===0, sc)}">${esc(rr.rpLabel || ('#'+(idx+1)))}</span>`;
+      }).join('');
+      const panels = items.map(({ rr, idx }, i) =>
+        `<div class="${tabId}-panel" data-i="${i}" style="display:${i===0?'block':'none'};background:#fff;color:#1e293b">
+           <b style="color:#1e293b">Route #${idx + 1}</b>${routePopupHtml(rr)}
+         </div>`).join('');
+      popupHtml = `
+        <div style="background:#fff;color:#1e293b">
+          <div style="font-size:12px;color:#1e293b;margin-bottom:4px"><b>📍 이 위치에 ${count}개 경로요청</b></div>
+          <div style="display:flex;gap:2px;flex-wrap:wrap;background:#fff">${tabs}</div>
+          <div style="border:1px solid #cbd5e1;padding:8px;background:#fff;border-radius:0 6px 6px 6px">${panels}</div>
+        </div>`;
+      marker.on('click', () => showRouteAnchors(items[0].rr));
+      // 탭 클릭 처리
+      marker.on('popupopen', e => {
+        const el = e.popup.getElement();
+        if (!el) return;
+        const tabEls = el.querySelectorAll(`.${tabId}-tab`);
+        const panelEls = el.querySelectorAll(`.${tabId}-panel`);
+        tabEls.forEach(t => t.addEventListener('click', () => {
+          const i = t.dataset.i;
+          tabEls.forEach(tt => {
+            const ttSc = tt.dataset.sc;
+            tt.setAttribute('style', tabStyle(tt.dataset.i === i, ttSc));
+          });
+          panelEls.forEach(p => p.style.display = p.dataset.i === i ? 'block' : 'none');
+          // 탭 변경 시 경로 앵커도 업데이트
+          showRouteAnchors(items[Number(i)].rr);
+        }));
+      });
+    }
+    marker.bindPopup(popupHtml, { maxWidth: 560, minWidth: 320 });
+    marker.addTo(layers.routeRequest);
+  }
+
+  // TTS markers
+  const ttsIcon = divIcon(ttsIconHtml, [26, 26], [13, 13], [0, -12]);
+  sortedTts.forEach((entry, idx) => {
+    const lat = entry.requestLat, lon = entry.requestLon;
+    if (lat == null || lon == null) return;
+    L.marker([lat, lon], { icon: ttsIcon })
+      .bindPopup(`<b>TTS #${idx + 1}</b>${ttsPopupHtml(entry)}`, { maxWidth: 400 })
+      .addTo(layers.tts);
+  });
+
+  // Fit bounds
+  if (trackPoints.length > 1) {
+    map.fitBounds(L.latLngBounds(trackPoints), { padding: [24, 24] });
+  } else {
+    const all = [
+      ...sortedLoc.map(p => [p.lat, p.lon]),
+      ...sortedMm.map(p => [p.lat, p.lon]),
+      ...sortedRoute.filter(r => r.requestLat != null).map(r => [r.requestLat, r.requestLon]),
+      ...sortedTts.filter(t => t.requestLat != null).map(t => [t.requestLat, t.requestLon]),
+    ];
+    if (all.length > 0) map.fitBounds(L.latLngBounds(all), { padding: [24, 24] });
+  }
+}
+
+export function toggleLayer(name, visible) {
+  const lg = layers[name];
+  if (!lg) return;
+  if (visible) lg.addTo(map);
+  else map.removeLayer(lg);
+}

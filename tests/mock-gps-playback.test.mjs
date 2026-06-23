@@ -5,6 +5,7 @@ import {
   interpolatePath,
   reinterpolateFromCurrent,
   indexFromProgress,
+  dltSpeedKmh,
 } from "../DltLogViewer/js/mock-gps-playback.js";
 
 // ---- haversineM ---- //
@@ -145,6 +146,40 @@ test("reinterpolateFromCurrent faster speed yields fewer coords", () => {
   const fast = reinterpolateFromCurrent(cur, drawPts, 1, 100);  // 100 km/h
   assert.ok(fast.length < slow.length,
     `fast(${fast.length}) should be < slow(${slow.length})`);
+});
+
+// ---- dltSpeedKmh ---- //
+
+test("dltSpeedKmh returns recorded speedKmh as-is when present", () => {
+  const cur = { lat: 37.5, lon: 127.0, speedKmh: 63.5 };
+  assert.equal(dltSpeedKmh(null, cur), 63.5);
+});
+
+test("dltSpeedKmh computes ground speed from prev/cur positions + timestamps", () => {
+  // 0.009도 위도 ≈ 1000m, 1초 간격 → 1000 m/s = 3600 km/h
+  const prev = { lat: 37.5,    lon: 127.0, timestamp: new Date(1000) };
+  const cur  = { lat: 37.509,  lon: 127.0, timestamp: new Date(2000) };
+  const v = dltSpeedKmh(prev, cur);
+  assert.ok(v > 3560 && v < 3640, `expected ~3600 km/h, got ${v}`);
+});
+
+test("dltSpeedKmh prefers recorded speed over computed", () => {
+  const prev = { lat: 37.5,   lon: 127.0, timestamp: new Date(1000) };
+  const cur  = { lat: 37.509, lon: 127.0, timestamp: new Date(2000), speedKmh: 12 };
+  assert.equal(dltSpeedKmh(prev, cur), 12);
+});
+
+test("dltSpeedKmh returns null without prev and without recorded speed", () => {
+  assert.equal(dltSpeedKmh(null, { lat: 37.5, lon: 127.0 }), null);
+});
+
+test("dltSpeedKmh returns null when timestamps missing or non-increasing", () => {
+  const a = { lat: 37.5,   lon: 127.0, timestamp: new Date(2000) };
+  const b = { lat: 37.509, lon: 127.0, timestamp: new Date(2000) };  // dt=0
+  assert.equal(dltSpeedKmh(a, b), null);
+  const c = { lat: 37.5,   lon: 127.0 };                              // no ts
+  const d = { lat: 37.509, lon: 127.0 };
+  assert.equal(dltSpeedKmh(c, d), null);
 });
 
 // ---- indexFromProgress ---- //

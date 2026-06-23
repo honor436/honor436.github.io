@@ -2259,7 +2259,7 @@
         <div style="margin:8px 0 6px;font-size:11px;color:var(--muted)">
           📋 DLT 모드<a href="help.html#mockgps" target="_blank" class="help-icon purple" title="DLT 모드 도움말" rel="noopener">?</a>
         </div>
-        <div class="mg-hint" style="margin-bottom:6px">DLT 로그에서 추출된 위치 데이터를 <b>원본 타임스탬프 그대로(1x 실시간)</b> 재현합니다. 정확도·위성수는 슬라이더 값으로 전송됩니다.</div>
+        <div class="mg-hint" style="margin-bottom:6px">DLT 로그에서 추출된 위치 데이터를 <b>원본 타임스탬프 그대로(1x 실시간)</b> 재현합니다. <b>속도·방위각·위치는 로그 값을 그대로</b> 전송하므로 속도 슬라이더는 비활성화됩니다. (정확도·위성수만 슬라이더 값 사용)</div>
         <div class="mg-stat-line" id="mg-dlt-status">DLT 분석 결과가 없습니다. 먼저 'DLT GPS Log' 탭에서 분석하세요.</div>
         <div class="mg-row" style="margin-top:6px">
           <label>GPS 소스</label>
@@ -2438,6 +2438,7 @@ import {
   interpolatePath as mgInterpolatePathImpl,
   reinterpolateFromCurrent as mgReinterpolateImpl,
   indexFromProgress as mgIndexFromProgress,
+  dltSpeedKmh as mgDltSpeedKmh,
 } from './js/mock-gps-playback.js';
 
 // ---- Right panel open/close ---- //
@@ -2970,12 +2971,18 @@ function mgSyncSatFromAcc() {
 }
 
 function mgFmtSpeedLabel() {
-  const v = mgSpeed.value;
-  if (mgMode === 'dlt') {
-    const x = (Number(v) / 40).toFixed(2);
-    return `${v} km/h (×${x})`;
+  return `${mgSpeed.value} km/h`;
+}
+// DLT 모드: 속도는 로그에 기록된 값을 그대로 전송 → 속도 슬라이더 비활성화.
+function mgUpdateSpeedControlState() {
+  const dlt = (mgMode === 'dlt');
+  mgSpeed.disabled = dlt;
+  const row = mgSpeed.closest('.mg-row');
+  if (row) {
+    row.style.opacity = dlt ? '0.45' : '';
+    row.title = dlt ? 'DLT 모드에서는 로그에 기록된 속도를 그대로 전송합니다.' : '';
   }
-  return `${v} km/h`;
+  mgSpeedVal.textContent = dlt ? '로그 속도 사용' : mgFmtSpeedLabel();
 }
 mgSpeed.addEventListener('input', () => {
   mgSpeedVal.textContent = mgFmtSpeedLabel();
@@ -3125,17 +3132,22 @@ mgModeTabs.forEach(tab => {
     // 모드 전환 시 이전 궤적 정리 + 드로잉 핸들러 상태 갱신
     mgClearTrajectory();
     mgUpdateDrawHandlerState();
-    mgSpeedVal.textContent = mgFmtSpeedLabel();
+    mgUpdateSpeedControlState();
   });
 });
+// 초기 속도 컨트롤 상태 동기화 (기본 모드 draw → 활성)
+mgUpdateSpeedControlState();
 
 // ---- 속도 기반 좌표 보간 (1초 간격) ---- //
 const mgInterpolatePath = mgInterpolatePathImpl;
 
 // ---- Mock GPS 1좌표 전송 (→ 릴레이 → MnsMockGps 앱) ---- //
-async function mgSendCoord(lat, lng, bearing) {
+async function mgSendCoord(lat, lng, bearing, speedKmhOverride) {
   const accuracy   = Number(mgAccuracy.value);
-  const speedKmh   = Number(mgSpeed.value);
+  // DLT 모드는 로그의 속도를 그대로 전송(override). 그 외에는 속도 슬라이더 값 사용.
+  const speedKmh   = (speedKmhOverride != null && Number.isFinite(speedKmhOverride))
+                       ? speedKmhOverride
+                       : Number(mgSpeed.value);
   const satellites = Number(mgSatellites.value);
   let url = `${MG_RELAY}/mock-gps?lat=${lat}&lon=${lng}`
           + `&accuracy=${accuracy}&speed_kmh=${speedKmh}&satellites=${satellites}`;
@@ -3220,12 +3232,20 @@ function mgPlaybackTick() {
       mgCarMarker.setLatLng([lat, lng]);
     }
   }
+  // DLT: 로그의 속도(기록값 vel=/NMEA, 없으면 직전 좌표와의 거리·시간차로 계산)를 그대로 전송
+  let sendSpeedKmh;   // undefined → 속도 슬라이더 값 사용 (draw/tvas)
+  if (mgDltPlayMode) {
+    const prevForSpeed = mgPlaybackCoords[mgPlaybackIdx - 2];
+    const s = mgDltSpeedKmh(prevForSpeed, cur);
+    sendSpeedKmh = (s != null && Number.isFinite(s)) ? s : 0;
+  }
   mgCurrentCoord.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-    + (bearing != null ? ` · ${bearing.toFixed(0)}°` : '');
+    + (bearing != null ? ` · ${bearing.toFixed(0)}°` : '')
+    + (sendSpeedKmh != null ? ` · ${sendSpeedKmh.toFixed(0)}km/h` : '');
   mgUpdatePlaybackUI();
-  mgSendCoord(lat, lng, bearing);
+  mgSendCoord(lat, lng, bearing, sendSpeedKmh);
 
-  // DLT 모드: 다음 좌표까지의 타임스탬프 간격으로 setTimeout 예약. 속도 슬라이더를 배속으로 사용.
+  // DLT 모드: 다음 좌표까지의 타임스탬프 간격으로 setTimeout 예약 (1x 실시간).
   if (mgDltPlayMode && mgPlaybackState === 'playing') {
     const next = mgPlaybackCoords[mgPlaybackIdx];
     const rate = mgGetDltPlaybackRate();
@@ -3239,9 +3259,9 @@ function mgPlaybackTick() {
   }
 }
 
-// DLT 모드 배속: 속도 슬라이더(km/h) ÷ 40 = 배속 (40 → 1.0x)
+// DLT 모드: 속도 슬라이더 비활성 → 항상 원본 타임스탬프 그대로 1x 실시간 재생
 function mgGetDltPlaybackRate() {
-  return Math.max(0.05, Number(mgSpeed.value) / 40);
+  return 1.0;
 }
 
 // 진행바 클릭 → 해당 인덱스로 점프 (재생 중이면 mock GPS 좌표도 즉시 송신)
@@ -3263,10 +3283,10 @@ function mgJumpToIndex(newIdx) {
   }
 }
 
-// 속도 슬라이더 변경 시: draw/tvas 재생 중이면 현재 위치 기준 재보간, DLT 는 다음 tick 에서 새 배속 자동 적용
+// 속도 슬라이더 변경 시: draw/tvas 재생 중이면 현재 위치 기준 재보간 (DLT 는 슬라이더 비활성이라 호출되지 않음)
 function mgOnSpeedChangedDuringPlayback() {
   if (mgPlaybackState === 'idle') return;
-  if (mgDltPlayMode) return;   // DLT 는 별도 처리 없이 다음 tick 에서 mgGetDltPlaybackRate() 가 새 값 사용
+  if (mgDltPlayMode) return;   // DLT 는 로그 속도/타임스탬프 사용 → 슬라이더 무관
   if (mgPlaybackCoords.length === 0) return;
   // 마지막으로 송신된 좌표 (= tick 직후 mgPlaybackIdx 는 다음 좌표를 가리킴)
   const lastEmittedIdx = Math.max(0, mgPlaybackIdx - 1);
@@ -3453,10 +3473,11 @@ mgDltLoadBtn.addEventListener('click', () => {
     return;
   }
   mgClearTrajectory();
-  // {lat, lon, bearing, timestamp} → {lat, lng, lon, bearing, timestamp}
+  // {lat, lon, bearing, speed(m/s), timestamp} → 재생 좌표 (속도는 km/h 로 보존)
   mgDrawPoints = raw.map(p => ({
     lat: p.lat, lng: p.lon, lon: p.lon,
     bearing: p.bearing, timestamp: p.timestamp,
+    speedKmh: (p.speed != null && Number.isFinite(p.speed)) ? p.speed * 3.6 : null,
   }));
   const map = getMap();
   if (map && mgDrawPoints.length > 1) {

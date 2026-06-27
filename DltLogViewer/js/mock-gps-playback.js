@@ -64,6 +64,22 @@ export function reinterpolateFromCurrent(currentPoint, drawPoints, srcNextIdx, s
   }));
 }
 
+// DLT 재생 시 한 좌표에서 mock GPS 로 보낼 속도(km/h)를 결정한다.
+// - 로그에 기록된 속도(cur.speedKmh, NMEA spd 또는 Location vel)가 있으면 그대로 사용.
+// - 없으면 직전 좌표와의 거리/시간차로 지면 속도를 계산(로그의 GPS 궤적 그대로).
+// - 둘 다 불가하면 null.
+export function dltSpeedKmh(prev, cur) {
+  if (cur && Number.isFinite(cur.speedKmh)) return cur.speedKmh;
+  if (!prev || !cur) return null;
+  const t1 = prev.timestamp, t2 = cur.timestamp;
+  if (!t1 || !t2) return null;
+  const dtSec = (t2.getTime() - t1.getTime()) / 1000;
+  if (!(dtSec > 0)) return null;
+  const a = { lat: prev.lat, lng: prev.lng != null ? prev.lng : prev.lon };
+  const b = { lat: cur.lat,  lng: cur.lng  != null ? cur.lng  : cur.lon };
+  return (haversineM(a, b) / dtSec) * 3.6;   // m/s → km/h
+}
+
 export function indexFromProgress(total, pct) {
   if (!Number.isFinite(total) || total <= 0) return 0;
   const clamped = Math.max(0, Math.min(1, pct));

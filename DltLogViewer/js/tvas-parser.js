@@ -537,58 +537,85 @@ const LANE_ANGLE_ARROWS = {
 
 export { LANE_ANGLE_NAMES, LANE_ANGLE_ARROWS };
 
-function parseEvChargers(dv, offset, size, charset) {
+// TVAS 명칭 블롭은 null-terminated 가 아니라 각 항목 offset ~ "다음 offset"
+// 까지가 명칭 범위다. 자신보다 큰 offset 중 최소값(없으면 blobSize)을 끝 경계로.
+export function nameBlobEnd(offsets, thisOffset, blobSize) {
+  let end = blobSize;
+  for (const o of offsets) {
+    if (o > thisOffset && o < end) end = o;
+  }
+  return end;
+}
+
+// ES3 명칭 블롭 시작 위치 (정방향).
+// 레이아웃: 헤더(28B) → 충전소 레코드 chargerCount×44B → 사업자별 충전기 정보
+// opTotalCount×20B → 명칭 블롭. opTotalCount = 각 충전소 opCount 의 합.
+export function evNameBlobStart(dataStart, chargerCount, opTotalCount) {
+  return dataStart + chargerCount * 44 + opTotalCount * 20;
+}
+
+export function parseEvChargers(dv, offset, size, charset) {
   // ES3 header: 28 bytes
   const count       = dv.getUint16(offset, true);
   const nameSize    = dv.getInt32(offset + 8, true);
   const typeNameSize = dv.getInt32(offset + 12, true);
   const opNameSize  = dv.getInt32(offset + 16, true);
   const dataStart = offset + 28;
-  const chargers = [];
+  const sectionEnd = offset + size;
+
+  // 1) 충전소 44B 레코드 먼저 전부 읽기 (명칭 블롭 시작 계산에 opCount 합 필요)
+  const records = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 44;
-    if (base + 44 > offset + size) break;
-    const vxIdx      = dv.getUint16(base, true);
-    const poiId      = dv.getInt32(base + 2, true);
-    const roadType   = dv.getUint8(base + 6);
-    const locX       = dv.getInt32(base + 7, true);
-    const locY       = dv.getInt32(base + 11, true);
-    const nameOffset = dv.getInt32(base + 15, true);
-    const onRoute    = dv.getUint8(base + 19);
-    const dcCha      = dv.getUint8(base + 20);
-    const ac3        = dv.getUint8(base + 21);
-    const dcCombo    = dv.getUint8(base + 22);
-    const slow       = dv.getUint8(base + 23);
-    const tesla      = dv.getUint8(base + 24);
-    const stationType = dv.getUint8(base + 25);
-    const mustCharge  = dv.getUint8(base + 26);
-    const isSelf     = dv.getUint8(base + 27);
-    const fastType   = dv.getUint8(base + 28);
-    const typeNameOff = dv.getInt32(base + 29, true);
-    const totalChargers = dv.getUint8(base + 33);
-    const availChargers = dv.getUint8(base + 34);
-    const chargeSpeed   = dv.getUint8(base + 35);
-    const opCount    = dv.getUint8(base + 36);
-    const chargeTime = dv.getUint16(base + 37, true);
-    const chargePower = dv.getUint16(base + 39, true);
-    const arrivalSoc  = dv.getUint8(base + 41);
-    const expectedSoc = dv.getUint8(base + 42);
-    const manualStation = dv.getUint8(base + 43);
-
-    // Read name from blob
-    const blobStart = dataStart + count * 44;
-    let name = '';
-    if (nameOffset >= 0 && blobStart + nameOffset < offset + size) {
-      name = readString(dv, blobStart + nameOffset, Math.min(200, offset + size - blobStart - nameOffset), charset);
-    }
-
-    chargers.push({
-      vxIdx, poiId, roadType, locX, locY, name, onRoute,
-      dcCha, ac3, dcCombo, slow, tesla, stationType, mustCharge, isSelf, fastType,
-      totalChargers, availChargers, chargeSpeed, opCount,
-      chargeTime, chargePower, arrivalSoc, expectedSoc, manualStation,
+    if (base + 44 > sectionEnd) break;
+    records.push({
+      vxIdx:        dv.getUint16(base, true),
+      poiId:        dv.getInt32(base + 2, true),
+      roadType:     dv.getUint8(base + 6),
+      locX:         dv.getInt32(base + 7, true),
+      locY:         dv.getInt32(base + 11, true),
+      nameOffset:   dv.getInt32(base + 15, true),
+      onRoute:      dv.getUint8(base + 19),
+      dcCha:        dv.getUint8(base + 20),
+      ac3:          dv.getUint8(base + 21),
+      dcCombo:      dv.getUint8(base + 22),
+      slow:         dv.getUint8(base + 23),
+      tesla:        dv.getUint8(base + 24),
+      stationType:  dv.getUint8(base + 25),
+      mustCharge:   dv.getUint8(base + 26),
+      isSelf:       dv.getUint8(base + 27),
+      fastType:     dv.getUint8(base + 28),
+      typeNameOff:  dv.getInt32(base + 29, true),
+      totalChargers:dv.getUint8(base + 33),
+      availChargers:dv.getUint8(base + 34),
+      chargeSpeed:  dv.getUint8(base + 35),
+      opCount:      dv.getUint8(base + 36),
+      chargeTime:   dv.getUint16(base + 37, true),
+      chargePower:  dv.getUint16(base + 39, true),
+      arrivalSoc:   dv.getUint8(base + 41),
+      expectedSoc:  dv.getUint8(base + 42),
+      manualStation:dv.getUint8(base + 43),
     });
   }
+
+  // 2) 명칭 블롭 시작 = 충전소 레코드(44B) + 사업자별 충전기 정보(20B×ΣopCount) 이후
+  const opTotalCount = records.reduce((s, r) => s + (r.opCount > 0 ? r.opCount : 0), 0);
+  const blobStart = evNameBlobStart(dataStart, count, opTotalCount);
+  // 명칭 블롭 길이: 헤더 nameSize 우선, 비정상이면 섹션 끝까지
+  const nameBlobSize = (nameSize > 0 && blobStart + nameSize <= sectionEnd)
+    ? nameSize : (sectionEnd - blobStart);
+
+  // 3) 명칭은 자신 offset ~ 다음 offset 범위로 읽는다 (null-terminated 아님)
+  const nameOffsets = records.map(r => r.nameOffset).filter(o => o >= 0);
+  const chargers = records.map(r => {
+    let name = '';
+    if (r.nameOffset >= 0 && r.nameOffset < nameBlobSize) {
+      const end = nameBlobEnd(nameOffsets, r.nameOffset, nameBlobSize);
+      const len = Math.min(end - r.nameOffset, sectionEnd - (blobStart + r.nameOffset));
+      if (len > 0) name = readString(dv, blobStart + r.nameOffset, len, charset);
+    }
+    return { ...r, name };
+  });
   return chargers;
 }
 

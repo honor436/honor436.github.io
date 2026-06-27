@@ -19,6 +19,7 @@ import {
 // ---- Compiled patterns --------------------------------------------------- //
 
 const LOCATION_RE = /#onLocationChanged.*?Location\[(dr_gps|gps) ([0-9.]+),([0-9.]+).*?bear=([0-9.]+)/;
+const LOCATION_VEL_RE = /\bvel=(-?[0-9.]+)/;   // Android Location 속도(m/s), 있으면 그대로 사용
 const ET_RE = /et=\+\d+m\d+s\d+ms/;
 const MM_RESULT_START_RE = /\[MM\]\[\d+\]:\[MM_RESULT\].*Result\(LocalMatch\)/;
 const MM_GPS_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*GPS\s+Pos\s*=\s*([0-9.]+)\s+([0-9.]+),\s*([0-9.\-]+)/;
@@ -569,16 +570,15 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
 
       // ---- Location ---- //
       if (hasLocation) {
-        const m = LOCATION_RE.exec(line);
-        if (m) {
-          const sourceType = m[1];
-          const lat = parseFloat(m[2]);
-          const lon = parseFloat(m[3]);
-          const bearing = parseFloat(m[4]);
+        const loc = parseLocationLine(line);
+        if (loc) {
+          const { sourceType, lat, lon, bearing, speed } = loc;
           const etM = ET_RE.exec(line);
           const et = etM ? etM[0] : '';
           if (doGps) {
-            locationLogs.push({ lon, lat, bearing, timestamp, et, sourceType, sequence });
+            const entry = { lon, lat, bearing, timestamp, et, sourceType, sequence };
+            if (speed != null) entry.speed = speed;   // m/s (Location vel=)
+            locationLogs.push(entry);
             sequence++;
           }
           recentLocation = { lon, lat, bearing, timestamp, sourceType };
@@ -876,6 +876,27 @@ export function formatTimestamp(ts) {
 
 export function preparePayloadForDisplayExport(payload) {
   return preparePayloadForDisplay(payload);
+}
+
+/**
+ * #onLocationChanged Location[...] 라인 파싱.
+ * 예: ... Location[gps 37.123,127.234 hAcc=8.0 et=... vel=16.7 bear=180.5 ...]
+ *
+ * @returns {{sourceType,lat,lon,bearing,speed}|null}
+ *   sourceType: 'gps' | 'dr_gps'
+ *   speed 단위: m/s (Android Location vel=, 없으면 null)
+ */
+export function parseLocationLine(line) {
+  const m = LOCATION_RE.exec(line);
+  if (!m) return null;
+  const velM = LOCATION_VEL_RE.exec(line);
+  return {
+    sourceType: m[1],
+    lat: parseFloat(m[2]),
+    lon: parseFloat(m[3]),
+    bearing: parseFloat(m[4]),
+    speed: velM ? parseFloat(velM[1]) : null,
+  };
 }
 
 /**

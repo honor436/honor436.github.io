@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd } from '../DltLogViewer/js/tvas-parser.js';
+import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd, evNameBlobStart } from '../DltLogViewer/js/tvas-parser.js';
+
+// ---- evNameBlobStart (ES3 명칭 블롭 시작 위치) --------------------------- //
+//
+// ES3 는 고정 레코드와 명칭 블롭 사이에 운영기관 인덱스 구간이 끼어들 수 있다.
+// name/typeName/opName 3개 블롭이 섹션 끝에 모여 있다고 보고, 끝에서부터
+// 세 크기 합을 빼서 name 블롭 시작을 역산한다. 비정상 크기면 recEnd 로 폴백.
+
+test('evNameBlobStart equals recEnd when blobs immediately follow records', () => {
+  // recEnd=100, 블롭합 60, sectionEnd=160 → 끝에서 역산 100 = recEnd
+  assert.equal(evNameBlobStart(160, 100, 30, 20, 10), 100);
+});
+
+test('evNameBlobStart skips an operator section between records and blobs', () => {
+  // recEnd=100, 블롭합 60, sectionEnd=180 → 운영기관 구간 20B 건너뛰어 120
+  assert.equal(evNameBlobStart(180, 100, 30, 20, 10), 120);
+});
+
+test('evNameBlobStart falls back to recEnd for impossible sizes', () => {
+  // 블롭합이 섹션보다 커서 역산이 recEnd 앞으로 가면 폴백
+  assert.equal(evNameBlobStart(160, 100, 1000, 0, 0), 100);
+  assert.equal(evNameBlobStart(160, 100, 0, 0, 0), 100);
+});
 import { laneIconHtml } from '../DltLogViewer/js/tvas-renderer.js';
 
 // ---- nameBlobEnd (명칭 블롭 경계 계산) ----------------------------------- //

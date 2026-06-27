@@ -1147,6 +1147,12 @@ export function evChargerLayerKey(ev) {
   return ev && ev.onRoute === 0 ? 'evChargerOnRoute' : 'evChargerNearRoute';
 }
 
+// 충전소 마커 색: 필수충전=빨강(강조), 경로상=파랑, 경로주변=초록.
+export function evChargerColor(ev) {
+  if (ev && ev.mustCharge === 1) return '#f04452';
+  return ev && ev.onRoute === 0 ? '#3182f6' : '#10b981';
+}
+
 // Store individual charger markers for show/hide from list
 let evChargerMarkers = [];
 
@@ -1167,7 +1173,8 @@ export function buildEvPopup(ev, lat, lon, idx) {
   if (isMust) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">필수충전</span>`;
   popup += `</div>`;
   popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
-  popup += `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">위치</td><td>${ev.onRoute === 0 ? '<b style="color:#3182f6">경로상</b>' : '경로주변'}</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">위치</td><td>${ev.onRoute === 0 ? '<b style="color:#3182f6">경로상</b>' : '<b style="color:#10b981">경로주변</b>'}</td></tr>`;
+  if (ev.typeName) popup += `<tr><td style="color:#8b95a1;padding:2px 0">종류명칭</td><td>${esc(ev.typeName)}</td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">소켓</td><td>${sockets.join(', ') || '-'}</td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전기</td><td><b>${ev.availChargers}</b>/${ev.totalChargers} (${speedName})</td></tr>`;
   if (ev.chargeTime) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전시간</td><td>${Math.floor(ev.chargeTime/60)}분 ${ev.chargeTime%60}초</td></tr>`;
@@ -1179,6 +1186,14 @@ export function buildEvPopup(ev, lat, lon, idx) {
   if (ev.manualStation) popup += `<tr><td style="color:#8b95a1">구분</td><td style="color:#fbbf24">수동충전소</td></tr>`;
   if (ev.isSelf) popup += `<tr><td style="color:#8b95a1">셀프</td><td>셀프 충전</td></tr>`;
   popup += `</table>`;
+  if (ev.operators && ev.operators.length) {
+    popup += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,0.2);font-size:11px">`;
+    popup += `<b>사업자별 충전기</b> (${ev.operators.length})`;
+    for (const op of ev.operators) {
+      popup += `<div style="padding-left:6px;color:#cbd5e1">· ${op.name ? '<b>'+esc(op.name)+'</b>' : '사업자'}${op.opCode ? ' <span style="color:#8b95a1">['+esc(op.opCode)+']</span>' : ''} — 초고속 ${op.ultraFastAvail} / 고속 ${op.fastAvail} / 완속 ${op.slowAvail}</div>`;
+    }
+    popup += `</div>`;
+  }
   if (idx != null) {
     popup += `<button onclick="window._addEvWaypoint(${idx})" style="margin-top:8px;width:100%;padding:6px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🚩 경유지 추가</button>`;
   }
@@ -1224,7 +1239,9 @@ function renderEvChargers(layers, coords, evChargers) {
         <div style="margin-top:2px;padding:1px 6px;background:rgba(240,68,82,0.9);color:#fff;font-size:8px;font-weight:700;border-radius:6px;white-space:nowrap">필수충전</div>
       </div>`;
     } else {
-      iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:rgba(49,130,246,0.85);border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⚡</div>`;
+      // 경로상=파랑, 경로주변=초록
+      const bg = evChargerColor(ev);
+      iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:${bg};border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⚡</div>`;
     }
 
     const popup = buildEvPopup(ev, lat, lon, idx);

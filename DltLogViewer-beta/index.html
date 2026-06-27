@@ -1692,7 +1692,7 @@
 
 <!-- BETA(테스트) 빌드 표시 -->
 <div style="position:fixed;top:0;right:0;z-index:99999;background:#a855f7;color:#fff;font:700 11px/1.4 'Segoe UI',sans-serif;padding:4px 12px;border-bottom-left-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;letter-spacing:.5px">
-  BETA · 테스트 빌드 (충전소 명칭 · 역지오코딩 · Mock GPS)
+  BETA · 테스트 빌드 (충전소 정보 · 역지오코딩 · Mock GPS)
 </div>
 
 <aside id="sidebar">
@@ -5293,10 +5293,11 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
           <b style="${isMust?'color:#f04452;font-size:14px':'font-size:12px;color:var(--text)'}">${esc(ev.name)}</b>
           ${isMust ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">필수충전</span>' : '<span style="color:var(--muted);font-size:10px">(클릭하면 지도 표시)</span>'}
         </div>
-        ${vx(ev.vxIdx, coords)} | ${isOnRoute?'<b style="color:#4ade80">경로상</b>':'<span style="color:#fbbf24">경로주변</span>'} | POI:${ev.poiId}<br>
+        ${ev.typeName ? '종류명칭: <b>'+esc(ev.typeName)+'</b><br>' : ''}${vx(ev.vxIdx, coords)} | ${isOnRoute?'<b style="color:#4ade80">경로상</b>':'<span style="color:#fbbf24">경로주변</span>'} | POI:${ev.poiId}<br>
         소켓: ${sockets.join(', ') || '-'} | 충전기: <b>${ev.availChargers}</b>/${ev.totalChargers} | ${speedName(ev.chargeSpeed)}
         ${ev.chargeTime ? '<br>충전: '+Math.floor(ev.chargeTime/60)+'분 | '+ev.chargePower+'kW | SoC '+ev.arrivalSoc+'%→'+ev.expectedSoc+'%' : ''}
-        ${ev.manualStation ? ' | <span style="color:#fbbf24">수동</span>' : ''}${ev.isSelf ? ' | 셀프' : ''}
+        <br><span style="color:var(--muted)">도로종별:${ev.roadType} | 충전소종류:${ev.stationType===2?'My e-poi':'서버'} | 급속종류:${ev.fastType}${ev.manualStation ? ' | <span style="color:#fbbf24">수동</span>' : ''}${ev.isSelf ? ' | 셀프' : ''}</span>
+        ${(ev.operators && ev.operators.length) ? '<div style="margin-top:3px;padding-left:8px;border-left:2px solid rgba(56,189,248,0.3);font-size:11px">사업자별 충전기 <b>'+ev.operators.length+'</b>'+ev.operators.map(op => '<br>· '+(op.name?'<b>'+esc(op.name)+'</b>':'사업자')+(op.opCode?' <span style="color:var(--muted)">['+esc(op.opCode)+']</span>':'')+' — 초고속 '+op.ultraFastAvail+' / 고속 '+op.fastAvail+' / 완속 '+op.slowAvail).join('')+'</div>' : ''}
       </div>`;
     }).join('');
     const filterHtml = `<div class="es3-filter-wrap">

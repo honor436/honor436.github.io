@@ -598,23 +598,52 @@ export function parseEvChargers(dv, offset, size, charset) {
     });
   }
 
-  // 2) 명칭 블롭 시작 = 충전소 레코드(44B) + 사업자별 충전기 정보(20B×ΣopCount) 이후
+  // 2) 블롭 위치: [충전소44B×n][사업자20B×ΣopCount][명칭blob][종류명칭blob][사업자명칭blob]
   const opTotalCount = records.reduce((s, r) => s + (r.opCount > 0 ? r.opCount : 0), 0);
-  const blobStart = evNameBlobStart(dataStart, count, opTotalCount);
-  // 명칭 블롭 길이: 헤더 nameSize 우선, 비정상이면 섹션 끝까지
-  const nameBlobSize = (nameSize > 0 && blobStart + nameSize <= sectionEnd)
-    ? nameSize : (sectionEnd - blobStart);
+  const opSecStart = dataStart + count * 44;
+  const nameBlobStart = evNameBlobStart(dataStart, count, opTotalCount);
+  const typeBlobStart = nameBlobStart + Math.max(0, nameSize);
+  const opNameBlobStart = typeBlobStart + Math.max(0, typeNameSize);
+  const clampSize = (start, declared) =>
+    (declared > 0 && start + declared <= sectionEnd) ? declared : Math.max(0, sectionEnd - start);
+  const nameBlobSize = clampSize(nameBlobStart, nameSize);
+  const typeBlobSize = clampSize(typeBlobStart, typeNameSize);
+  const opNameBlobSize = clampSize(opNameBlobStart, opNameSize);
 
-  // 3) 명칭은 자신 offset ~ 다음 offset 범위로 읽는다 (null-terminated 아님)
+  // 블롭에서 offset~다음offset 범위로 명칭 읽기 (null 종료 안전 처리 포함)
+  const readBlobName = (blobStart, blobSize, off, offsetsList) => {
+    if (!(off >= 0) || off >= blobSize) return '';
+    const end = nameBlobEnd(offsetsList, off, blobSize);
+    const len = Math.min(end - off, sectionEnd - (blobStart + off));
+    return len > 0 ? readString(dv, blobStart + off, len, charset) : '';
+  };
+
+  // 3) 사업자별 충전기 정보(20B) 전체 파싱 → 사업자명칭 offset 경계 계산용
+  const allOps = [];
+  for (let k = 0; k < opTotalCount; k++) {
+    const ob = opSecStart + k * 20;
+    if (ob + 20 > sectionEnd) break;
+    allOps.push({
+      ultraFastAvail: dv.getUint8(ob),       // 이용가능 초고속 충전기 개수
+      fastAvail:      dv.getUint8(ob + 1),   // 이용가능 고속 충전기 개수
+      slowAvail:      dv.getUint8(ob + 2),   // 이용가능 완속 충전기 개수
+      opCode:         readAscii(dv, ob + 3, 4), // 사업자 코드
+      opNameOff:      dv.getInt32(ob + 7, true),
+    });
+  }
+  const opNameOffs = allOps.map(o => o.opNameOff).filter(o => o >= 0);
+  for (const op of allOps) op.name = readBlobName(opNameBlobStart, opNameBlobSize, op.opNameOff, opNameOffs);
+
+  // 4) 충전소별 명칭/종류명칭 + opCount 만큼 사업자 배정 (순서대로)
   const nameOffsets = records.map(r => r.nameOffset).filter(o => o >= 0);
+  const typeOffsets = records.map(r => r.typeNameOff).filter(o => o >= 0);
+  let opCursor = 0;
   const chargers = records.map(r => {
-    let name = '';
-    if (r.nameOffset >= 0 && r.nameOffset < nameBlobSize) {
-      const end = nameBlobEnd(nameOffsets, r.nameOffset, nameBlobSize);
-      const len = Math.min(end - r.nameOffset, sectionEnd - (blobStart + r.nameOffset));
-      if (len > 0) name = readString(dv, blobStart + r.nameOffset, len, charset);
-    }
-    return { ...r, name };
+    const name = readBlobName(nameBlobStart, nameBlobSize, r.nameOffset, nameOffsets);
+    const typeName = readBlobName(typeBlobStart, typeBlobSize, r.typeNameOff, typeOffsets);
+    const operators = [];
+    for (let j = 0; j < r.opCount && opCursor < allOps.length; j++) operators.push(allOps[opCursor++]);
+    return { ...r, name, typeName, operators };
   });
   return chargers;
 }

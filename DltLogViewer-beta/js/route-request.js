@@ -51,14 +51,16 @@ export function extractIsochroneRings(json) {
   return coords.filter(ring => Array.isArray(ring) && ring.length > 0);
 }
 
-// EV 경로 → 도달 가능 범위로 그대로 가져올 차량/소비 관련 필드.
-export const EV_ISOCHRONE_SHARED_FIELDS = ['consumptionParam', 'slopeFlag', 'vehicleId', 'vehicleMass', 'vendor'];
+// EV 경로 → 도달 가능 범위로 그대로 가져올 차량/소비/전력 관련 필드.
+export const EV_ISOCHRONE_SHARED_FIELDS = ['consumptionParam', 'slopeFlag', 'vehicleId', 'vehicleMass', 'vendor', 'auxiliaryPower', 'efficientSpeed'];
+// EV 배터리 4필드(EV·도달가능범위 공통 단일 데이터로 그대로 보존).
+export const EV_BATTERY_FIELDS = ['chargedEnergy', 'chargedRange', 'currentEnergy', 'currentRange'];
 
 /**
- * EV 배터리 정보를 도달 가능 범위(isochrone) 요청 바디에 반영.
+ * EV 경로 파라미터를 도달 가능 범위(isochrone) 요청 바디에 그대로 반영(공통 데이터).
  * EV 현재 잔량(currentEnergy) → contoursEnergy, 현재 도달거리(currentRange) → contoursMeters.
- * 또한 EV 경로의 consumptionParam·slopeFlag·vehicleId·vehicleMass·vendor 를
- * 그대로 가져와 동일하게 적용한다(EV 바디에 값이 있을 때만).
+ * 또한 차량/소비/전력(EV_ISOCHRONE_SHARED_FIELDS)과 배터리 4필드(EV_BATTERY_FIELDS)를
+ * 그대로 가져와 EV·도달가능범위가 동일한 EV 파라미터를 쓰도록 한다(값이 있을 때만).
  */
 export function applyEvBatteryToIsochrone(isoBody, evBody) {
   const out = { ...(isoBody || {}) };
@@ -66,7 +68,7 @@ export function applyEvBatteryToIsochrone(isoBody, evBody) {
   const cm = Number(evBody && evBody.currentRange);
   if (Number.isFinite(ce)) out.contoursEnergy = ce;
   if (Number.isFinite(cm)) out.contoursMeters = cm;
-  for (const k of EV_ISOCHRONE_SHARED_FIELDS) {
+  for (const k of [...EV_ISOCHRONE_SHARED_FIELDS, ...EV_BATTERY_FIELDS]) {
     if (evBody && evBody[k] != null) out[k] = evBody[k];
   }
   return out;
@@ -143,7 +145,7 @@ function isochroneConsumptionParam() {
  *   body=null 이면 현재 바디 유지(교체하지 않음).
  */
 export function resolveRouteTypeSwitch(opts) {
-  const { prevType, nextType, currentBody, saved, evEdited, defaultBody, isochroneBody } = opts;
+  const { prevType, nextType, currentBody, saved, defaultBody, isochroneBody } = opts;
   const kind = t => (t === 'isochrone' ? 'isochrone' : 'route');
   const prevKind = kind(prevType);
   const nextKind = kind(nextType);
@@ -153,16 +155,12 @@ export function resolveRouteTypeSwitch(opts) {
   }
   // 떠나는 종류의 현재 바디 저장(사용자 설정 보존)
   nextSaved[prevKind] = currentBody;
-  // 들어가는 종류: 저장본 있으면 복원
-  if (nextSaved[nextKind]) {
-    return { body: nextSaved[nextKind], saved: nextSaved };
-  }
-  // 저장본 없음 → 기본 템플릿
   if (nextKind === 'isochrone') {
-    const tmpl = evEdited ? applyEvBatteryToIsochrone(isochroneBody, currentBody) : isochroneBody;
-    return { body: tmpl, saved: nextSaved };
+    // 도달 가능 범위는 항상 EV 경로 파라미터를 그대로 사용(EV·도달범위 단일 데이터).
+    return { body: applyEvBatteryToIsochrone(isochroneBody, currentBody), saved: nextSaved };
   }
-  return { body: defaultBody, saved: nextSaved };
+  // isochrone → route: 저장된 EV(route) 바디 복원, 없으면 기본
+  return { body: nextSaved.route || defaultBody, saved: nextSaved };
 }
 
 /**

@@ -1,7 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRouteSummary, parseLaneGuidance, parseRpLinks } from '../DltLogViewer/js/tvas-parser.js';
+import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd } from '../DltLogViewer/js/tvas-parser.js';
 import { laneIconHtml } from '../DltLogViewer/js/tvas-renderer.js';
+
+// ---- nameBlobEnd (명칭 블롭 경계 계산) ----------------------------------- //
+//
+// TVAS 명칭 블롭은 null-terminated 가 아니라 각 항목 offset 의 "다음 offset"
+// 까지가 그 항목의 명칭 범위다. ES3 충전소 등에서 명칭이 다음 명칭과 이어붙어
+// 깨지는 문제를 막기 위해, 자신보다 큰 offset 중 최소값(없으면 blobSize)을
+// 끝 경계로 돌려준다.
+
+test('nameBlobEnd returns next larger offset', () => {
+  assert.equal(nameBlobEnd([0, 10, 25], 0, 40), 10);
+  assert.equal(nameBlobEnd([0, 10, 25], 10, 40), 25);
+});
+
+test('nameBlobEnd returns blobSize for the last (largest) offset', () => {
+  assert.equal(nameBlobEnd([0, 10, 25], 25, 40), 40);
+});
+
+test('nameBlobEnd handles unsorted and duplicate offsets', () => {
+  assert.equal(nameBlobEnd([25, 0, 10, 10], 10, 40), 25);
+  // 동일 offset 은 경계로 보지 않는다 (자신보다 "큰" 것만)
+  assert.equal(nameBlobEnd([10, 10, 30], 10, 40), 30);
+});
+
+test('nameBlobEnd clamps to blobSize when no larger offset exists', () => {
+  assert.equal(nameBlobEnd([5], 5, 12), 12);
+});
 
 // ---- RS7 parseRouteSummary ----------------------------------------------- //
 //

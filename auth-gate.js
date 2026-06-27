@@ -55,8 +55,9 @@
     gate.innerHTML =
       '<form id="h436-gate-form" style="background:rgba(15,23,42,0.95);border:1px solid rgba(148,163,184,0.18);border-radius:14px;padding:30px 26px;width:min(92vw,350px);box-shadow:0 24px 70px rgba(0,0,0,.55);text-align:center">' +
         '<div style="font-size:32px;margin-bottom:6px">🔒</div>' +
-        '<div style="color:#e2e8f0;font-size:17px;font-weight:800;margin-bottom:3px">내비게이션 개발 도구</div>' +
-        '<div style="color:#94a3b8;font-size:12.5px;margin-bottom:18px">비밀번호를 입력하세요</div>' +
+        '<div style="color:#e2e8f0;font-size:17px;font-weight:800;margin-bottom:6px">내비게이션 개발 도구</div>' +
+        '<div style="color:#94a3b8;font-size:12px;line-height:1.6;margin-bottom:14px">DLT 로그 분석, 경로 탐색(TVAS)과 충전소·교통정보, Mock GPS 주입을 한 곳에서 다루는 내비게이션 개발용 도구 모음입니다.</div>' +
+        '<div style="color:#cbd5e1;font-size:12.5px;margin-bottom:14px">계속하려면 비밀번호를 입력하세요</div>' +
         '<input id="h436-gate-input" type="password" autocomplete="current-password" placeholder="비밀번호" style="width:100%;padding:11px 13px;border-radius:9px;border:1px solid rgba(148,163,184,0.3);background:rgba(2,6,23,0.6);color:#e2e8f0;font-size:15px;outline:none;margin-bottom:10px">' +
         '<div id="h436-gate-error" style="color:#f87171;font-size:12px;min-height:16px;margin-bottom:10px"></div>' +
         '<button type="submit" style="width:100%;padding:11px;border:none;border-radius:9px;background:#38bdf8;color:#0b1220;font-size:15px;font-weight:800;cursor:pointer">입장</button>' +

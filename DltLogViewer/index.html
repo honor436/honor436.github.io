@@ -3838,11 +3838,22 @@ function refreshWpDisplay(type, wp) {
     marker.setPopupContent(`${head}${addr}<br>WGS84: ${wp.lat.toFixed(6)}, ${wp.lon.toFixed(6)}`);
   }
 }
+// 좌표→주소 역지오코딩 (좌표 키 캐시). 같은 지점 재요청을 방지한다.
+const rgCache = new Map();
+function rgKey(lat, lon) { return lat.toFixed(6) + ',' + lon.toFixed(6); }
+async function lookupAddress(lat, lon) {
+  const key = rgKey(lat, lon);
+  if (rgCache.has(key)) return rgCache.get(key);
+  const res = await fetch(buildReverseGeocodeUrl(lat, lon), { mode: 'cors', signal: AbortSignal.timeout(6000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const info = parseReverseGeocode(await res.json());
+  rgCache.set(key, info);
+  return info;
+}
+
 async function resolveWaypointName(type, wp) {
   try {
-    const res = await fetch(buildReverseGeocodeUrl(wp.lat, wp.lon), { mode: 'cors', signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return;
-    const info = parseReverseGeocode(await res.json());
+    const info = await lookupAddress(wp.lat, wp.lon);
     if (!info) return;
     const nm = info.buildingName || info.address;   // departName/destName 으로 buildingName 우선
     if (!nm) return;
@@ -3996,12 +4007,26 @@ function setupMapContextMenu() {
     content.innerHTML = '<b>좌표 정보</b><br>' +
       'WGS84: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
       'SK: ' + sk[0] + ', ' + sk[1] + '<br>' +
+      '<div id="_rg_addr" style="margin-top:4px;padding:5px 8px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);border-radius:6px;color:#bae6fd;font-size:11px">📍 주소 조회 중…</div>' +
       '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">' +
       '<button id="_wp_dep" style="flex:1;padding:5px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">출발지</button>' +
       '<button id="_wp_via" style="flex:1;padding:5px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">경유지</button>' +
       '<button id="_wp_dst" style="flex:1;padding:5px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">목적지</button>' +
       '</div>';
     const popup = L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(content).openOn(map);
+    // 우클릭 즉시 역지오코딩으로 주소 조회 → 팝업에 표시 (실패 시 사유 노출)
+    const addrEl = content.querySelector('#_rg_addr');
+    lookupAddress(lat, lng).then(info => {
+      if (!addrEl) return;
+      if (!info || (!info.address && !info.buildingName)) { addrEl.textContent = '📍 주소 정보 없음'; return; }
+      const bld = info.buildingName ? `<b>${esc(info.buildingName)}</b><br>` : '';
+      addrEl.innerHTML = '📍 ' + bld + esc(info.address || '');
+    }).catch(err => {
+      if (addrEl) {
+        addrEl.style.color = '#fca5a5';
+        addrEl.textContent = '📍 주소 조회 실패: ' + (err && err.message ? err.message : '네트워크/CORS 오류');
+      }
+    });
     content.querySelector('#_wp_dep').addEventListener('click', () => { setWaypoint('depart', lat, lng); map.closePopup(popup); });
     content.querySelector('#_wp_via').addEventListener('click', () => { setWaypoint('via', lat, lng); map.closePopup(popup); });
     content.querySelector('#_wp_dst').addEventListener('click', () => { setWaypoint('dest', lat, lng); map.closePopup(popup); });

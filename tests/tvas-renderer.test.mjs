@@ -12,7 +12,35 @@ import {
   buildEvPopup,
   buildRpLinkPopup,
   rpLinkStyle,
+  buildEndpointLabel,
 } from '../DltLogViewer/js/tvas-renderer.js';
+
+// ---- buildEndpointLabel --------------------------------------------------- //
+//
+// 경로 탐색 결과의 출발/도착 마커에 항상 표시할 라벨 텍스트.
+// 헤더 지도정보(mapInfo)의 출발지/목적지 명칭을 사용한다.
+//   kind 'depart' → "출발 · {명칭}", 'dest' → "도착 · {명칭}"
+//   명칭이 비어있으면 기본 라벨('출발지'/'목적지').
+//   명칭 안의 HTML 특수문자는 이스케이프.
+
+test('buildEndpointLabel_departure_uses_name_with_출발_prefix', () => {
+  assert.equal(buildEndpointLabel('depart', '스타필드'), '출발 · 스타필드');
+});
+
+test('buildEndpointLabel_destination_uses_name_with_도착_prefix', () => {
+  assert.equal(buildEndpointLabel('dest', '강남역'), '도착 · 강남역');
+});
+
+test('buildEndpointLabel_falls_back_when_name_empty_or_whitespace', () => {
+  assert.equal(buildEndpointLabel('depart', ''), '출발지');
+  assert.equal(buildEndpointLabel('depart', '   '), '출발지');
+  assert.equal(buildEndpointLabel('dest', null), '목적지');
+  assert.equal(buildEndpointLabel('dest', undefined), '목적지');
+});
+
+test('buildEndpointLabel_escapes_html_in_name', () => {
+  assert.equal(buildEndpointLabel('depart', '<b>집</b>'), '출발 · &lt;b&gt;집&lt;/b&gt;');
+});
 
 // ---- buildRouteArrowSpecs ------------------------------------------------- //
 //

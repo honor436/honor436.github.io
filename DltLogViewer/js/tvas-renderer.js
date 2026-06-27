@@ -789,16 +789,27 @@ function addDirectionArrows(lg, specs) {
   }
 }
 
+// 출발/도착 마커에 항상 표시할 명칭 라벨 (헤더 지도정보의 출발지/목적지 명칭).
+//   kind: 'depart' | 'dest'. name 이 비거나 공백뿐이면 기본 라벨('출발지'/'목적지').
+export function buildEndpointLabel(kind, name) {
+  const isDepart = kind === 'depart';
+  const trimmed = (name == null ? '' : String(name)).trim();
+  if (!trimmed) return isDepart ? '출발지' : '목적지';
+  return `${isDepart ? '출발' : '도착'} · ${esc(trimmed)}`;
+}
+
 function renderEndpoints(lg, coords, header) {
   const first = coords[0], last = coords[coords.length - 1];
-  const depName = header.mapInfo.departureName || '출발지';
-  const dstName = header.mapInfo.destinationName || '목적지';
+  const depLabel = buildEndpointLabel('depart', header.mapInfo.departureName);
+  const dstLabel = buildEndpointLabel('dest', header.mapInfo.destinationName);
   L.marker([first.lat, first.lon], {
     icon: L.divIcon({ className: '', html: departIconHtml(), iconSize: [28, 28], iconAnchor: [14, 14] }), zIndexOffset: 1000,
-  }).bindPopup(`<b>${esc(depName)}</b><br>SK: (${first.skX}, ${first.skY})<br>WGS84: ${first.lat.toFixed(6)}, ${first.lon.toFixed(6)}`).addTo(lg);
+  }).bindTooltip(depLabel, { permanent: true, direction: 'top', offset: [0, -16], className: 'tvas-endpoint-label' })
+    .bindPopup(`<b>${depLabel}</b><br>SK: (${first.skX}, ${first.skY})<br>WGS84: ${first.lat.toFixed(6)}, ${first.lon.toFixed(6)}`).addTo(lg);
   L.marker([last.lat, last.lon], {
     icon: L.divIcon({ className: '', html: destIconHtml(), iconSize: [28, 28], iconAnchor: [14, 14] }), zIndexOffset: 1000,
-  }).bindPopup(`<b>${esc(dstName)}</b><br>SK: (${last.skX}, ${last.skY})<br>WGS84: ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}`).addTo(lg);
+  }).bindTooltip(dstLabel, { permanent: true, direction: 'top', offset: [0, -16], className: 'tvas-endpoint-label' })
+    .bindPopup(`<b>${dstLabel}</b><br>SK: (${last.skX}, ${last.skY})<br>WGS84: ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}`).addTo(lg);
 }
 
 // RO4 링크종류/시설 코드 → 명칭 (도로 정보 섹션과 동일 기준).

@@ -422,6 +422,20 @@
     .leaflet-tooltip.depart-hint.leaflet-tooltip-top::before { border-top-color: #16a34a; }
     @keyframes departHintPulse { from { opacity: .8; } to { opacity: 1; } }
 
+    /* ---- 경로 출발/도착 명칭 라벨 (항상 표시) ---- */
+    .leaflet-tooltip.tvas-endpoint-label {
+      background: rgba(15, 23, 42, 0.92);
+      color: #fff;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      white-space: nowrap;
+    }
+    .leaflet-tooltip.tvas-endpoint-label.leaflet-tooltip-top::before { border-top-color: rgba(15, 23, 42, 0.92); }
+
     /* ---- Google-Maps style POI search box ---- */
     #poi-search-box {
       position: absolute;

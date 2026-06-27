@@ -1,27 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd, evNameBlobStart } from '../DltLogViewer/js/tvas-parser.js';
+import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd, evNameBlobStart, parseEvChargers } from '../DltLogViewer/js/tvas-parser.js';
+
+// ---- parseEvChargers (ES3 전기차 충전소, 명칭 블롭 위치) ------------------ //
+//
+// 스펙: 헤더28B → 충전소 44B×n → 사업자별 충전기 정보 20B×(Σ opCount) →
+// 충전소명칭 blob(NULL포함) → 종류명칭 blob → 사업자명칭 blob.
+// 명칭이 운영기관 구간 뒤에서 시작하므로 그 구간을 건너뛰어야 명칭이 맞다.
+
+test('parseEvChargers reads station names past the operator-info section', () => {
+  const enc = new TextEncoder();
+  const n0 = new Uint8Array([...enc.encode('STN-A'), 0]);   // offset 0, 6B (NULL 포함)
+  const n1 = new Uint8Array([...enc.encode('STN-B'), 0]);   // offset 6, 6B (NULL 포함)
+  const nameBlob = new Uint8Array([...n0, ...n1]); // nameSize = 12
+  const count = 2;
+  const opTotal = 3;                               // charger0 opCount=1, charger1 opCount=2
+  const headerSize = 28, recSize = 44, opSize = 20;
+  const total = headerSize + count * recSize + opTotal * opSize + nameBlob.length + 1 + 1;
+  const buf = new ArrayBuffer(total);
+  const dv = new DataView(buf);
+  // header
+  dv.setUint16(0, count, true);
+  dv.setInt32(8, nameBlob.length, true);          // nameSize=12
+  dv.setInt32(12, 1, true);                        // typeNameSize
+  dv.setInt32(16, 1, true);                        // opNameSize
+  // charger #0 @ 28
+  dv.setInt32(28 + 15, 0, true);                   // nameOffset=0
+  dv.setUint8(28 + 36, 1);                         // opCount=1
+  // charger #1 @ 72
+  dv.setInt32(72 + 15, 6, true);                   // nameOffset=6
+  dv.setUint8(72 + 36, 2);                         // opCount=2
+  // operator section: 28+88 .. (3×20)  — 값은 0이어도 무방
+  // name blob @ 28 + 88 + 60 = 176
+  const blobAt = headerSize + count * recSize + opTotal * opSize;
+  new Uint8Array(buf).set(nameBlob, blobAt);
+
+  const chargers = parseEvChargers(dv, 0, total, 1); // charset 1 = utf-8
+  assert.equal(chargers.length, 2);
+  assert.equal(chargers[0].name, 'STN-A');
+  assert.equal(chargers[1].name, 'STN-B');
+});
 
 // ---- evNameBlobStart (ES3 명칭 블롭 시작 위치) --------------------------- //
 //
-// ES3 는 고정 레코드와 명칭 블롭 사이에 운영기관 인덱스 구간이 끼어들 수 있다.
-// name/typeName/opName 3개 블롭이 섹션 끝에 모여 있다고 보고, 끝에서부터
-// 세 크기 합을 빼서 name 블롭 시작을 역산한다. 비정상 크기면 recEnd 로 폴백.
+// ES3 레이아웃: 헤더(28B) → 충전소 레코드 count×44B → 사업자별 충전기 정보
+// (Σ opCount)×20B → 명칭 블롭. 명칭 블롭 시작은 정방향으로 계산한다:
+//   dataStart + chargerCount*44 + opTotalCount*20
 
-test('evNameBlobStart equals recEnd when blobs immediately follow records', () => {
-  // recEnd=100, 블롭합 60, sectionEnd=160 → 끝에서 역산 100 = recEnd
-  assert.equal(evNameBlobStart(160, 100, 30, 20, 10), 100);
+test('evNameBlobStart without operator records is right after charger records', () => {
+  // dataStart=28, 충전소 2개 → 28 + 88 + 0 = 116
+  assert.equal(evNameBlobStart(28, 2, 0), 116);
 });
 
-test('evNameBlobStart skips an operator section between records and blobs', () => {
-  // recEnd=100, 블롭합 60, sectionEnd=180 → 운영기관 구간 20B 건너뛰어 120
-  assert.equal(evNameBlobStart(180, 100, 30, 20, 10), 120);
+test('evNameBlobStart adds 20B per operator-charger record', () => {
+  // dataStart=28, 충전소 2개, 사업자 충전기 3개 → 28 + 88 + 60 = 176
+  assert.equal(evNameBlobStart(28, 2, 3), 176);
 });
 
-test('evNameBlobStart falls back to recEnd for impossible sizes', () => {
-  // 블롭합이 섹션보다 커서 역산이 recEnd 앞으로 가면 폴백
-  assert.equal(evNameBlobStart(160, 100, 1000, 0, 0), 100);
-  assert.equal(evNameBlobStart(160, 100, 0, 0, 0), 100);
+test('evNameBlobStart honors an arbitrary section dataStart', () => {
+  // dataStart=100, 충전소 1개, 사업자 충전기 2개 → 100 + 44 + 40 = 184
+  assert.equal(evNameBlobStart(100, 1, 2), 184);
 });
 import { laneIconHtml } from '../DltLogViewer/js/tvas-renderer.js';
 

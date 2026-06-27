@@ -547,17 +547,14 @@ export function nameBlobEnd(offsets, thisOffset, blobSize) {
   return end;
 }
 
-// ES3 명칭 블롭 시작 위치. 고정 레코드와 명칭 블롭 사이에 운영기관 인덱스
-// 구간이 끼어들 수 있으므로, name/typeName/opName 3개 블롭이 섹션 끝에
-// 모여 있다고 보고 끝에서부터 역산한다. 역산값이 recEnd 보다 앞이거나
-// 크기가 비정상이면 recEnd(레코드 직후) 로 폴백.
-export function evNameBlobStart(sectionEnd, recEnd, nameSize, typeNameSize, opNameSize) {
-  const total = Math.max(0, nameSize) + Math.max(0, typeNameSize) + Math.max(0, opNameSize);
-  const fromEnd = sectionEnd - total;
-  return (total > 0 && fromEnd >= recEnd) ? fromEnd : recEnd;
+// ES3 명칭 블롭 시작 위치 (정방향).
+// 레이아웃: 헤더(28B) → 충전소 레코드 chargerCount×44B → 사업자별 충전기 정보
+// opTotalCount×20B → 명칭 블롭. opTotalCount = 각 충전소 opCount 의 합.
+export function evNameBlobStart(dataStart, chargerCount, opTotalCount) {
+  return dataStart + chargerCount * 44 + opTotalCount * 20;
 }
 
-function parseEvChargers(dv, offset, size, charset) {
+export function parseEvChargers(dv, offset, size, charset) {
   // ES3 header: 28 bytes
   const count       = dv.getUint16(offset, true);
   const nameSize    = dv.getInt32(offset + 8, true);
@@ -565,14 +562,8 @@ function parseEvChargers(dv, offset, size, charset) {
   const opNameSize  = dv.getInt32(offset + 16, true);
   const dataStart = offset + 28;
   const sectionEnd = offset + size;
-  const recEnd = dataStart + count * 44;
-  // 명칭 블롭 시작: 운영기관 구간을 건너뛰도록 섹션 끝에서 역산
-  const blobStart = evNameBlobStart(sectionEnd, recEnd, nameSize, typeNameSize, opNameSize);
-  // 명칭 블롭 길이: 헤더의 nameSize 우선, 비정상이면 typeName 블롭 시작 전까지
-  const nameBlobSize = (nameSize > 0 && blobStart + nameSize <= sectionEnd)
-    ? nameSize : (sectionEnd - blobStart);
 
-  // 1) 고정 레코드 먼저 전부 읽고 nameOffset 목록 확보 (다음 offset 경계 계산용)
+  // 1) 충전소 44B 레코드 먼저 전부 읽기 (명칭 블롭 시작 계산에 opCount 합 필요)
   const records = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 44;
@@ -607,7 +598,14 @@ function parseEvChargers(dv, offset, size, charset) {
     });
   }
 
-  // 2) 명칭은 자신 offset ~ 다음 offset 범위로 읽는다 (null-terminated 아님)
+  // 2) 명칭 블롭 시작 = 충전소 레코드(44B) + 사업자별 충전기 정보(20B×ΣopCount) 이후
+  const opTotalCount = records.reduce((s, r) => s + (r.opCount > 0 ? r.opCount : 0), 0);
+  const blobStart = evNameBlobStart(dataStart, count, opTotalCount);
+  // 명칭 블롭 길이: 헤더 nameSize 우선, 비정상이면 섹션 끝까지
+  const nameBlobSize = (nameSize > 0 && blobStart + nameSize <= sectionEnd)
+    ? nameSize : (sectionEnd - blobStart);
+
+  // 3) 명칭은 자신 offset ~ 다음 offset 범위로 읽는다 (null-terminated 아님)
   const nameOffsets = records.map(r => r.nameOffset).filter(o => o >= 0);
   const chargers = records.map(r => {
     let name = '';
@@ -618,27 +616,6 @@ function parseEvChargers(dv, offset, size, charset) {
     }
     return { ...r, name };
   });
-
-  // 진단: 충전소가 있는데 명칭이 전부 비면 오프셋/블롭 위치를 콘솔에 덤프
-  if (chargers.length > 0 && chargers.every(c => !c.name)) {
-    try {
-      const previewAt = (pos, n = 48) => {
-        const out = [];
-        for (let k = 0; k < n && pos + k < sectionEnd; k++) out.push(dv.getUint8(pos + k).toString(16).padStart(2, '0'));
-        return out.join(' ');
-      };
-      console.warn('[ES3 명칭 빈값 진단]', {
-        count, nameSize, typeNameSize, opNameSize,
-        dataStart, recEnd, blobStart, nameBlobSize, sectionEnd,
-        firstNameOffsets: records.slice(0, 5).map(r => r.nameOffset),
-        firstTypeNameOffs: records.slice(0, 5).map(r => r.typeNameOff),
-        firstOpCounts: records.slice(0, 5).map(r => r.opCount),
-        bytesAtRecEnd: previewAt(recEnd),
-        bytesAtBlobStart: previewAt(blobStart),
-        bytesAtBlobStartPlusOff0: previewAt(blobStart + (records[0] ? Math.max(0, records[0].nameOffset) : 0)),
-      });
-    } catch (e) { /* 진단 실패 무시 */ }
-  }
   return chargers;
 }
 

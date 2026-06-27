@@ -13,7 +13,27 @@ import {
   buildRpLinkPopup,
   rpLinkStyle,
   buildEndpointLabel,
+  evChargerColor,
 } from '../DltLogViewer/js/tvas-renderer.js';
+
+// ---- evChargerColor (경로상/경로주변 마커 색 구분) ----------------------- //
+//
+// ES3 충전소 마커 색: 필수충전=빨강(강조), 경로상(onRoute===0)=파랑,
+// 경로주변(onRoute!==0)=초록.
+
+test('evChargerColor_onRoute_is_blue', () => {
+  assert.equal(evChargerColor({ onRoute: 0 }), '#3182f6');
+});
+
+test('evChargerColor_nearRoute_is_green', () => {
+  assert.equal(evChargerColor({ onRoute: 1 }), '#10b981');
+  assert.equal(evChargerColor({}), '#10b981');
+});
+
+test('evChargerColor_mustCharge_is_red_regardless_of_route', () => {
+  assert.equal(evChargerColor({ onRoute: 0, mustCharge: 1 }), '#f04452');
+  assert.equal(evChargerColor({ onRoute: 1, mustCharge: 1 }), '#f04452');
+});
 
 // ---- buildEndpointLabel --------------------------------------------------- //
 //

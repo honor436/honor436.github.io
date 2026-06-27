@@ -8,37 +8,66 @@ import { parseRouteSummary, parseLaneGuidance, parseRpLinks, nameBlobEnd, evName
 // 충전소명칭 blob(NULL포함) → 종류명칭 blob → 사업자명칭 blob.
 // 명칭이 운영기관 구간 뒤에서 시작하므로 그 구간을 건너뛰어야 명칭이 맞다.
 
-test('parseEvChargers reads station names past the operator-info section', () => {
+test('parseEvChargers parses names, type names, and per-operator info', () => {
   const enc = new TextEncoder();
-  const n0 = new Uint8Array([...enc.encode('STN-A'), 0]);   // offset 0, 6B (NULL 포함)
-  const n1 = new Uint8Array([...enc.encode('STN-B'), 0]);   // offset 6, 6B (NULL 포함)
-  const nameBlob = new Uint8Array([...n0, ...n1]); // nameSize = 12
-  const count = 2;
-  const opTotal = 3;                               // charger0 opCount=1, charger1 opCount=2
+  const z = (s) => new Uint8Array([...enc.encode(s), 0]);   // NULL 종료 문자열
+  const nameBlob = new Uint8Array([...z('STN-A'), ...z('STN-B')]);   // 12B, off 0/6
+  const typeBlob = new Uint8Array([...z('T-A'), ...z('T-B')]);       // 8B,  off 0/4
+  const opNameBlob = new Uint8Array([...z('OP-X'), ...z('OP-Y'), ...z('OP-Z')]); // 15B, off 0/5/10
+
+  const count = 2, opTotal = 3;            // charger0 opCount=1, charger1 opCount=2
   const headerSize = 28, recSize = 44, opSize = 20;
-  const total = headerSize + count * recSize + opTotal * opSize + nameBlob.length + 1 + 1;
+  const opSecStart = headerSize + count * recSize;          // 116
+  const nameAt = opSecStart + opTotal * opSize;             // 176
+  const typeAt = nameAt + nameBlob.length;                  // 188
+  const opNameAt = typeAt + typeBlob.length;                // 196
+  const total = opNameAt + opNameBlob.length;               // 211
   const buf = new ArrayBuffer(total);
   const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+
   // header
   dv.setUint16(0, count, true);
-  dv.setInt32(8, nameBlob.length, true);          // nameSize=12
-  dv.setInt32(12, 1, true);                        // typeNameSize
-  dv.setInt32(16, 1, true);                        // opNameSize
-  // charger #0 @ 28
-  dv.setInt32(28 + 15, 0, true);                   // nameOffset=0
-  dv.setUint8(28 + 36, 1);                         // opCount=1
-  // charger #1 @ 72
-  dv.setInt32(72 + 15, 6, true);                   // nameOffset=6
-  dv.setUint8(72 + 36, 2);                         // opCount=2
-  // operator section: 28+88 .. (3×20)  — 값은 0이어도 무방
-  // name blob @ 28 + 88 + 60 = 176
-  const blobAt = headerSize + count * recSize + opTotal * opSize;
-  new Uint8Array(buf).set(nameBlob, blobAt);
+  dv.setInt32(8, nameBlob.length, true);     // nameSize=12
+  dv.setInt32(12, typeBlob.length, true);    // typeNameSize=8
+  dv.setInt32(16, opNameBlob.length, true);  // opNameSize=15
+  // charger #0 @28
+  dv.setInt32(28 + 15, 0, true);  dv.setInt32(28 + 29, 0, true);  dv.setUint8(28 + 36, 1);
+  // charger #1 @72
+  dv.setInt32(72 + 15, 6, true);  dv.setInt32(72 + 29, 4, true);  dv.setUint8(72 + 36, 2);
+  // operator records (20B each) @116
+  const setOp = (k, ultra, fast, slow, code, nameOff) => {
+    const b = opSecStart + k * opSize;
+    dv.setUint8(b, ultra); dv.setUint8(b + 1, fast); dv.setUint8(b + 2, slow);
+    u8.set(enc.encode(code), b + 3);          // Char[4] 사업자 코드
+    dv.setInt32(b + 7, nameOff, true);        // 사업자 명칭 offset
+  };
+  setOp(0, 1, 2, 3, 'AAAA', 0);   // charger0 의 사업자
+  setOp(1, 4, 5, 6, 'BBBB', 5);   // charger1 의 사업자 1
+  setOp(2, 7, 8, 9, 'CCCC', 10);  // charger1 의 사업자 2
+  // blobs
+  u8.set(nameBlob, nameAt);
+  u8.set(typeBlob, typeAt);
+  u8.set(opNameBlob, opNameAt);
 
-  const chargers = parseEvChargers(dv, 0, total, 1); // charset 1 = utf-8
-  assert.equal(chargers.length, 2);
-  assert.equal(chargers[0].name, 'STN-A');
-  assert.equal(chargers[1].name, 'STN-B');
+  const c = parseEvChargers(dv, 0, total, 1);  // charset 1 = utf-8
+  assert.equal(c.length, 2);
+  // 충전소 명칭 / 종류명칭
+  assert.equal(c[0].name, 'STN-A');
+  assert.equal(c[1].name, 'STN-B');
+  assert.equal(c[0].typeName, 'T-A');
+  assert.equal(c[1].typeName, 'T-B');
+  // 사업자별 충전기 정보 (opCount 만큼 순서대로 배정)
+  assert.equal(c[0].operators.length, 1);
+  assert.equal(c[1].operators.length, 2);
+  assert.equal(c[0].operators[0].opCode, 'AAAA');
+  assert.equal(c[0].operators[0].name, 'OP-X');
+  assert.deepEqual(
+    [c[0].operators[0].ultraFastAvail, c[0].operators[0].fastAvail, c[0].operators[0].slowAvail],
+    [1, 2, 3]);
+  assert.equal(c[1].operators[0].name, 'OP-Y');
+  assert.equal(c[1].operators[1].name, 'OP-Z');
+  assert.equal(c[1].operators[1].opCode, 'CCCC');
 });
 
 // ---- evNameBlobStart (ES3 명칭 블롭 시작 위치) --------------------------- //

@@ -2445,6 +2445,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
+import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
 import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch, buildIsoBodyFromEvBattery, EV_ISOCHRONE_SHARED_FIELDS } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
@@ -3731,16 +3732,18 @@ function wpIconHtml(label, color, sub) {
 
 function updateWpBar() {
   let html = '';
+  const wpLabel = (w) => w.name ? esc(w.name) : (w.lat.toFixed(5) + ',' + w.lon.toFixed(5));
+  const wpTitle = (w) => w.lat.toFixed(6) + ', ' + w.lon.toFixed(6) + (w.name ? ' · ' + esc(w.name) : '');
   if (routeWaypoints.depart) {
     const d = routeWaypoints.depart;
-    html += '<span class="wp-badge depart">S ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
+    html += '<span class="wp-badge depart" title="' + wpTitle(d) + '">S ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
   }
   routeWaypoints.vias.forEach((v, i) => {
-    html += '<span class="wp-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + v.lat.toFixed(5) + ',' + v.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
+    html += '<span class="wp-badge" title="' + wpTitle(v) + '" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + wpLabel(v) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
   });
   if (routeWaypoints.dest) {
     const d = routeWaypoints.dest;
-    html += '<span class="wp-badge dest">E ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
+    html += '<span class="wp-badge dest" title="' + wpTitle(d) + '">E ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
   }
   if (!html) html = '<span style="color:var(--muted);font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
   tvasWpBar.innerHTML = html;
@@ -3778,22 +3781,26 @@ function addViaMarker(lat, lon, idx) {
 }
 
 function setWaypoint(type, lat, lon, name, rpFlag) {
+  let wp;
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    routeWaypoints.vias.push({ lat, lon, name, rpFlag });
+    wp = { lat, lon, name, rpFlag };
+    routeWaypoints.vias.push(wp);
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
-    routeWaypoints[type] = { lat, lon, name, rpFlag };
+    wp = { lat, lon, name, rpFlag };
+    routeWaypoints[type] = wp;
     const map = getMap();
     if (!map) return;
     if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
     const label = type === 'depart' ? 'S' : 'E';
     const color = type === 'depart' ? '#22c55e' : '#ef4444';
     const subLabel = type === 'depart' ? '출발' : '도착';
+    const head = name ? `<b>${esc(name)}</b><br>` : `<b>${subLabel}</b><br>`;
     wpMarkers[type] = L.marker([lat, lon], {
       icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
       zIndexOffset: 2000,
-    }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+    }).bindPopup(`${head}WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
   }
   updateWpBar();
   // Auto-open route request panel when waypoint set
@@ -3809,6 +3816,42 @@ function setWaypoint(type, lat, lon, name, rpFlag) {
     enableDepartHeadingDrag(wpMarkers.depart, lat, lon);
     showDepartHint(lat, lon);
   }
+  // 지도 선택(이름 미지정) → 역지오코딩으로 명칭 보강. POI 선택은 name 이 이미 있음.
+  if (!name) resolveWaypointName(type, wp);
+}
+
+// 지도 선택으로 추가된 지점의 명칭을 역지오코딩(좌표→주소)으로 보강한다.
+// buildingName 을 명칭(departName/destName, 경유지는 wayPointName)으로 쓰고,
+// 없으면 주소 문자열로 대체. 실패해도 좌표 기반 동작에는 영향 없음.
+function wpIsActive(type, wp) {
+  return type === 'via' ? routeWaypoints.vias.indexOf(wp) >= 0 : routeWaypoints[type] === wp;
+}
+function refreshWpDisplay(type, wp) {
+  updateWpBar();
+  let marker = null;
+  if (type === 'via') { const i = routeWaypoints.vias.indexOf(wp); marker = i >= 0 ? wpMarkers.vias[i] : null; }
+  else marker = wpMarkers[type];
+  if (marker && marker.getPopup()) {
+    const sub = type === 'depart' ? '출발' : type === 'dest' ? '도착' : '경유';
+    const head = wp.name ? `<b>${esc(wp.name)}</b>` : `<b>${sub}</b>`;
+    const addr = (wp.address && wp.address !== wp.name) ? `<br>${esc(wp.address)}` : '';
+    marker.setPopupContent(`${head}${addr}<br>WGS84: ${wp.lat.toFixed(6)}, ${wp.lon.toFixed(6)}`);
+  }
+}
+async function resolveWaypointName(type, wp) {
+  try {
+    const res = await fetch(buildReverseGeocodeUrl(wp.lat, wp.lon), { mode: 'cors', signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return;
+    const info = parseReverseGeocode(await res.json());
+    if (!info) return;
+    const nm = info.buildingName || info.address;   // departName/destName 으로 buildingName 우선
+    if (!nm) return;
+    if (!wpIsActive(type, wp)) return;              // 사용자가 그새 지웠으면 무시
+    wp.name = nm;
+    wp.address = info.address;
+    refreshWpDisplay(type, wp);
+    applyWaypointsToBody();
+  } catch (e) { /* 역지오코딩 실패 무시 — 좌표 기반 동작 유지 */ }
 }
 
 // 출발지 아이콘 주변에 방위각 설정 방법을 잠깐 안내.
@@ -3905,6 +3948,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.depart.lat, routeWaypoints.depart.lon);
       body.departXPos = sk[0];
       body.departYPos = sk[1];
+      // 출발지 명칭: POI name 또는 역지오코딩 buildingName → departName
+      if (routeWaypoints.depart.name) body.departName = routeWaypoints.depart.name;
       // 출발 방위각(드래그로 설정) → angle
       if (routeWaypoints.depart.angle != null) body.angle = routeWaypoints.depart.angle;
     }
@@ -3912,6 +3957,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);
       body.destXPos = sk[0];
       body.destYPos = sk[1];
+      // 목적지 명칭: POI name 또는 역지오코딩 buildingName → destName
+      if (routeWaypoints.dest.name) body.destName = routeWaypoints.dest.name;
       // 목적지 rpFlag: POI(검색/상세) 값 우선, 없으면 16
       body.destRpFlag = resolveRpFlag('dest', routeWaypoints.dest.rpFlag);
     }

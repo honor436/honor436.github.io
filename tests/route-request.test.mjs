@@ -137,6 +137,23 @@ test('applyEvBatteryToIsochrone_copies_vehicle_fields_from_ev', () => {
   assert.equal(out.vendor, 'BMW');
 });
 
+test('applyEvBatteryToIsochrone_copies_aux_efficientSpeed_and_battery_fields', () => {
+  // EV·도달가능범위 공통 데이터: 보조전력/효율속도 + 배터리 4필드도 그대로 가져온다.
+  const iso = { contoursEnergy: 1, contoursMeters: 2, auxiliaryPower: 99, efficientSpeed: 5 };
+  const out = applyEvBatteryToIsochrone(iso, {
+    chargedEnergy: 70000, chargedRange: 500000, currentEnergy: 100, currentRange: 200,
+    auxiliaryPower: 1200, efficientSpeed: 0,
+  });
+  assert.equal(out.auxiliaryPower, 1200);
+  assert.equal(out.efficientSpeed, 0);
+  assert.equal(out.chargedEnergy, 70000);
+  assert.equal(out.chargedRange, 500000);
+  assert.equal(out.currentEnergy, 100);
+  assert.equal(out.currentRange, 200);
+  assert.equal(out.contoursEnergy, 100);   // = currentEnergy
+  assert.equal(out.contoursMeters, 200);    // = currentRange
+});
+
 test('applyEvBatteryToIsochrone_keeps_iso_vehicle_fields_when_ev_missing', () => {
   const iso = { slopeFlag: 1, vehicleId: 'RV11', vehicleMass: 2000, vendor: 'BMW' };
   const out = applyEvBatteryToIsochrone(iso, { currentEnergy: 100 });
@@ -239,22 +256,23 @@ test('resolveRouteTypeSwitch_same_kind_keeps_current_body', () => {
   assert.equal(r.body, null); // 변경 없음(현재 유지)
 });
 
-test('resolveRouteTypeSwitch_route_to_iso_first_time_uses_template', () => {
+test('resolveRouteTypeSwitch_route_to_iso_always_derives_from_ev', () => {
+  // 도달가능범위는 항상 EV 경로 파라미터를 그대로 사용(단일 데이터). 편집 여부 무관.
   const r = resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'isochrone', currentBody: { ...DEF },
     saved: { route: null, isochrone: null }, evEdited: false,
     defaultBody: DEF, isochroneBody: ISO,
   });
-  assert.equal(r.body.contoursEnergy, 56000);
-  assert.equal(r.body.contoursMeters, 300000);
+  assert.equal(r.body.contoursEnergy, DEF.currentEnergy); // 6970 (EV 잔량)
+  assert.equal(r.body.contoursMeters, DEF.currentRange);  // 47000 (EV 도달거리)
   assert.deepEqual(r.saved.route, DEF); // 떠난 EV 바디 저장
 });
 
-test('resolveRouteTypeSwitch_route_to_iso_applies_ev_battery_when_edited', () => {
+test('resolveRouteTypeSwitch_route_to_iso_uses_edited_ev_battery', () => {
   const editedEv = { ...DEF, currentEnergy: 51200, currentRange: 280000 };
   const r = resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'isochrone', currentBody: editedEv,
-    saved: { route: null, isochrone: null }, evEdited: true,
+    saved: { route: null, isochrone: null }, evEdited: false,
     defaultBody: DEF, isochroneBody: ISO,
   });
   assert.equal(r.body.contoursEnergy, 51200);

@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <script src="/auth-gate.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>honor436 — 개발 도구 모음</title>
   <meta name="description" content="honor436가 만든 개발용 웹 도구 모음. DLT 로그 분석기 등.">
@@ -276,56 +277,6 @@
   </style>
 </head>
 <body>
-
-<!-- ===== 비밀번호 게이트 (클라이언트 측 차단막) =====
-     주의: GitHub Pages 는 정적 호스팅이라 서버 인증이 불가능합니다.
-     이 게이트는 일반 사용자에 대한 가벼운 차단일 뿐, 진짜 보안이 아닙니다
-     (소스 보기/개발자도구로 우회 가능). 비밀번호는 평문 대신 SHA-256 해시로 비교합니다. -->
-<div id="auth-gate" style="position:fixed;inset:0;z-index:2147483647;background:radial-gradient(ellipse at top,#111a2e 0%,#0b1220 65%);display:flex;align-items:center;justify-content:center;font-family:'Segoe UI','Noto Sans KR',-apple-system,sans-serif">
-  <form id="auth-form" style="background:rgba(15,23,42,0.95);border:1px solid rgba(148,163,184,0.18);border-radius:14px;padding:30px 26px;width:min(92vw,350px);box-shadow:0 24px 70px rgba(0,0,0,.55);text-align:center">
-    <div style="font-size:32px;margin-bottom:6px">🔒</div>
-    <div style="color:#e2e8f0;font-size:17px;font-weight:800;margin-bottom:3px">honor436 개발 도구</div>
-    <div style="color:#94a3b8;font-size:12.5px;margin-bottom:18px">비밀번호를 입력하세요</div>
-    <input id="auth-input" type="password" autocomplete="current-password" placeholder="비밀번호"
-      style="width:100%;padding:11px 13px;border-radius:9px;border:1px solid rgba(148,163,184,0.3);background:rgba(2,6,23,0.6);color:#e2e8f0;font-size:15px;outline:none;margin-bottom:10px">
-    <div id="auth-error" style="color:#f87171;font-size:12px;min-height:16px;margin-bottom:10px"></div>
-    <button type="submit" style="width:100%;padding:11px;border:none;border-radius:9px;background:#38bdf8;color:#0b1220;font-size:15px;font-weight:800;cursor:pointer">입장</button>
-  </form>
-</div>
-<script>
-(function () {
-  var KEY = 'h436_gate_v1';
-  // SHA-256("mns1234") — 비밀번호 평문은 소스에 두지 않음
-  var HASH = 'f4ae2d8c0ea877f403e06bf5a4e9b98e798cacb2f5d0d2fdf07d5dabf21572fe';
-  var gate = document.getElementById('auth-gate');
-  function unlock() {
-    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
-    if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
-    document.documentElement.style.overflow = '';
-  }
-  try { if (sessionStorage.getItem(KEY) === '1') { unlock(); return; } } catch (e) {}
-  document.documentElement.style.overflow = 'hidden';   // 인증 전 스크롤/내용 차단
-  async function sha256hex(str) {
-    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-  }
-  var form = document.getElementById('auth-form');
-  var input = document.getElementById('auth-input');
-  var err = document.getElementById('auth-error');
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    err.textContent = '';
-    try {
-      var h = await sha256hex(input.value);
-      if (h === HASH) { unlock(); }
-      else { err.textContent = '비밀번호가 올바르지 않습니다.'; input.value = ''; input.focus(); }
-    } catch (ex) {
-      err.textContent = '이 환경에서는 인증을 사용할 수 없습니다 (HTTPS 필요).';
-    }
-  });
-  if (input) input.focus();
-})();
-</script>
 
 <header class="site">
   <div class="inner">

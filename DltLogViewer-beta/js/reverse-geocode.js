@@ -39,8 +39,10 @@ function clean(s) {
 /**
  * 역지오코딩 응답 파싱.
  * @param {any} json TMAP 응답 ({ addressInfo: {...} })
- * @returns {{buildingName:string, address:string}|null}
+ * @returns {{buildingName:string, roadName:string, fullAddress:string, address:string}|null}
  *   buildingName: 건물명 (없으면 '')
+ *   roadName: 도로명 (없으면 '')
+ *   fullAddress: 응답의 전체 주소 (없으면 '')
  *   address: 표시용 주소 (fullAddress 우선, 없으면 구성요소 조합)
  */
 export function parseReverseGeocode(json) {
@@ -48,13 +50,14 @@ export function parseReverseGeocode(json) {
   if (!a || typeof a !== 'object') return null;
 
   const buildingName = clean(a.buildingName);
+  const roadName = clean(a.roadName);
+  const fullAddress = clean(a.fullAddress);
 
-  let address = clean(a.fullAddress);
+  let address = fullAddress;
   if (!address) {
-    const road = clean(a.roadName);
-    if (road) {
+    if (roadName) {
       // 도로명 주소
-      address = [clean(a.city_do), clean(a.gu_gun), clean(a.eup_myun), road, clean(a.buildingIndex)]
+      address = [clean(a.city_do), clean(a.gu_gun), clean(a.eup_myun), roadName, clean(a.buildingIndex)]
         .filter(Boolean).join(' ');
     } else {
       // 지번 주소
@@ -64,5 +67,5 @@ export function parseReverseGeocode(json) {
     }
   }
 
-  return { buildingName, address };
+  return { buildingName, roadName, fullAddress, address };
 }

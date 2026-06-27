@@ -3861,7 +3861,7 @@ async function resolveWaypointName(type, wp) {
   try {
     const info = await lookupAddress(wp.lat, wp.lon);
     if (!info) return;
-    const nm = info.buildingName || info.address;   // departName/destName 으로 buildingName 우선
+    const nm = info.buildingName || info.roadName || info.address;   // buildingName 없으면 roadName
     if (!nm) return;
     if (!wpIsActive(type, wp)) return;              // 사용자가 그새 지웠으면 무시
     wp.name = nm;
@@ -4013,7 +4013,7 @@ function setupMapContextMenu() {
     content.innerHTML = '<b>좌표 정보</b><br>' +
       'WGS84: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
       'SK: ' + sk[0] + ', ' + sk[1] + '<br>' +
-      '<div id="_rg_addr" style="margin-top:4px;padding:5px 8px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);border-radius:6px;color:#bae6fd;font-size:11px">📍 주소 조회 중…</div>' +
+      '<div id="_rg_addr" style="margin-top:4px;padding:6px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;color:#0f172a;font-size:12px;line-height:1.6">📍 주소 조회 중…</div>' +
       '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">' +
       '<button id="_wp_dep" style="flex:1;padding:5px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">출발지</button>' +
       '<button id="_wp_via" style="flex:1;padding:5px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">경유지</button>' +
@@ -4024,12 +4024,16 @@ function setupMapContextMenu() {
     const addrEl = content.querySelector('#_rg_addr');
     lookupAddress(lat, lng).then(info => {
       if (!addrEl) return;
-      if (!info || (!info.address && !info.buildingName)) { addrEl.textContent = '📍 주소 정보 없음'; return; }
-      const bld = info.buildingName ? `<b>${esc(info.buildingName)}</b><br>` : '';
-      addrEl.innerHTML = '📍 ' + bld + esc(info.address || '');
+      if (!info) { addrEl.textContent = '📍 주소 정보 없음'; return; }
+      // fullAddress · buildingName · roadName 만 표시
+      const rows = [];
+      if (info.fullAddress)  rows.push('📍 ' + esc(info.fullAddress));
+      if (info.buildingName) rows.push('🏢 <b>' + esc(info.buildingName) + '</b>');
+      if (info.roadName)     rows.push('🛣 ' + esc(info.roadName));
+      addrEl.innerHTML = rows.length ? rows.join('<br>') : '📍 주소 정보 없음';
     }).catch(err => {
       if (addrEl) {
-        addrEl.style.color = '#fca5a5';
+        addrEl.style.color = '#b91c1c';
         addrEl.textContent = '📍 주소 조회 실패: ' + (err && err.message ? err.message : '네트워크/CORS 오류');
       }
     });

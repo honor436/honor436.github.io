@@ -547,6 +547,16 @@ export function nameBlobEnd(offsets, thisOffset, blobSize) {
   return end;
 }
 
+// ES3 명칭 블롭 시작 위치. 고정 레코드와 명칭 블롭 사이에 운영기관 인덱스
+// 구간이 끼어들 수 있으므로, name/typeName/opName 3개 블롭이 섹션 끝에
+// 모여 있다고 보고 끝에서부터 역산한다. 역산값이 recEnd 보다 앞이거나
+// 크기가 비정상이면 recEnd(레코드 직후) 로 폴백.
+export function evNameBlobStart(sectionEnd, recEnd, nameSize, typeNameSize, opNameSize) {
+  const total = Math.max(0, nameSize) + Math.max(0, typeNameSize) + Math.max(0, opNameSize);
+  const fromEnd = sectionEnd - total;
+  return (total > 0 && fromEnd >= recEnd) ? fromEnd : recEnd;
+}
+
 function parseEvChargers(dv, offset, size, charset) {
   // ES3 header: 28 bytes
   const count       = dv.getUint16(offset, true);
@@ -554,9 +564,11 @@ function parseEvChargers(dv, offset, size, charset) {
   const typeNameSize = dv.getInt32(offset + 12, true);
   const opNameSize  = dv.getInt32(offset + 16, true);
   const dataStart = offset + 28;
-  const blobStart = dataStart + count * 44;       // 명칭 블롭 시작
-  // 명칭 블롭 길이: 헤더의 nameSize 우선, 비정상이면 섹션 끝까지로 보정
   const sectionEnd = offset + size;
+  const recEnd = dataStart + count * 44;
+  // 명칭 블롭 시작: 운영기관 구간을 건너뛰도록 섹션 끝에서 역산
+  const blobStart = evNameBlobStart(sectionEnd, recEnd, nameSize, typeNameSize, opNameSize);
+  // 명칭 블롭 길이: 헤더의 nameSize 우선, 비정상이면 typeName 블롭 시작 전까지
   const nameBlobSize = (nameSize > 0 && blobStart + nameSize <= sectionEnd)
     ? nameSize : (sectionEnd - blobStart);
 
@@ -606,6 +618,27 @@ function parseEvChargers(dv, offset, size, charset) {
     }
     return { ...r, name };
   });
+
+  // 진단: 충전소가 있는데 명칭이 전부 비면 오프셋/블롭 위치를 콘솔에 덤프
+  if (chargers.length > 0 && chargers.every(c => !c.name)) {
+    try {
+      const previewAt = (pos, n = 48) => {
+        const out = [];
+        for (let k = 0; k < n && pos + k < sectionEnd; k++) out.push(dv.getUint8(pos + k).toString(16).padStart(2, '0'));
+        return out.join(' ');
+      };
+      console.warn('[ES3 명칭 빈값 진단]', {
+        count, nameSize, typeNameSize, opNameSize,
+        dataStart, recEnd, blobStart, nameBlobSize, sectionEnd,
+        firstNameOffsets: records.slice(0, 5).map(r => r.nameOffset),
+        firstTypeNameOffs: records.slice(0, 5).map(r => r.typeNameOff),
+        firstOpCounts: records.slice(0, 5).map(r => r.opCount),
+        bytesAtRecEnd: previewAt(recEnd),
+        bytesAtBlobStart: previewAt(blobStart),
+        bytesAtBlobStartPlusOff0: previewAt(blobStart + (records[0] ? Math.max(0, records[0].nameOffset) : 0)),
+      });
+    } catch (e) { /* 진단 실패 무시 */ }
+  }
   return chargers;
 }
 

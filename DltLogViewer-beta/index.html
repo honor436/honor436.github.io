@@ -423,6 +423,20 @@
     .leaflet-tooltip.depart-hint.leaflet-tooltip-top::before { border-top-color: #16a34a; }
     @keyframes departHintPulse { from { opacity: .8; } to { opacity: 1; } }
 
+    /* ---- 경로 출발/도착 명칭 라벨 (항상 표시) ---- */
+    .leaflet-tooltip.tvas-endpoint-label {
+      background: rgba(15, 23, 42, 0.92);
+      color: #fff;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      white-space: nowrap;
+    }
+    .leaflet-tooltip.tvas-endpoint-label.leaflet-tooltip-top::before { border-top-color: rgba(15, 23, 42, 0.92); }
+
     /* ---- Google-Maps style POI search box ---- */
     #poi-search-box {
       position: absolute;
@@ -1678,7 +1692,7 @@
 
 <!-- BETA(테스트) 빌드 표시 — 운영 페이지(/DltLogViewer/)와 구분용 -->
 <div style="position:fixed;top:0;right:0;z-index:99999;background:#a855f7;color:#fff;font:700 11px/1.4 'Segoe UI',sans-serif;padding:4px 12px;border-bottom-left-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;letter-spacing:.5px">
-  BETA · Mock GPS DLT 속도/방위/위치 테스트
+  BETA · 테스트 빌드 (역지오코딩 · Mock GPS · 출발/도착 명칭)
 </div>
 
 <aside id="sidebar">
@@ -2437,6 +2451,7 @@ import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
+import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
 import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch, buildIsoBodyFromEvBattery, EV_ISOCHRONE_SHARED_FIELDS } from './js/route-request.js';
 import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
 import {
@@ -3723,16 +3738,18 @@ function wpIconHtml(label, color, sub) {
 
 function updateWpBar() {
   let html = '';
+  const wpLabel = (w) => w.name ? esc(w.name) : (w.lat.toFixed(5) + ',' + w.lon.toFixed(5));
+  const wpTitle = (w) => w.lat.toFixed(6) + ', ' + w.lon.toFixed(6) + (w.name ? ' · ' + esc(w.name) : '');
   if (routeWaypoints.depart) {
     const d = routeWaypoints.depart;
-    html += '<span class="wp-badge depart">S ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
+    html += '<span class="wp-badge depart" title="' + wpTitle(d) + '">S ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
   }
   routeWaypoints.vias.forEach((v, i) => {
-    html += '<span class="wp-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + v.lat.toFixed(5) + ',' + v.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
+    html += '<span class="wp-badge" title="' + wpTitle(v) + '" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + wpLabel(v) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
   });
   if (routeWaypoints.dest) {
     const d = routeWaypoints.dest;
-    html += '<span class="wp-badge dest">E ' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
+    html += '<span class="wp-badge dest" title="' + wpTitle(d) + '">E ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
   }
   if (!html) html = '<span style="color:var(--muted);font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
   tvasWpBar.innerHTML = html;
@@ -3770,22 +3787,26 @@ function addViaMarker(lat, lon, idx) {
 }
 
 function setWaypoint(type, lat, lon, name, rpFlag) {
+  let wp;
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    routeWaypoints.vias.push({ lat, lon, name, rpFlag });
+    wp = { lat, lon, name, rpFlag };
+    routeWaypoints.vias.push(wp);
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
-    routeWaypoints[type] = { lat, lon, name, rpFlag };
+    wp = { lat, lon, name, rpFlag };
+    routeWaypoints[type] = wp;
     const map = getMap();
     if (!map) return;
     if (wpMarkers[type]) map.removeLayer(wpMarkers[type]);
     const label = type === 'depart' ? 'S' : 'E';
     const color = type === 'depart' ? '#22c55e' : '#ef4444';
     const subLabel = type === 'depart' ? '출발' : '도착';
+    const head = name ? `<b>${esc(name)}</b><br>` : `<b>${subLabel}</b><br>`;
     wpMarkers[type] = L.marker([lat, lon], {
       icon: L.divIcon({ className: '', html: wpIconHtml(label, color, subLabel), iconSize: [36, 52], iconAnchor: [18, 26] }),
       zIndexOffset: 2000,
-    }).bindPopup(`<b>${subLabel}</b><br>WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+    }).bindPopup(`${head}WGS84: ${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
   }
   updateWpBar();
   // Auto-open route request panel when waypoint set
@@ -3801,6 +3822,53 @@ function setWaypoint(type, lat, lon, name, rpFlag) {
     enableDepartHeadingDrag(wpMarkers.depart, lat, lon);
     showDepartHint(lat, lon);
   }
+  // 지도 선택(이름 미지정) → 역지오코딩으로 명칭 보강. POI 선택은 name 이 이미 있음.
+  if (!name) resolveWaypointName(type, wp);
+}
+
+// 지도 선택으로 추가된 지점의 명칭을 역지오코딩(좌표→주소)으로 보강한다.
+// buildingName 을 명칭(departName/destName, 경유지는 wayPointName)으로 쓰고,
+// 없으면 주소 문자열로 대체. 실패해도 좌표 기반 동작에는 영향 없음.
+function wpIsActive(type, wp) {
+  return type === 'via' ? routeWaypoints.vias.indexOf(wp) >= 0 : routeWaypoints[type] === wp;
+}
+function refreshWpDisplay(type, wp) {
+  updateWpBar();
+  let marker = null;
+  if (type === 'via') { const i = routeWaypoints.vias.indexOf(wp); marker = i >= 0 ? wpMarkers.vias[i] : null; }
+  else marker = wpMarkers[type];
+  if (marker && marker.getPopup()) {
+    const sub = type === 'depart' ? '출발' : type === 'dest' ? '도착' : '경유';
+    const head = wp.name ? `<b>${esc(wp.name)}</b>` : `<b>${sub}</b>`;
+    const addr = (wp.address && wp.address !== wp.name) ? `<br>${esc(wp.address)}` : '';
+    marker.setPopupContent(`${head}${addr}<br>WGS84: ${wp.lat.toFixed(6)}, ${wp.lon.toFixed(6)}`);
+  }
+}
+// 좌표→주소 역지오코딩 (좌표 키 캐시). 같은 지점 재요청을 방지한다.
+const rgCache = new Map();
+function rgKey(lat, lon) { return lat.toFixed(6) + ',' + lon.toFixed(6); }
+async function lookupAddress(lat, lon) {
+  const key = rgKey(lat, lon);
+  if (rgCache.has(key)) return rgCache.get(key);
+  const res = await fetch(buildReverseGeocodeUrl(lat, lon), { mode: 'cors', signal: AbortSignal.timeout(6000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const info = parseReverseGeocode(await res.json());
+  rgCache.set(key, info);
+  return info;
+}
+
+async function resolveWaypointName(type, wp) {
+  try {
+    const info = await lookupAddress(wp.lat, wp.lon);
+    if (!info) return;
+    const nm = info.buildingName || info.address;   // departName/destName 으로 buildingName 우선
+    if (!nm) return;
+    if (!wpIsActive(type, wp)) return;              // 사용자가 그새 지웠으면 무시
+    wp.name = nm;
+    wp.address = info.address;
+    refreshWpDisplay(type, wp);
+    applyWaypointsToBody();
+  } catch (e) { /* 역지오코딩 실패 무시 — 좌표 기반 동작 유지 */ }
 }
 
 // 출발지 아이콘 주변에 방위각 설정 방법을 잠깐 안내.
@@ -3897,6 +3965,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.depart.lat, routeWaypoints.depart.lon);
       body.departXPos = sk[0];
       body.departYPos = sk[1];
+      // 출발지 명칭: POI name 또는 역지오코딩 buildingName → departName
+      if (routeWaypoints.depart.name) body.departName = routeWaypoints.depart.name;
       // 출발 방위각(드래그로 설정) → angle
       if (routeWaypoints.depart.angle != null) body.angle = routeWaypoints.depart.angle;
     }
@@ -3904,6 +3974,8 @@ function applyWaypointsToBody() {
       const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);
       body.destXPos = sk[0];
       body.destYPos = sk[1];
+      // 목적지 명칭: POI name 또는 역지오코딩 buildingName → destName
+      if (routeWaypoints.dest.name) body.destName = routeWaypoints.dest.name;
       // 목적지 rpFlag: POI(검색/상세) 값 우선, 없으면 16
       body.destRpFlag = resolveRpFlag('dest', routeWaypoints.dest.rpFlag);
     }
@@ -3941,12 +4013,26 @@ function setupMapContextMenu() {
     content.innerHTML = '<b>좌표 정보</b><br>' +
       'WGS84: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '<br>' +
       'SK: ' + sk[0] + ', ' + sk[1] + '<br>' +
+      '<div id="_rg_addr" style="margin-top:4px;padding:5px 8px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);border-radius:6px;color:#bae6fd;font-size:11px">📍 주소 조회 중…</div>' +
       '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">' +
       '<button id="_wp_dep" style="flex:1;padding:5px;background:#22c55e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">출발지</button>' +
       '<button id="_wp_via" style="flex:1;padding:5px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">경유지</button>' +
       '<button id="_wp_dst" style="flex:1;padding:5px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">목적지</button>' +
       '</div>';
     const popup = L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(content).openOn(map);
+    // 우클릭 즉시 역지오코딩으로 주소 조회 → 팝업에 표시 (실패 시 사유 노출)
+    const addrEl = content.querySelector('#_rg_addr');
+    lookupAddress(lat, lng).then(info => {
+      if (!addrEl) return;
+      if (!info || (!info.address && !info.buildingName)) { addrEl.textContent = '📍 주소 정보 없음'; return; }
+      const bld = info.buildingName ? `<b>${esc(info.buildingName)}</b><br>` : '';
+      addrEl.innerHTML = '📍 ' + bld + esc(info.address || '');
+    }).catch(err => {
+      if (addrEl) {
+        addrEl.style.color = '#fca5a5';
+        addrEl.textContent = '📍 주소 조회 실패: ' + (err && err.message ? err.message : '네트워크/CORS 오류');
+      }
+    });
     content.querySelector('#_wp_dep').addEventListener('click', () => { setWaypoint('depart', lat, lng); map.closePopup(popup); });
     content.querySelector('#_wp_via').addEventListener('click', () => { setWaypoint('via', lat, lng); map.closePopup(popup); });
     content.querySelector('#_wp_dst').addEventListener('click', () => { setWaypoint('dest', lat, lng); map.closePopup(popup); });

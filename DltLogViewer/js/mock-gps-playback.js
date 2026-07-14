@@ -17,23 +17,42 @@ export function haversineM(a, b) {
 // 보간된 좌표는 { lat, lng, srcNextIdx } 형태.
 // srcNextIdx 는 원본 points 배열에서 "다음으로 향하고 있는" 인덱스.
 // 마지막(엔드포인트) 좌표의 srcNextIdx 는 points.length (= 더 이상 다음 없음).
+//
+// 좌표는 세그먼트 단위가 아니라 전체 경로의 누적 거리 기준으로 stepM 간격마다 찍는다.
+// (세그먼트별로 최소 1스텝을 강제하면, 촘촘한 점들이 몰려있는 구간에서 실제 이동 거리와
+//  무관하게 세그먼트 수만큼 좌표가 그 자리에 추가로 생성되어 차량이 멈춘 것처럼 보인다.)
 export function interpolatePath(points, speedKmh) {
   if (!Array.isArray(points) || points.length === 0) return [];
   if (points.length === 1) {
     return [{ lat: points[0].lat, lng: points[0].lng, srcNextIdx: 1 }];
   }
   const stepM = Math.max(1, speedKmh * 1000 / 3600);
-  const coords = [];
+  const segDist = [];
+  let total = 0;
   for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i], b = points[i + 1];
-    const dist = haversineM(a, b);
-    const steps = Math.max(1, Math.round(dist / stepM));
-    for (let s = 0; s < steps; s++) {
-      const t = s / steps;
+    const d = haversineM(points[i], points[i + 1]);
+    segDist.push(d);
+    total += d;
+  }
+  const coords = [{ lat: points[0].lat, lng: points[0].lng, srcNextIdx: 1 }];
+  if (total > 0) {
+    const steps = Math.max(1, Math.round(total / stepM));
+    const actualStep = total / steps;
+    let segIdx = 0;
+    let segStart = 0; // 현재 세그먼트 시작점까지의 누적 거리
+    for (let k = 1; k < steps; k++) {
+      const target = k * actualStep;
+      while (segIdx < segDist.length - 1 && segStart + segDist[segIdx] < target) {
+        segStart += segDist[segIdx];
+        segIdx++;
+      }
+      const segLen = segDist[segIdx];
+      const t = segLen > 0 ? (target - segStart) / segLen : 0;
+      const a = points[segIdx], b = points[segIdx + 1];
       coords.push({
         lat: a.lat + (b.lat - a.lat) * t,
         lng: a.lng + (b.lng - a.lng) * t,
-        srcNextIdx: i + 1,
+        srcNextIdx: segIdx + 1,
       });
     }
   }

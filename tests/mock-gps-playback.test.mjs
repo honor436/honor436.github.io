@@ -71,6 +71,21 @@ test("interpolatePath first coord equals first point", () => {
   assert.equal(coords[0].lng, 127.0);
 });
 
+test("interpolatePath does not inflate coord count for a cluster of near-duplicate vertices", () => {
+  // 10개의 점이 한 자리에 몰려있고(간격 ~0.06m), 그 다음 ~1000m 떨어진 지점으로 이어지는 경로.
+  // 전체 이동 거리는 ~1000.5m 이므로 40km/h 기준 좌표는 ~91개여야 한다.
+  // 세그먼트별 최소 1스텝을 강제하면 촘촘한 구간의 세그먼트 수(9)만큼 좌표가 그 자리에
+  // 추가로 몰려 생성되어 총 개수가 부풀려진다 (해당 구간에서 차량이 멈춘 것처럼 보이는 원인).
+  const cluster = [];
+  for (let i = 0; i < 10; i++) {
+    cluster.push({ lat: 37.5 + i * 0.0000005, lng: 127.0 });
+  }
+  const pts = [...cluster, { lat: 37.509, lng: 127.0 }];
+  const coords = interpolatePath(pts, 40);
+  assert.ok(coords.length <= 95,
+    `dense cluster should not inflate coord count, got ${coords.length}`);
+});
+
 test("interpolatePath last coord equals last point", () => {
   const pts = [
     { lat: 37.5, lng: 127.0 },

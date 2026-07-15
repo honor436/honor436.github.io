@@ -51,57 +51,6 @@ export function extractIsochroneRings(json) {
   return coords.filter(ring => Array.isArray(ring) && ring.length > 0);
 }
 
-// 일반 길안내(/rsd/route/planningroutemultiformat, TVAS 4.4+) 요청 포맷에 존재하는
-// top-level 필드 화이트리스트(스펙 "4.1.2. 일반 길안내" 요청 포맷 표 기준).
-// EV 배터리/충전/소비/차량 관련 필드는 이 목록에 없으므로 자연히 제외된다.
-export const NORMAL_ROUTE_FIELDS = [
-  // 공통/옵션
-  'tvas', 'resFlag', 'routePlanTypes', 'usedFavoriteRouteVertices', 'detailLocFlag',
-  'serviceFlag', 'subRouteYn', 'patternTime', 'patternWeek', 'guideImgResolutionCode',
-  'dangerAreaOptions', 'routePlanAroundRange', 'internalRouteOption', 'hdMapVersion',
-  // 출발지 정보
-  'departMeshId', 'departLinkId', 'departDirectionType', 'departRoadType', 'departName',
-  'departXPos', 'departYPos', 'departMeshCode', 'angle', 'speed', 'departDirPriority',
-  'departSrchFlag',
-  // 목적지 정보
-  'destName', 'destXPos', 'destYPos', 'destRpFlag', 'destSearchFlag', 'destSearchDetailFlag',
-  'destPoiId', 'destMeshCode', 'destLinkId', 'destDirectionType', 'navSeq', 'destPkey',
-  // GPS/부가/경유지/탐색조건
-  'gpsTraceData', 'tollCarType', 'carOilType', 'addCameraTypes', 'fareWeightOpts',
-  'controlRouteReqFlag', 'hipassFlag', 'wayPoints', 'searchCondData',
-  // 재탐색 데이터
-  'lastTollgateId', 'lastTollgatePassTime', 'lastRid', 'groupId', 'tcRid', 'preMapVersion',
-  'preRids', 'preSecs', 'preTollgateIds', 'initSrchLength', 'initSrchSessionId',
-  'initSrchDepartXPos', 'initSrchDepartYPos',
-  // 경로 주변 링크
-  'radiusInfoType', 'radiusEntryTurnType', 'radiusLinkId', 'radiusMeshCode',
-  'radiusLinkDirection', 'radiusLeaveTurnType', 'radiusXPos', 'radiusYPos',
-  // 화물차/기타
-  'truckWidth', 'truckHeight', 'truckWeight', 'truckTotalWeight', 'truckLength', 'truckType',
-  'commercialVehicle',
-  // 공통 헤더/버전
-  'header', 'version',
-];
-
-/**
- * EV 경로 바디 → 일반 길안내(planningroutemultiformat) 요청 바디.
- * EV 바디에서 일반 스펙(NORMAL_ROUTE_FIELDS)에 존재하는 공통 필드만 그대로 가져오고
- * (EV 전용 배터리/충전/소비/차량 필드는 자연히 제외), 일반 필수 필드를 보정한다.
- * - detailLocFlag: Tvas4.5+ 요청 시 반드시 "NotApplied".
- * - resFlag: 1 (binary 응답, default).
- * 원본(evBody)은 변경하지 않는다.
- */
-export function buildNormalBodyFromEv(evBody) {
-  const src = evBody || {};
-  const out = {};
-  for (const k of NORMAL_ROUTE_FIELDS) {
-    if (src[k] !== undefined) out[k] = src[k];
-  }
-  out.detailLocFlag = 'NotApplied';
-  out.resFlag = 1;
-  return out;
-}
-
 // EV 경로 → 도달 가능 범위로 그대로 가져올 차량/소비/전력 관련 필드.
 export const EV_ISOCHRONE_SHARED_FIELDS = ['consumptionParam', 'slopeFlag', 'vehicleId', 'vehicleMass', 'vendor', 'auxiliaryPower', 'efficientSpeed'];
 // EV 배터리 4필드(EV·도달가능범위 공통 단일 데이터로 그대로 보존).
@@ -187,35 +136,34 @@ function isochroneConsumptionParam() {
  * - 같은 타입이면 현재 바디를 그대로 둔다(body=null = 변경 없음).
  * - 타입이 바뀌면 떠나는 타입의 현재 바디를 saved[prevType] 에 저장하고,
  *   들어가는 타입의 저장본이 있으면 복원한다(사용자 설정 보존).
- * - 저장본이 없으면 기본 템플릿을 만든다:
+ * - 저장본이 없으면 기본 템플릿을 쓴다(EV·일반은 서로 독립된 별도 템플릿):
  *   · ev       → defaultBody
- *   · normal   → EV 바디에서 공통 필드만 가져와 일반 바디 생성(buildNormalBodyFromEv)
+ *   · normal   → normalBody (EV 와 무관한 일반 전용 독립 템플릿)
  *   · isochrone→ 항상 EV 경로 파라미터를 그대로 반영(EV·도달범위 단일 데이터)
- *   EV 소스는 저장된 EV 바디 → 떠나는 EV 바디 → defaultBody 순으로 고른다.
  *
  * @param {{ prevType:string, nextType:string, currentBody:object,
  *   saved:{ev:?object, normal:?object, isochrone:?object},
- *   defaultBody:object, isochroneBody:object }} opts
+ *   defaultBody:object, normalBody:object, isochroneBody:object }} opts
  * @returns {{ body: object|null, saved: {ev:?object, normal:?object, isochrone:?object} }}
  *   body=null 이면 현재 바디 유지(교체하지 않음).
  */
 export function resolveRouteTypeSwitch(opts) {
-  const { prevType, nextType, currentBody, saved, defaultBody, isochroneBody } = opts;
+  const { prevType, nextType, currentBody, saved, defaultBody, normalBody, isochroneBody } = opts;
   const nextSaved = { ev: saved.ev, normal: saved.normal, isochrone: saved.isochrone };
   if (prevType === nextType) {
     return { body: null, saved: nextSaved }; // 같은 타입 → 변경 없음
   }
   // 떠나는 타입의 현재 바디 저장(사용자 설정 보존)
   nextSaved[prevType] = currentBody;
-  // EV 소스: 저장된 EV 바디 → 떠나는 게 EV 면 그 바디 → 기본
-  const evSource = nextSaved.ev || (prevType === 'ev' ? currentBody : defaultBody);
   if (nextType === 'isochrone') {
     // 도달 가능 범위는 항상 EV 경로 파라미터를 그대로 사용(EV·도달범위 단일 데이터).
+    // EV 소스: 저장된 EV 바디 → 떠나는 게 EV 면 그 바디 → 기본.
+    const evSource = nextSaved.ev || (prevType === 'ev' ? currentBody : defaultBody);
     return { body: applyEvBatteryToIsochrone(isochroneBody, evSource), saved: nextSaved };
   }
   if (nextType === 'normal') {
-    // 저장된 일반 바디 복원, 없으면 EV 공통 필드로 일반 바디 생성.
-    return { body: nextSaved.normal || buildNormalBodyFromEv(evSource), saved: nextSaved };
+    // 일반은 EV 와 별개로 관리 → 저장된 일반 바디 복원, 없으면 일반 전용 기본 템플릿.
+    return { body: nextSaved.normal || normalBody, saved: nextSaved };
   }
   // nextType === 'ev': 저장된 EV 바디 복원, 없으면 기본.
   return { body: nextSaved.ev || defaultBody, saved: nextSaved };

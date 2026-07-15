@@ -984,50 +984,6 @@
     }
     #error-close:hover { background: #e42939; }
 
-    /* ======== TVAS Sidebar Button ======== */
-    .tvas-sidebar-btns {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    #tvas-menu-btn {
-      width: 100%;
-      padding: 12px 16px;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius-sm);
-      color: #fff;
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1.252;
-      cursor: pointer;
-      transition: background 0.1s ease-in-out;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #tvas-menu-btn:hover {
-      background: var(--accent-hover);
-    }
-    #tvas-clear-route-btn {
-      width: 100%;
-      padding: 8px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.1s ease-in-out;
-    }
-    #tvas-clear-route-btn:hover {
-      background: rgba(240,68,82,0.08);
-      border-color: var(--danger);
-      color: var(--danger);
-    }
 
     /* ======== TVAS Right Panel ======== */
     /* ---- Right sliding panels (shared) ---- */
@@ -1748,12 +1704,6 @@
     <div id="ruler-status">모드를 켜고 지도를 클릭하세요.</div>
   </div>
 
-  <!-- TVAS Route Request (sidebar buttons) -->
-  <div class="tvas-sidebar-btns">
-    <button id="tvas-menu-btn">경로 요청</button>
-    <button id="tvas-clear-route-btn">경로 데이터 지우기</button>
-  </div>
-
   <!-- SHP Link/Node Layer -->
   <div id="shp-panel">
     <h2>링크/노드 레이어<a href="help.html#shp" target="_blank" class="help-icon" title="SHP 링크/노드 도움말 열기" rel="noopener">?</a></h2>
@@ -2448,9 +2398,6 @@ const mockgpsPanel   = document.getElementById('mockgps-right-panel');
 const tabTvas        = document.getElementById('tab-tvas');
 const tabDlt         = document.getElementById('tab-dlt');
 const tabMockgps     = document.getElementById('tab-mockgps');
-const tvasMenuBtn    = document.getElementById('tvas-menu-btn');
-
-const tvasClearRouteBtn = document.getElementById('tvas-clear-route-btn');
 
 // ---- Bookmark tab toggle logic (3 panels) ---- //
 const _allPanels = [tvasPanel, dltPanel, mockgpsPanel];
@@ -2473,30 +2420,7 @@ function togglePanelTo(panel, tab) {
 tabTvas.addEventListener('click', () => togglePanelTo(tvasPanel, tabTvas));
 tabDlt.addEventListener('click', () => togglePanelTo(dltPanel, tabDlt));
 tabMockgps.addEventListener('click', () => togglePanelTo(mockgpsPanel, tabMockgps));
-// Sidebar button also opens TVAS panel
-tvasMenuBtn.addEventListener('click', () => openPanel(tvasPanel, tabTvas));
 
-// ---- Clear ALL route data from map ---- //
-tvasClearRouteBtn.addEventListener('click', () => {
-  const map = getMap();
-  if (map) clearTvasRoute(map);
-  // Remove all waypoint markers
-  ['depart','dest'].forEach(k => { if (wpMarkers[k]) { map.removeLayer(wpMarkers[k]); wpMarkers[k] = null; } routeWaypoints[k] = null; });
-  wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
-  wpMarkers.vias = [];
-  routeWaypoints.vias = [];
-  updateWpBar();
-  // Reset panel state
-  tvasSummary.innerHTML = '';
-  tvasRespRaw.style.display = 'none';
-  tvasRespPre.textContent = '';
-  tvasSaveRespBtn.style.display = 'none';
-  tvasLayerToggles.style.display = 'none';
-  lastResponseJson = null;
-  lastBinaryResponse = null;
-  lastCoords = null;
-  setStatus('');
-});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeAllPanels();
 });
@@ -3551,7 +3475,7 @@ function onRouteTypeChange() {
     const { body, saved } = resolveRouteTypeSwitch({
       prevType: _prevRouteType, nextType: t, currentBody,
       saved: _savedRouteBodies,
-      defaultBody, isochroneBody: ISOCHRONE_BODY,
+      defaultBody, normalBody: DEFAULT_NORMAL_BODY, isochroneBody: ISOCHRONE_BODY,
     });
     _savedRouteBodies.ev = saved.ev;
     _savedRouteBodies.normal = saved.normal;
@@ -4418,6 +4342,12 @@ const ISOCHRONE_BODY = {
 // (차량·소비·보조전력·배터리·등에너지/등거리선까지 EV 값에서 파생 — 공통 단일 데이터).
 Object.assign(ISOCHRONE_BODY, applyEvBatteryToIsochrone(ISOCHRONE_BODY, defaultBody));
 
+// 일반 길안내(/tmap-channel/rsd/route/planningroutemultiformat) 기본 요청 데이터.
+// EV(defaultBody)와 별개로 관리하는 일반 전용 독립 템플릿 — 실제 일반 경로 요청
+// 샘플 기반이며 규격서(4.1.2 일반 길안내)에 없는 필드는 제외했다. 좌표/명칭은
+// 웨이포인트 UI(applyWaypointsToBody)로 덮어쓰이고, header.reqTime 은 전송 시 채운다.
+const DEFAULT_NORMAL_BODY = {"addCameraTypes":["Bus","SignalSpeeding","Moving","ShoulderControl","Traffic"],"angle":359,"carOilType":"Gasoline","controlRouteReqFlag":0,"dangerAreaOptions":["OccurFrequently","SharpCurveSection","MistArea","SchoolZone","TrainCrossing"],"departDirPriority":0,"departDirectionType":0,"departLinkId":0,"departMeshId":0,"departName":"서울특별시 강남구 논현1동","departRoadType":"None","departSrchFlag":0,"departXPos":4573249,"departYPos":1350213,"destName":"응봉산","destRpFlag":16,"destSearchDetailFlag":"None","destSearchFlag":"UserResearch","destXPos":4573150,"destYPos":1351635,"detailLocFlag":"NotApplied","gpsTraceData":"","groupId":0,"guideImgResolutionCode":"R480x540","header":{"appLaunchCount":1,"appVersion":"3.20.590","buildNo":"320590","carrier":"T-Mobile","deviceId":"0-1-c42f91826d949fef2f2b5006e2f8404127e13189656dcec41311b1c4dce78430","modelNo":"BMW Flavoured AOSP on arm64 Emulator","osType":"AND","osVersion":"14","pushDeviceKey":"","reqTime":"","resolution":"QUAD_HD","screenHeight":1218,"screenWidth":2560,"svcType":113,"using":"MAIN"},"hipassFlag":1,"initSrchLength":4390,"initSrchSessionId":"TP5n20260715105904614DsN","lastRid":5872309,"lastTollgateId":0,"preMapVersion":"20260707","preRids":[5872309,5860276,5925516,5860279,5851002,5925515,5889300,5889299,5914466,5914469,5889264,5914472,5914473,5889265,5914468,5914467,5889298,5889301,5925514,5851003,5860278,5925517,5860277,5926964,5848907,5848902,5927205,5850576,5924125,5850455,5850395,5925426,5850321,5925420,5850235,5850236,5924084,5850119,5850120,5859482,5925428,5859481,5859974,5915842,5915841,5849984,5906428,5906427,5849928,5925139,5849831,5873364,5873361,5849794,5856875,5849611,5849608,5854618,5924053,5866753,5887966,5873603,5873599,5873608,5873611,5848893,5847438,5909183,5873183,5868527,5927280,5888101,5914984,5914987,5898254,5898260,5898259,5870481,5873198,5910066,5910065,5902404,5902403,5848501,5876858,5876861,5870498,5870497,5870486,5870579,5866028,5925710,5866027,5893130,5893133,5910332,5909631,5867845,5855194,5909632,5873217,5871932,5871931,5907412,5923089,5907415,5894712,5894711],"preSecs":[18,16,10,8,4,4,1,12,2,9,10,49,3,20,18,4,25,3,8,9,6,6,11,16,16,6,10,2,13,13,25,8,23,7,12,15,8,5,4,13,6,5,6,15,7,3,5,20,13,6,48,3,4,6,4,3,7,6,1,3,1,39,1,30,56,6,11,53,31,26,16,11,12,6,13,10,2,6,37,5,7,17,5,6,6,2,25,46,4,10,2,15,3,3,14,11,1,30,3,17,8,12,3,16,8,4,11,7],"preTollgateIds":"","radiusEntryTurnType":0,"radiusInfoType":0,"radiusLeaveTurnType":0,"radiusLinkDirection":0,"radiusLinkId":0,"radiusMeshCode":0,"radiusXPos":0,"radiusYPos":0,"resFlag":1,"routePlanAroundRange":1,"routePlanTypes":["Traffic_Recommend"],"searchCondData":"","serviceFlag":"Realtime","speed":0,"subRouteYn":"N","tvas":"5.9","wayPoints":[]};
+
 tvasBody.value = JSON.stringify(defaultBody, null, 2);
 updateEvParamsVisibility();
 
@@ -4456,8 +4386,10 @@ tvasClearBtn.addEventListener('click', () => {
   clearIsochrone();
   // 2) 출발/경유/목적지 + 방위각 화살표 제거
   clearAllWaypoints();
-  // 3) 경로 요청 데이터 기본값으로 초기화
-  tvasBody.value = JSON.stringify(defaultBody, null, 2);
+  // 3) 경로 요청 데이터를 현재 타입의 기본 템플릿으로 초기화(EV·일반 분리 관리)
+  const _t = segVal(tvasRouteType);
+  const _tmpl = _t === 'isochrone' ? ISOCHRONE_BODY : _t === 'normal' ? DEFAULT_NORMAL_BODY : defaultBody;
+  tvasBody.value = JSON.stringify(_tmpl, null, 2);
   updateEvParamsVisibility();
   // 4) 응답/상태 초기화
   tvasSummary.innerHTML = '';

@@ -238,6 +238,8 @@ const EV_FULL = {
   consumptionParam: '{"mass":2580}', vehicleId: '11CF', vendor: 'BMW', header: { svcType: 113 },
 };
 const SAVED0 = () => ({ ev: null, normal: null, isochrone: null });
+// 일반은 EV 와 별개의 독립 템플릿(신규탐색용 실제 요청 샘플 기반).
+const NORMAL_TMPL = { detailLocFlag: 'NotApplied', resFlag: 1, tvas: '5.9', destSearchFlag: 'UserResearch', destXPos: 300, destYPos: 400 };
 
 test('resolveRouteTypeSwitch_same_type_keeps_current_body', () => {
   const r = resolveRouteTypeSwitch({
@@ -247,21 +249,15 @@ test('resolveRouteTypeSwitch_same_type_keeps_current_body', () => {
   assert.equal(r.body, null); // 같은 타입 → 변경 없음
 });
 
-test('resolveRouteTypeSwitch_ev_to_normal_builds_normal_body', () => {
+test('resolveRouteTypeSwitch_ev_to_normal_uses_standalone_normal_template', () => {
+  // 일반은 EV 에서 파생하지 않고 독립 템플릿(normalBody)을 그대로 쓴다.
   const r = resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'normal', currentBody: { ...EV_FULL },
-    saved: SAVED0(), defaultBody: EV_FULL, isochroneBody: ISO,
+    saved: SAVED0(), defaultBody: DEF, normalBody: NORMAL_TMPL, isochroneBody: ISO,
   });
-  // 일반 바디: 공통 필드 유지 + 필수 보정, EV 전용 필드 제거
-  assert.equal(r.body.detailLocFlag, 'NotApplied');
-  assert.equal(r.body.resFlag, 1);
-  assert.equal(r.body.tvas, '5.9');
-  assert.equal(r.body.departXPos, 100);
-  assert.equal(r.body.destXPos, 300);
-  assert.equal('chargedEnergy' in r.body, false);
-  assert.equal('consumptionParam' in r.body, false);
-  assert.equal('vehicleId' in r.body, false);
-  assert.deepEqual(r.saved.ev, EV_FULL); // 떠난 EV 바디 저장
+  assert.deepEqual(r.body, NORMAL_TMPL);   // EV 값과 무관한 독립 템플릿
+  assert.equal('chargedEnergy' in r.body, false); // EV 전용 필드 없음
+  assert.deepEqual(r.saved.ev, EV_FULL);   // 떠난 EV 바디 저장
 });
 
 test('resolveRouteTypeSwitch_normal_to_ev_restores_saved_ev_edits', () => {
@@ -287,9 +283,9 @@ test('resolveRouteTypeSwitch_ev_to_normal_restores_saved_normal', () => {
   const r = resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'normal', currentBody: { ...EV_FULL },
     saved: { ev: null, normal: savedNormal, isochrone: null },
-    defaultBody: EV_FULL, isochroneBody: ISO,
+    defaultBody: DEF, normalBody: NORMAL_TMPL, isochroneBody: ISO,
   });
-  assert.deepEqual(r.body, savedNormal); // 저장된 일반 바디 복원
+  assert.deepEqual(r.body, savedNormal); // 저장된 일반 바디 복원(템플릿 아님)
 });
 
 test('resolveRouteTypeSwitch_ev_to_iso_applies_ev_battery', () => {
@@ -349,67 +345,4 @@ test('buildIsoBodyFromEvBattery_falls_back_when_no_saved_ev', () => {
   const out = buildIsoBodyFromEvBattery(ISO, null, DEF);
   assert.equal(out.contoursEnergy, DEF.currentEnergy); // 6970
   assert.equal(out.contoursMeters, DEF.currentRange);  // 47000
-});
-
-// ---- buildNormalBodyFromEv (EV 바디 → 일반 길안내 바디) -------------------- //
-//
-// 일반 길안내(/rsd/route/planningroutemultiformat, TVAS 4.4+)는 EV 와 요청 포맷이
-// 다르다. EV 전용 필드(배터리/충전/소비/차량)를 제거하고, EV 바디에서 일반 스펙에
-// 존재하는 공통 필드만 그대로 가져온 뒤 일반 필수 필드를 보정한다.
-import { buildNormalBodyFromEv } from '../DltLogViewer/js/route-request.js';
-
-// EV defaultBody 축약본(공통 필드 + EV 전용 필드 혼재).
-const EV_SAMPLE = {
-  // 공통 필드
-  tvas: '5.9', routePlanTypes: ['Traffic_Recommend'], serviceFlag: 'Realtime',
-  departXPos: 4581514, departYPos: 1322213, departRoadType: 'None',
-  destXPos: 4630714, destYPos: 1291586, destSearchFlag: 'LeaveReSearch',
-  destRpFlag: 16, angle: 130, speed: 0, hipassFlag: 0, tollCarType: 'Car',
-  wayPoints: [], header: { svcType: 113, using: 'MAIN' }, version: '1.1',
-  // EV 전용 필드(일반 스펙에 없음 → 제거되어야 함)
-  chargedEnergy: 70000, chargedRange: 500000, currentEnergy: 6970, currentRange: 47000,
-  consumptionParam: '{"mass":2580}', socketType: ['DcCombo'], evMobilityProviders: [],
-  vehicleId: '11CF', vehicleMass: 2580, vendor: 'BMW', maxCharge: 69770,
-  minEnergy: 6977, slopeFlag: 0, efficientSpeed: 0, auxiliaryPower: 1200,
-  destEVChargerFlag: false, ecoModeFlag: 0, applyEvChargingTimeOnETA: true,
-};
-
-test('buildNormalBodyFromEv_removes_ev_only_fields', () => {
-  const out = buildNormalBodyFromEv(EV_SAMPLE);
-  for (const k of ['chargedEnergy', 'chargedRange', 'currentEnergy', 'currentRange',
-    'consumptionParam', 'socketType', 'evMobilityProviders', 'vehicleId', 'vehicleMass',
-    'vendor', 'maxCharge', 'minEnergy', 'slopeFlag', 'efficientSpeed', 'auxiliaryPower',
-    'destEVChargerFlag', 'ecoModeFlag', 'applyEvChargingTimeOnETA']) {
-    assert.equal(k in out, false, `EV 전용 필드 ${k} 는 제거되어야 함`);
-  }
-});
-
-test('buildNormalBodyFromEv_keeps_common_fields_from_ev', () => {
-  const out = buildNormalBodyFromEv(EV_SAMPLE);
-  assert.equal(out.tvas, '5.9');
-  assert.equal(out.departXPos, 4581514);
-  assert.equal(out.departYPos, 1322213);
-  assert.equal(out.destXPos, 4630714);
-  assert.equal(out.destYPos, 1291586);
-  assert.equal(out.destSearchFlag, 'LeaveReSearch');
-  assert.equal(out.departRoadType, 'None');
-  assert.deepEqual(out.routePlanTypes, ['Traffic_Recommend']);
-  assert.deepEqual(out.wayPoints, []);
-  assert.equal(out.header.svcType, 113);
-  assert.equal(out.version, '1.1');
-});
-
-test('buildNormalBodyFromEv_adds_required_normal_fields', () => {
-  const out = buildNormalBodyFromEv(EV_SAMPLE);
-  // Tvas4.5+ 요청 시 detailLocFlag 는 반드시 "NotApplied"
-  assert.equal(out.detailLocFlag, 'NotApplied');
-  // resFlag 1 = binary 응답(default)
-  assert.equal(out.resFlag, 1);
-});
-
-test('buildNormalBodyFromEv_does_not_mutate_input', () => {
-  const ev = { ...EV_SAMPLE };
-  buildNormalBodyFromEv(ev);
-  assert.equal(ev.chargedEnergy, 70000); // 원본 불변
-  assert.equal('detailLocFlag' in ev, false);
 });

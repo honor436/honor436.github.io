@@ -648,6 +648,66 @@ export function parseEvChargers(dv, offset, size, charset) {
   return chargers;
 }
 
+// GAS3: 주유소 정보. 일반 경로는 ES3(충전소) 대신 이 블록을 표시한다.
+// 레이아웃: 헤더(12B) → 주유소 레코드 count×40B → 명칭 blob(nameSize).
+//   헤더: UShort count@0, Byte type@2(0x01), Byte reserved@3, Char[4] id@4("GAS3"),
+//         Int nameSize@8.
+//   레코드(40B): UShort vxIdx@0, Byte stationType@2, Byte brandCode@3, Byte facilityBits@4,
+//     Byte roadType@5, Byte premiumGasSale@6, Byte isLowestPrice@7, Int locX@8, Int locY@12,
+//     Int nameOffset@16, UShort gasoline@20, UShort diesel@22, UShort kerosene@24,
+//     UShort lpg@26, UShort premiumGasoline@28, Byte truckDiscount@30, Byte owinMember@31,
+//     Byte muffinMember@32, Byte reserved@33, Int poiId@34, Byte cardDiscount@38, Byte isSelf@39.
+//   좌표는 SK정규화 0.01초 단위(ES3 와 동일 규약).
+export function parseGasStations(dv, offset, size, charset) {
+  const count = dv.getUint16(offset, true);
+  const nameSize = dv.getInt32(offset + 8, true);
+  const dataStart = offset + 12;
+  const sectionEnd = offset + size;
+
+  const records = [];
+  for (let i = 0; i < count; i++) {
+    const base = dataStart + i * 40;
+    if (base + 40 > sectionEnd) break;
+    records.push({
+      vxIdx:           dv.getUint16(base, true),
+      stationType:     dv.getUint8(base + 2),
+      brandCode:       dv.getUint8(base + 3),
+      facilityBits:    dv.getUint8(base + 4),
+      roadType:        dv.getUint8(base + 5),
+      premiumGasSale:  dv.getUint8(base + 6),
+      isLowestPrice:   dv.getUint8(base + 7),
+      locX:            dv.getInt32(base + 8, true),
+      locY:            dv.getInt32(base + 12, true),
+      nameOffset:      dv.getInt32(base + 16, true),
+      gasoline:        dv.getUint16(base + 20, true),
+      diesel:          dv.getUint16(base + 22, true),
+      kerosene:        dv.getUint16(base + 24, true),
+      lpg:             dv.getUint16(base + 26, true),
+      premiumGasoline: dv.getUint16(base + 28, true),
+      truckDiscount:   dv.getUint8(base + 30),
+      owinMember:      dv.getUint8(base + 31),
+      muffinMember:    dv.getUint8(base + 32),
+      poiId:           dv.getInt32(base + 34, true),
+      cardDiscount:    dv.getUint8(base + 38),
+      isSelf:          dv.getUint8(base + 39),
+    });
+  }
+
+  // 명칭 blob: 레코드 뒤. nameOffset ~ 다음 offset 범위로 읽는다(null 종료 안전).
+  const nameBlobStart = dataStart + count * 40;
+  const nameBlobSize = (nameSize > 0 && nameBlobStart + nameSize <= sectionEnd)
+    ? nameSize : Math.max(0, sectionEnd - nameBlobStart);
+  const nameOffsets = records.map(r => r.nameOffset).filter(o => o >= 0);
+  const readName = (off) => {
+    if (!(off >= 0) || off >= nameBlobSize) return '';
+    const end = nameBlobEnd(nameOffsets, off, nameBlobSize);
+    const len = Math.min(end - off, sectionEnd - (nameBlobStart + off));
+    return len > 0 ? readString(dv, nameBlobStart + off, len, charset) : '';
+  };
+
+  return records.map(r => ({ ...r, name: readName(r.nameOffset) }));
+}
+
 function parseTrafficInfo(dv, offset, size) {
   // LT2: TSD링크교통정보
   const count = dv.getUint16(offset, true);
@@ -1001,6 +1061,7 @@ export function parseTvas(arrayBuffer) {
     restAreas: null,
     laneGuidance: null,
     evChargers: null,
+    gasStations: null,
     trafficInfo: null,
     waypoints: null,
     rpLinks: null,
@@ -1065,6 +1126,9 @@ export function parseTvas(arrayBuffer) {
         break;
       case 'ES3': case 'ES2':
         result.evChargers = parseEvChargers(dv, absOffset, idx.size, charset);
+        break;
+      case 'GAS3':
+        result.gasStations = parseGasStations(dv, absOffset, idx.size, charset);
         break;
       case 'LT2':
         result.trafficInfo = parseTrafficInfo(dv, absOffset, idx.size);

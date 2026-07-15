@@ -435,3 +435,96 @@ test('parseNormalRouteResponse_locates_tvasSize_and_tvasStart_after_destination'
   assert.deepEqual(w.tvasSize, [4]);
   assert.equal(w.tvasStart, 326); // destination 가변 길이를 정확히 넘긴 위치
 });
+
+// ---- parseGasStations (GAS3 주유소정보) ----------------------------------- //
+//
+// 일반 경로는 ES3(충전소) 대신 GAS3(주유소)를 표시한다. 스펙(TVAS 규격서):
+//   헤더 12B: UShort count(n), Byte type(0x01), Byte reserved, Char[4] "GAS3",
+//             Int nameSize(명칭 blob 전체 크기)
+//   레코드 40B×n: UShort vxIdx, Byte stationType, Byte brandCode, Byte facilityBits,
+//     Byte roadType, Byte premiumGasSale, Byte isLowestPrice, Int locX, Int locY,
+//     Int nameOffset, UShort gasoline, UShort diesel, UShort kerosene, UShort lpg,
+//     UShort premiumGasoline, Byte truckDiscount, Byte owinMember, Byte muffinMember,
+//     Byte reserved, Int poiId, Byte cardDiscount, Byte isSelf
+//   명칭 blob: 주유소명칭(NULL 포함), nameOffset 기준.
+import { parseGasStations } from '../DltLogViewer/js/tvas-parser.js';
+
+function buildGas3Fixture() {
+  // header(12) + record(40)×2 + nameBlob("AAA\0BB\0"=7) = 99
+  const buf = new ArrayBuffer(99);
+  const dv = new DataView(buf);
+  const b = new Uint8Array(buf);
+  // header
+  dv.setUint16(0, 2, true);   // count
+  b[2] = 0x01;                // type
+  b[3] = 0;                   // reserved
+  b[4] = 0x47; b[5] = 0x41; b[6] = 0x53; b[7] = 0x33; // "GAS3"
+  dv.setInt32(8, 7, true);    // nameSize
+  const rec = (base, o) => {
+    dv.setUint16(base + 0, o.vxIdx, true);
+    b[base + 2] = o.stationType; b[base + 3] = o.brandCode; b[base + 4] = o.facilityBits;
+    b[base + 5] = o.roadType; b[base + 6] = o.premiumGasSale; b[base + 7] = o.isLowestPrice;
+    dv.setInt32(base + 8, o.locX, true);
+    dv.setInt32(base + 12, o.locY, true);
+    dv.setInt32(base + 16, o.nameOffset, true);
+    dv.setUint16(base + 20, o.gasoline, true);
+    dv.setUint16(base + 22, o.diesel, true);
+    dv.setUint16(base + 24, o.kerosene, true);
+    dv.setUint16(base + 26, o.lpg, true);
+    dv.setUint16(base + 28, o.premiumGasoline, true);
+    b[base + 30] = o.truckDiscount; b[base + 31] = o.owinMember; b[base + 32] = o.muffinMember;
+    b[base + 33] = 0; // reserved
+    dv.setInt32(base + 34, o.poiId, true);
+    b[base + 38] = o.cardDiscount; b[base + 39] = o.isSelf;
+  };
+  rec(12, { vxIdx: 39, stationType: 0, brandCode: 1, facilityBits: 9, roadType: 5,
+    premiumGasSale: 1, isLowestPrice: 1, locX: 45732470, locY: 13502790, nameOffset: 0,
+    gasoline: 1999, diesel: 1995, kerosene: 0, lpg: 0, premiumGasoline: 2548,
+    truckDiscount: 0, owinMember: 0, muffinMember: 0, poiId: 203924, cardDiscount: 0, isSelf: 1 });
+  rec(52, { vxIdx: 100, stationType: 0, brandCode: 2, facilityBits: 0, roadType: 3,
+    premiumGasSale: 2, isLowestPrice: 0, locX: 45700000, locY: 13500000, nameOffset: 4,
+    gasoline: 1650, diesel: 1600, kerosene: 0, lpg: 990, premiumGasoline: 0,
+    truckDiscount: 1, owinMember: 0, muffinMember: 0, poiId: 999, cardDiscount: 1, isSelf: 0 });
+  // name blob @ 12 + 80 = 92 : "AAA\0BB\0"
+  const nb = 92;
+  b[nb + 0] = 65; b[nb + 1] = 65; b[nb + 2] = 65; b[nb + 3] = 0;  // "AAA\0"
+  b[nb + 4] = 66; b[nb + 5] = 66; b[nb + 6] = 0;                  // "BB\0"
+  return { dv, size: 99 };
+}
+
+test('parseGasStations_reads_all_records_with_40B_stride', () => {
+  const { dv, size } = buildGas3Fixture();
+  const gs = parseGasStations(dv, 0, size, 1);
+  assert.equal(gs.length, 2);
+  assert.equal(gs[0].vxIdx, 39);
+  assert.equal(gs[1].vxIdx, 100);
+});
+
+test('parseGasStations_parses_location_and_prices', () => {
+  const { dv, size } = buildGas3Fixture();
+  const g = parseGasStations(dv, 0, size, 1)[0];
+  assert.equal(g.locX, 45732470);
+  assert.equal(g.locY, 13502790);
+  assert.equal(g.gasoline, 1999);
+  assert.equal(g.diesel, 1995);
+  assert.equal(g.premiumGasoline, 2548);
+  assert.equal(g.poiId, 203924);
+});
+
+test('parseGasStations_parses_flags', () => {
+  const { dv, size } = buildGas3Fixture();
+  const gs = parseGasStations(dv, 0, size, 1);
+  assert.equal(gs[0].isSelf, 1);
+  assert.equal(gs[0].isLowestPrice, 1);
+  assert.equal(gs[0].brandCode, 1);
+  assert.equal(gs[1].isSelf, 0);
+  assert.equal(gs[1].truckDiscount, 1);
+  assert.equal(gs[1].cardDiscount, 1);
+});
+
+test('parseGasStations_reads_names_by_offset', () => {
+  const { dv, size } = buildGas3Fixture();
+  const gs = parseGasStations(dv, 0, size, 1);
+  assert.equal(gs[0].name, 'AAA'); // nameOffset 0
+  assert.equal(gs[1].name, 'BB');  // nameOffset 4
+});

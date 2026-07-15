@@ -2376,7 +2376,7 @@ catCbs.forEach(cb => {
 
 <!-- TVAS Route Request Test Module -->
 <script type="module">
-import { parseTvas, resolveVertexCoordinates } from './js/tvas-parser.js';
+import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
 import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
@@ -4638,30 +4638,36 @@ tvasSendBtn.addEventListener('click', async () => {
       tvasSaveRespBtn.style.display = '';
       markRawResponse(`(바이너리 응답 ${rawBuf.byteLength}바이트 — '응답 저장'으로 다운로드)`);
 
-      const dv = new DataView(rawBuf);
-      const decUtf = new TextDecoder('utf-8');
-      const decEuc = new TextDecoder('euc-kr');
-      // Try UTF-8 first, fallback to EUC-KR for Korean text
-      function decStr(bytes) {
-        const s = decUtf.decode(bytes).replace(/\0+$/g, '');
-        if (s.includes('\ufffd')) return decEuc.decode(bytes).replace(/\0+$/g, '');
-        return s;
+      // 응답 래퍼는 경로 타입에 따라 포맷이 다르다. 일반(planningroutemultiformat)은
+      // roadCount/roadType/routePlanTypes/…/destination 이 앞에 있어 routeCount 가
+      // offset 245 에 오고, EV 는 routeCount 가 offset 240·직후 tvasSize 다.
+      let errCode, errMsg, detailCode, detailMsg, sessionId, routeCount, tvasSizes, tvasStart;
+      if (segVal(tvasRouteType) === 'normal') {
+        const w = parseNormalRouteResponse(rawBuf);
+        errCode = w.errorCode; errMsg = w.errorMessage;
+        detailCode = w.errorDetailCode; detailMsg = w.errorDetailMessage;
+        sessionId = w.sessionId; routeCount = w.routeCount;
+        tvasSizes = w.tvasSize; tvasStart = w.tvasStart;
+      } else {
+        const dv = new DataView(rawBuf);
+        const decUtf = new TextDecoder('utf-8');
+        const decEuc = new TextDecoder('euc-kr');
+        // Try UTF-8 first, fallback to EUC-KR for Korean text
+        const decStr = (bytes) => {
+          const s = decUtf.decode(bytes).replace(/\0+$/g, '');
+          return s.includes('�') ? decEuc.decode(bytes).replace(/\0+$/g, '') : s;
+        };
+        errCode    = decStr(rawBytes.slice(0, 6));
+        errMsg     = decStr(rawBytes.slice(6, 106));
+        detailCode = decStr(rawBytes.slice(106, 116));
+        detailMsg  = decStr(rawBytes.slice(116, 216));
+        sessionId  = decStr(rawBytes.slice(216, 240));
+        routeCount = rawBytes[240];
+        // tvasSize[] — big-endian int32 x routeCount
+        tvasSizes = [];
+        for (let i = 0; i < routeCount; i++) tvasSizes.push(dv.getInt32(241 + i * 4, false));
+        tvasStart = 241 + routeCount * 4;
       }
-
-      // Parse binary response wrapper
-      const errCode    = decStr(rawBytes.slice(0, 6));
-      const errMsg     = decStr(rawBytes.slice(6, 106));
-      const detailCode = decStr(rawBytes.slice(106, 116));
-      const detailMsg  = decStr(rawBytes.slice(116, 216));
-      const sessionId  = decStr(rawBytes.slice(216, 240));
-      const routeCount = rawBytes[240];
-
-      // tvasSize[] — big-endian int32 × routeCount
-      const tvasSizes = [];
-      for (let i = 0; i < routeCount; i++) {
-        tvasSizes.push(dv.getInt32(241 + i * 4, false)); // big-endian
-      }
-      const tvasStart = 241 + routeCount * 4;
 
       respInfo = {
         sessionId, errorCode: errCode, errorMessage: errMsg,

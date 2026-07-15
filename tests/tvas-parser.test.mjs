@@ -355,3 +355,83 @@ test('parseRpLinks stops cleanly when records exceed section size', () => {
   const { items } = parseRpLinks(dv, 0, 64, 'utf-8');
   assert.equal(items.length, 1);
 });
+
+// ---- parseNormalRouteResponse (일반 길안내 바이너리 응답 래퍼) ------------- //
+//
+// 일반(planningroutemultiformat) 응답은 EV 와 래퍼가 다르다. 실데이터로 확정한 레이아웃:
+//   응답공통헤더(240) → roadCount(int32) → roadType(byte) → routeCount(byte)
+//   → routePlanTypes(int32×n) → fareWeightOpt(int32×n) → routeSummaryCode(int32×n)
+//   → destination(가변) → tvasSize(int32×n) → tvases(byte[])
+// EV(routeCount@240, 직후 tvasSize)와 달리 roadCount/roadType/…/destination 이 앞에 있다.
+import { parseNormalRouteResponse } from '../DltLogViewer/js/tvas-parser.js';
+
+function buildNormalRespFixture() {
+  const buf = new ArrayBuffer(330);
+  const dv = new DataView(buf);
+  const b = new Uint8Array(buf);
+  const put = (off, s) => { for (let i = 0; i < s.length; i++) b[off + i] = s.charCodeAt(i); };
+  put(0, '000000');       // errorCode
+  put(6, 'success');      // errorMessage
+  put(216, 'SESSION-XYZ');// sessionId
+  dv.setInt32(240, 1, false);  // roadCount (deprecated)
+  b[244] = 0x20;               // roadType (deprecated)
+  b[245] = 1;                  // routeCount
+  dv.setInt32(246, 7, false);  // routePlanTypes[0]
+  dv.setInt32(250, 2, false);  // fareWeightOpt[0]
+  dv.setInt32(254, 0, false);  // routeSummaryCode[0]
+  b[258] = 0;                  // compressFlag
+  put(259, '9999999');         // destPoiId String(10)
+  b[269] = 16;                 // destRpFlag
+  b[270] = 3;                  // departCoordType (0x03 fix)
+  dv.setInt32(271, 4573150, false); // destXPos
+  dv.setInt32(275, 1351635, false); // destYPos
+  b[279] = 2;                  // destNameSize
+  b[280] = 1;                  // tvasCount
+  put(281, 'AB');              // destName String(2)
+  put(283, 'SKY_O00');         // skyCode String(7)
+  put(290, 'sunny');           // skyName String(20)
+  put(310, '0');               // rainTypeCode String(1)
+  put(311, '0.00');            // rainSinceOnTime String(6)
+  put(317, '20.0');            // tempC1h String(5)
+  dv.setInt32(322, 4, false);  // tvasSize[0]
+  b[326] = 0xDE; b[327] = 0xAD; b[328] = 0xBE; b[329] = 0xEF; // tvases
+  return buf;
+}
+
+test('parseNormalRouteResponse_reads_routeCount_after_roadCount_roadType', () => {
+  const w = parseNormalRouteResponse(buildNormalRespFixture());
+  assert.equal(w.roadCount, 1);
+  assert.equal(w.roadType, 0x20);
+  assert.equal(w.routeCount, 1); // offset 245, not 240
+});
+
+test('parseNormalRouteResponse_reads_header_strings', () => {
+  const w = parseNormalRouteResponse(buildNormalRespFixture());
+  assert.equal(w.errorCode, '000000');
+  assert.equal(w.errorMessage, 'success');
+  assert.equal(w.sessionId, 'SESSION-XYZ');
+});
+
+test('parseNormalRouteResponse_reads_int_arrays', () => {
+  const w = parseNormalRouteResponse(buildNormalRespFixture());
+  assert.deepEqual(w.routePlanTypes, [7]);
+  assert.deepEqual(w.fareWeightOpt, [2]);
+  assert.deepEqual(w.routeSummaryCode, [0]);
+});
+
+test('parseNormalRouteResponse_parses_variable_destination', () => {
+  const w = parseNormalRouteResponse(buildNormalRespFixture());
+  assert.equal(w.destination.departCoordType, 3);
+  assert.equal(w.destination.destRpFlag, 16);
+  assert.equal(w.destination.destXPos, 4573150);
+  assert.equal(w.destination.destYPos, 1351635);
+  assert.equal(w.destination.destNameSize, 2);
+  assert.equal(w.destination.destName, 'AB');
+  assert.equal(w.destination.skyCode, 'SKY_O00');
+});
+
+test('parseNormalRouteResponse_locates_tvasSize_and_tvasStart_after_destination', () => {
+  const w = parseNormalRouteResponse(buildNormalRespFixture());
+  assert.deepEqual(w.tvasSize, [4]);
+  assert.equal(w.tvasStart, 326); // destination 가변 길이를 정확히 넘긴 위치
+});

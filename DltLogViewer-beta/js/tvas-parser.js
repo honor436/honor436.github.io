@@ -904,6 +904,84 @@ function parseCityBoundary(dv, offset, size, charset) {
 
 // ---- Main parser ---------------------------------------------------------- //
 
+/**
+ * 일반 길안내(/rsd/route/planningroutemultiformat) 바이너리 응답 래퍼 파싱.
+ *
+ * EV 응답과 래퍼 포맷이 다르다(내부 TVAS 포맷은 동일). 실데이터로 확정한 레이아웃:
+ *   응답공통헤더(240B: errorCode6 + errorMessage100 + errorDetailCode10 +
+ *     errorDetailMessage100 + sessionId24)
+ *   → roadCount int32   (deprecated)
+ *   → roadType  byte    (deprecated)
+ *   → routeCount byte                         ← EV 는 offset 240, 일반은 245
+ *   → routePlanTypes   int32[routeCount]
+ *   → fareWeightOpt    int32[routeCount]
+ *   → routeSummaryCode int32[routeCount]
+ *   → destination Object (가변 길이 — destName 크기가 내부 바이트로 결정)
+ *   → tvasSize int32[routeCount]
+ *   → tvases  byte[]  (tvasStart 부터, 각 tvasSize[i] 바이트)
+ *
+ * @param {ArrayBuffer} arrayBuffer 응답 전체 바이너리
+ * @returns 래퍼 필드 + tvasStart(오프셋). tvases 는 arrayBuffer.slice(tvasStart, tvasStart+tvasSize[0]).
+ */
+export function parseNormalRouteResponse(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const dv = new DataView(arrayBuffer);
+  const decUtf = new TextDecoder('utf-8');
+  const decEuc = new TextDecoder('euc-kr');
+  const str = (a, b) => {
+    const sub = bytes.subarray(a, b);
+    const s = decUtf.decode(sub).replace(/\0+$/g, '');
+    return s.includes('�') ? decEuc.decode(sub).replace(/\0+$/g, '') : s;
+  };
+  const errorCode = str(0, 6);
+  const errorMessage = str(6, 106);
+  const errorDetailCode = str(106, 116);
+  const errorDetailMessage = str(116, 216);
+  const sessionId = str(216, 240);
+
+  let off = 240;
+  const roadCount = dv.getInt32(off, false); off += 4;   // deprecated
+  const roadType = bytes[off]; off += 1;                  // deprecated
+  const routeCount = bytes[off]; off += 1;
+  const readIntArr = (n) => {
+    const arr = [];
+    for (let i = 0; i < n; i++) { arr.push(dv.getInt32(off, false)); off += 4; }
+    return arr;
+  };
+  const routePlanTypes = readIntArr(routeCount);
+  const fareWeightOpt = readIntArr(routeCount);
+  const routeSummaryCode = readIntArr(routeCount);
+
+  // destination Object (가변 길이)
+  const compressFlag = bytes[off]; off += 1;
+  const destPoiId = str(off, off + 10); off += 10;
+  const destRpFlag = bytes[off]; off += 1;
+  const departCoordType = bytes[off]; off += 1;
+  const destXPos = dv.getInt32(off, false); off += 4;
+  const destYPos = dv.getInt32(off, false); off += 4;
+  const destNameSize = bytes[off]; off += 1;
+  const tvasCount = bytes[off]; off += 1;
+  const destName = str(off, off + destNameSize); off += destNameSize;
+  const skyCode = str(off, off + 7); off += 7;
+  const skyName = str(off, off + 20); off += 20;
+  const rainTypeCode = str(off, off + 1); off += 1;
+  const rainSinceOnTime = str(off, off + 6); off += 6;
+  const tempC1h = str(off, off + 5); off += 5;
+  const destination = {
+    compressFlag, destPoiId, destRpFlag, departCoordType, destXPos, destYPos,
+    destNameSize, tvasCount, destName, skyCode, skyName, rainTypeCode, rainSinceOnTime, tempC1h,
+  };
+
+  const tvasSize = readIntArr(routeCount);
+  const tvasStart = off;
+
+  return {
+    errorCode, errorMessage, errorDetailCode, errorDetailMessage, sessionId,
+    roadCount, roadType, routeCount, routePlanTypes, fareWeightOpt, routeSummaryCode,
+    destination, tvasSize, tvasStart,
+  };
+}
+
 export function parseTvas(arrayBuffer) {
   const dv = new DataView(arrayBuffer);
   const header = parseHeader(dv);

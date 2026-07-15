@@ -14,7 +14,8 @@ test('ROUTE_ENVS_has_prod_stg_dev_korean_labels', () => {
 
 // ---- buildRouteUrl -------------------------------------------------------- //
 //
-// 전기차(ev): /tmap-channel/rsd/ev/route, 일반: /tmap-channel/rsd/route
+// 전기차(ev): /tmap-channel/rsd/ev/route
+// 일반(TVAS 4.4+): /tmap-channel/rsd/route/planningroutemultiformat
 
 test('buildRouteUrl_ev_stg', () => {
   assert.equal(
@@ -26,7 +27,7 @@ test('buildRouteUrl_ev_stg', () => {
 test('buildRouteUrl_normal_prod', () => {
   assert.equal(
     buildRouteUrl('prod', false),
-    'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route'
+    'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route/planningroutemultiformat'
   );
 });
 
@@ -70,7 +71,7 @@ test('buildRouteUrl_isochrone_stg', () => {
 
 test('buildRouteUrl_string_routeType_ev_and_normal', () => {
   assert.equal(buildRouteUrl('dev', 'ev'), 'https://ntmapdev.tmap.co.kr:9443/tmap-channel/rsd/ev/route');
-  assert.equal(buildRouteUrl('prod', 'normal'), 'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route');
+  assert.equal(buildRouteUrl('prod', 'normal'), 'https://ntmap.tmap.co.kr:9443/tmap-channel/rsd/route/planningroutemultiformat');
 });
 
 // ---- extractIsochroneRings (도달 가능 범위 GeoJSON Polygon) --------------- //
@@ -222,73 +223,112 @@ test('resolveIsochroneHeaders_does_not_mutate_input', () => {
 
 // ---- resolveRouteTypeSwitch (경로 타입 전환 시 설정 값 유지) --------------- //
 //
-// 경로 타입(ev/normal/isochrone)을 바꿔도 사용자가 설정한 EV 배터리/도달범위
-// 값이 유지되어야 한다. 같은 스키마(ev↔normal)면 현재 바디 그대로, 스키마가
-// 바뀌면(iso↔route) 직전에 저장한 해당 종류의 바디를 복원한다.
+// 경로 타입(ev/normal/isochrone)은 서로 다른 요청 스키마다. 타입을 바꿀 때 떠나는
+// 타입의 바디를 저장하고, 들어가는 타입의 저장본(없으면 기본 템플릿)을 복원한다.
+// - 일반은 EV 와 포맷이 다르므로 최초 전환 시 EV 바디에서 공통 필드만 가져와 만든다.
+// - 도달범위(isochrone)는 항상 EV 경로 파라미터를 그대로 사용한다(단일 데이터).
 import { resolveRouteTypeSwitch } from '../DltLogViewer/js/route-request.js';
 
 const DEF = { chargedEnergy: 70000, chargedRange: 500000, currentEnergy: 6970, currentRange: 47000 };
 const ISO = { contoursEnergy: 56000, contoursMeters: 300000, auxiliaryPower: 1200 };
+// 공통 필드 + EV 전용 필드가 섞인 EV 경로 바디.
+const EV_FULL = {
+  ...DEF, tvas: '5.9', departXPos: 100, departYPos: 200, destXPos: 300, destYPos: 400,
+  destSearchFlag: 'LeaveReSearch', departRoadType: 'None', routePlanTypes: ['Traffic_Recommend'],
+  consumptionParam: '{"mass":2580}', vehicleId: '11CF', vendor: 'BMW', header: { svcType: 113 },
+};
+const SAVED0 = () => ({ ev: null, normal: null, isochrone: null });
 
-test('resolveRouteTypeSwitch_same_kind_keeps_current_body', () => {
+test('resolveRouteTypeSwitch_same_type_keeps_current_body', () => {
   const r = resolveRouteTypeSwitch({
-    prevType: 'ev', nextType: 'normal', currentBody: { chargedEnergy: 1 },
-    saved: { route: null, isochrone: null }, evEdited: false,
-    defaultBody: DEF, isochroneBody: ISO,
+    prevType: 'ev', nextType: 'ev', currentBody: { chargedEnergy: 1 },
+    saved: SAVED0(), defaultBody: DEF, isochroneBody: ISO,
   });
-  assert.equal(r.body, null); // 변경 없음(현재 유지)
+  assert.equal(r.body, null); // 같은 타입 → 변경 없음
 });
 
-test('resolveRouteTypeSwitch_route_to_iso_first_time_uses_template', () => {
+test('resolveRouteTypeSwitch_ev_to_normal_builds_normal_body', () => {
+  const r = resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'normal', currentBody: { ...EV_FULL },
+    saved: SAVED0(), defaultBody: EV_FULL, isochroneBody: ISO,
+  });
+  // 일반 바디: 공통 필드 유지 + 필수 보정, EV 전용 필드 제거
+  assert.equal(r.body.detailLocFlag, 'NotApplied');
+  assert.equal(r.body.resFlag, 1);
+  assert.equal(r.body.tvas, '5.9');
+  assert.equal(r.body.departXPos, 100);
+  assert.equal(r.body.destXPos, 300);
+  assert.equal('chargedEnergy' in r.body, false);
+  assert.equal('consumptionParam' in r.body, false);
+  assert.equal('vehicleId' in r.body, false);
+  assert.deepEqual(r.saved.ev, EV_FULL); // 떠난 EV 바디 저장
+});
+
+test('resolveRouteTypeSwitch_normal_to_ev_restores_saved_ev_edits', () => {
+  const editedEv = { ...EV_FULL, chargedEnergy: 12345 };
+  const r = resolveRouteTypeSwitch({
+    prevType: 'normal', nextType: 'ev', currentBody: { detailLocFlag: 'NotApplied' },
+    saved: { ev: editedEv, normal: null, isochrone: null },
+    defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.equal(r.body.chargedEnergy, 12345);       // 저장된 EV 설정 복원
+});
+
+test('resolveRouteTypeSwitch_normal_to_ev_no_saved_uses_default', () => {
+  const r = resolveRouteTypeSwitch({
+    prevType: 'normal', nextType: 'ev', currentBody: { detailLocFlag: 'NotApplied' },
+    saved: SAVED0(), defaultBody: DEF, isochroneBody: ISO,
+  });
+  assert.deepEqual(r.body, DEF);
+});
+
+test('resolveRouteTypeSwitch_ev_to_normal_restores_saved_normal', () => {
+  const savedNormal = { detailLocFlag: 'NotApplied', tvas: '5.9', destXPos: 999 };
+  const r = resolveRouteTypeSwitch({
+    prevType: 'ev', nextType: 'normal', currentBody: { ...EV_FULL },
+    saved: { ev: null, normal: savedNormal, isochrone: null },
+    defaultBody: EV_FULL, isochroneBody: ISO,
+  });
+  assert.deepEqual(r.body, savedNormal); // 저장된 일반 바디 복원
+});
+
+test('resolveRouteTypeSwitch_ev_to_iso_applies_ev_battery', () => {
+  // 도달범위는 항상 EV 경로 파라미터 사용(단일 데이터).
   const r = resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'isochrone', currentBody: { ...DEF },
-    saved: { route: null, isochrone: null }, evEdited: false,
-    defaultBody: DEF, isochroneBody: ISO,
+    saved: SAVED0(), defaultBody: DEF, isochroneBody: ISO,
   });
-  assert.equal(r.body.contoursEnergy, 56000);
-  assert.equal(r.body.contoursMeters, 300000);
-  assert.deepEqual(r.saved.route, DEF); // 떠난 EV 바디 저장
+  assert.equal(r.body.contoursEnergy, DEF.currentEnergy); // 6970
+  assert.equal(r.body.contoursMeters, DEF.currentRange);  // 47000
+  assert.deepEqual(r.saved.ev, DEF);                      // 떠난 EV 바디 저장
 });
 
-test('resolveRouteTypeSwitch_route_to_iso_applies_ev_battery_when_edited', () => {
-  const editedEv = { ...DEF, currentEnergy: 51200, currentRange: 280000 };
-  const r = resolveRouteTypeSwitch({
-    prevType: 'ev', nextType: 'isochrone', currentBody: editedEv,
-    saved: { route: null, isochrone: null }, evEdited: true,
-    defaultBody: DEF, isochroneBody: ISO,
-  });
-  assert.equal(r.body.contoursEnergy, 51200);
-  assert.equal(r.body.contoursMeters, 280000);
-});
-
-test('resolveRouteTypeSwitch_iso_to_route_restores_saved_ev_edits', () => {
-  // 사용자가 EV 배터리를 바꿔둔 바디가 저장돼 있으면, 기본값이 아니라 그걸 복원
+test('resolveRouteTypeSwitch_iso_to_ev_restores_saved_ev_edits', () => {
   const editedEv = { ...DEF, chargedEnergy: 12345 };
   const r = resolveRouteTypeSwitch({
     prevType: 'isochrone', nextType: 'ev', currentBody: { ...ISO },
-    saved: { route: editedEv, isochrone: null }, evEdited: true,
+    saved: { ev: editedEv, normal: null, isochrone: null },
     defaultBody: DEF, isochroneBody: ISO,
   });
   assert.equal(r.body.chargedEnergy, 12345); // 사용자 설정 유지
   assert.deepEqual(r.saved.isochrone, ISO);  // 떠난 iso 바디 저장
 });
 
-test('resolveRouteTypeSwitch_iso_to_route_no_saved_uses_default', () => {
+test('resolveRouteTypeSwitch_iso_to_ev_no_saved_uses_default', () => {
   const r = resolveRouteTypeSwitch({
     prevType: 'isochrone', nextType: 'ev', currentBody: { ...ISO },
-    saved: { route: null, isochrone: null }, evEdited: false,
-    defaultBody: DEF, isochroneBody: ISO,
+    saved: SAVED0(), defaultBody: DEF, isochroneBody: ISO,
   });
   assert.deepEqual(r.body, DEF);
 });
 
 test('resolveRouteTypeSwitch_does_not_mutate_saved_input', () => {
-  const saved = { route: null, isochrone: null };
+  const saved = SAVED0();
   resolveRouteTypeSwitch({
     prevType: 'ev', nextType: 'isochrone', currentBody: { ...DEF },
-    saved, evEdited: false, defaultBody: DEF, isochroneBody: ISO,
+    saved, defaultBody: DEF, isochroneBody: ISO,
   });
-  assert.equal(saved.route, null); // 원본 불변
+  assert.equal(saved.ev, null); // 원본 불변
 });
 
 // ---- buildIsoBodyFromEvBattery ("EV 경로 데이터 가져오기" 버튼) ------------ //
@@ -309,4 +349,67 @@ test('buildIsoBodyFromEvBattery_falls_back_when_no_saved_ev', () => {
   const out = buildIsoBodyFromEvBattery(ISO, null, DEF);
   assert.equal(out.contoursEnergy, DEF.currentEnergy); // 6970
   assert.equal(out.contoursMeters, DEF.currentRange);  // 47000
+});
+
+// ---- buildNormalBodyFromEv (EV 바디 → 일반 길안내 바디) -------------------- //
+//
+// 일반 길안내(/rsd/route/planningroutemultiformat, TVAS 4.4+)는 EV 와 요청 포맷이
+// 다르다. EV 전용 필드(배터리/충전/소비/차량)를 제거하고, EV 바디에서 일반 스펙에
+// 존재하는 공통 필드만 그대로 가져온 뒤 일반 필수 필드를 보정한다.
+import { buildNormalBodyFromEv } from '../DltLogViewer/js/route-request.js';
+
+// EV defaultBody 축약본(공통 필드 + EV 전용 필드 혼재).
+const EV_SAMPLE = {
+  // 공통 필드
+  tvas: '5.9', routePlanTypes: ['Traffic_Recommend'], serviceFlag: 'Realtime',
+  departXPos: 4581514, departYPos: 1322213, departRoadType: 'None',
+  destXPos: 4630714, destYPos: 1291586, destSearchFlag: 'LeaveReSearch',
+  destRpFlag: 16, angle: 130, speed: 0, hipassFlag: 0, tollCarType: 'Car',
+  wayPoints: [], header: { svcType: 113, using: 'MAIN' }, version: '1.1',
+  // EV 전용 필드(일반 스펙에 없음 → 제거되어야 함)
+  chargedEnergy: 70000, chargedRange: 500000, currentEnergy: 6970, currentRange: 47000,
+  consumptionParam: '{"mass":2580}', socketType: ['DcCombo'], evMobilityProviders: [],
+  vehicleId: '11CF', vehicleMass: 2580, vendor: 'BMW', maxCharge: 69770,
+  minEnergy: 6977, slopeFlag: 0, efficientSpeed: 0, auxiliaryPower: 1200,
+  destEVChargerFlag: false, ecoModeFlag: 0, applyEvChargingTimeOnETA: true,
+};
+
+test('buildNormalBodyFromEv_removes_ev_only_fields', () => {
+  const out = buildNormalBodyFromEv(EV_SAMPLE);
+  for (const k of ['chargedEnergy', 'chargedRange', 'currentEnergy', 'currentRange',
+    'consumptionParam', 'socketType', 'evMobilityProviders', 'vehicleId', 'vehicleMass',
+    'vendor', 'maxCharge', 'minEnergy', 'slopeFlag', 'efficientSpeed', 'auxiliaryPower',
+    'destEVChargerFlag', 'ecoModeFlag', 'applyEvChargingTimeOnETA']) {
+    assert.equal(k in out, false, `EV 전용 필드 ${k} 는 제거되어야 함`);
+  }
+});
+
+test('buildNormalBodyFromEv_keeps_common_fields_from_ev', () => {
+  const out = buildNormalBodyFromEv(EV_SAMPLE);
+  assert.equal(out.tvas, '5.9');
+  assert.equal(out.departXPos, 4581514);
+  assert.equal(out.departYPos, 1322213);
+  assert.equal(out.destXPos, 4630714);
+  assert.equal(out.destYPos, 1291586);
+  assert.equal(out.destSearchFlag, 'LeaveReSearch');
+  assert.equal(out.departRoadType, 'None');
+  assert.deepEqual(out.routePlanTypes, ['Traffic_Recommend']);
+  assert.deepEqual(out.wayPoints, []);
+  assert.equal(out.header.svcType, 113);
+  assert.equal(out.version, '1.1');
+});
+
+test('buildNormalBodyFromEv_adds_required_normal_fields', () => {
+  const out = buildNormalBodyFromEv(EV_SAMPLE);
+  // Tvas4.5+ 요청 시 detailLocFlag 는 반드시 "NotApplied"
+  assert.equal(out.detailLocFlag, 'NotApplied');
+  // resFlag 1 = binary 응답(default)
+  assert.equal(out.resFlag, 1);
+});
+
+test('buildNormalBodyFromEv_does_not_mutate_input', () => {
+  const ev = { ...EV_SAMPLE };
+  buildNormalBodyFromEv(ev);
+  assert.equal(ev.chargedEnergy, 70000); // 원본 불변
+  assert.equal('detailLocFlag' in ev, false);
 });

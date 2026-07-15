@@ -3546,7 +3546,6 @@ function syncTvasUrl() {
 // 경로 타입 변경: isochrone ↔ 일반/EV 전환. 사용자가 설정한 값(EV 배터리/도달범위)
 // 이 타입 이동 후에도 유지되도록, 각 종류의 바디를 저장/복원한다(resolveRouteTypeSwitch).
 let _prevRouteType = 'ev';
-let _evBatteryEdited = false;   // EV 배터리 슬라이더를 실제로 조작했는지
 // ev/normal/isochrone 은 서로 다른 요청 스키마 → 타입별로 바디를 저장/복원한다.
 const _savedRouteBodies = { ev: null, normal: null, isochrone: null };
 function onRouteTypeChange() {
@@ -3657,7 +3656,6 @@ function onParamSliderInput(group, changedKey) {
   }
   // 현재 도달거리 = chargedRange × (currentEnergy / chargedEnergy) 자동계산
   body.currentRange = computeCurrentRange(body.chargedRange, body.chargedEnergy, body.currentEnergy);
-  _evBatteryEdited = true;
   // 도달 가능 범위 모드: 등에너지선/등거리선을 EV 잔량/도달거리로 파생(공통 데이터)
   if (segVal(tvasRouteType) === 'isochrone') {
     body.contoursEnergy = Number(body.currentEnergy) || 0;

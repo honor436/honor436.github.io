@@ -1472,6 +1472,17 @@
     .es3-fbtn[data-ef="nearby"].on { background: rgba(251,191,36,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.3); }
     .es3-row { transition: display 0.1s; }
 
+    /* ---- GAS3 filter badges ---- */
+    .gas3-filter-wrap { display:flex; gap:4px; margin:4px 0 2px; flex-wrap:wrap; }
+    .gas3-fbtn {
+      padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: rgba(15,23,42,0.6);
+      color: var(--muted); transition: all 0.15s; user-select: none;
+    }
+    .gas3-fbtn.on { background: rgba(245,158,11,0.15); color: #f59e0b; border-color: rgba(245,158,11,0.3); }
+    .gas3-fbtn[data-gf="lowest"].on { background: rgba(240,68,82,0.15); color: #f87171; border-color: rgba(240,68,82,0.4); }
+    .gas3-fbtn[data-gf="self"].on { background: rgba(56,189,248,0.15); color: var(--accent); border-color: rgba(56,189,248,0.3); }
+
     /* ---- VX clickable links ---- */
     .vx-link {
       color: var(--accent);
@@ -2378,7 +2389,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, routeLineMode } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
@@ -4028,6 +4039,28 @@ tvasSummary.addEventListener('click', e => {
   });
 });
 
+// ---- GAS3 filter toggle (최저가 / 셀프 / 일반) ---- //
+tvasSummary.addEventListener('click', e => {
+  const btn = e.target.closest('.gas3-fbtn');
+  if (!btn) return;
+  btn.classList.toggle('on');
+  const wrap = btn.closest('.gas3-filter-wrap');
+  if (!wrap) return;
+  const container = wrap.parentElement;
+  if (!container) return;
+  const lowestOn = wrap.querySelector('[data-gf="lowest"]').classList.contains('on');
+  const selfOn   = wrap.querySelector('[data-gf="self"]').classList.contains('on');
+  const normalOn = wrap.querySelector('[data-gf="normal"]').classList.contains('on');
+  container.querySelectorAll('.gas3-row').forEach(row => {
+    const isLowest = row.classList.contains('gas3-lowest');
+    const isSelf   = row.classList.contains('gas3-self');
+    const isNormal = row.classList.contains('gas3-normal');
+    // 최저가 항목은 최저가 필터로만 제어, 그 외는 셀프/일반 필터로 제어
+    const visible = isLowest ? lowestOn : ((isSelf && selfOn) || (isNormal && normalOn));
+    row.style.display = visible ? '' : 'none';
+  });
+});
+
 // ---- VX click → map fly ---- //
 window._flyToVx = function(idx) {
   if (!lastCoords || !lastCoords[idx]) return;
@@ -5234,28 +5267,39 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   if (tvasResult.gasStations && tvasResult.gasStations.length > 0) {
     const won = v => (v > 0 ? v.toLocaleString() + '원' : '-');
     const premName = (v) => ({0:'미조사',1:'판매',2:'미판매'}[v] ?? v);
-    const lowestCount = tvasResult.gasStations.filter(g => g.isLowestPrice === 1).length;
-    const rows = tvasResult.gasStations.map((g, i) => {
+    const gs = tvasResult.gasStations;
+    const lowestCount = gs.filter(g => g.isLowestPrice === 1).length;
+    const selfCount   = gs.filter(g => g.isSelf === 1).length;
+    const normalCount = gs.length - selfCount;
+    const rows = gs.map((g, i) => {
       const flags = [];
-      if (g.isSelf) flags.push('셀프');
       if (g.cardDiscount) flags.push('제휴카드할인');
       if (g.truckDiscount) flags.push('화물차우대');
       if (g.owinMember) flags.push('오윈가맹');
       if (g.muffinMember) flags.push('머핀가맹');
-      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);cursor:pointer" onclick="window._showGasStation(${i})">
+      const facs = gasFacilities(g.facilityBits).map(f => f.icon + f.name).join(' ');
+      const rowClass = `gas3-row${g.isLowestPrice ? ' gas3-lowest' : ''}${g.isSelf ? ' gas3-self' : ' gas3-normal'}`;
+      return `<div class="${rowClass}" style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);cursor:pointer" onclick="window._showGasStation(${i})">
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:14px">⛽</span>
+          <span style="font-size:14px">${gasStationTypeIcon(g.stationType)}</span>
           <b style="font-size:12px;color:var(--text)">${esc(g.name || '주유소')}</b>
+          <span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;color:#fff;background:#64748b">${esc(gasBrandName(g.brandCode))}</span>
+          ${g.isSelf ? '<span style="color:#3182f6;font-size:10px;font-weight:700">셀프</span>' : ''}
           ${g.isLowestPrice ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">최저가</span>' : ''}
           <span style="color:var(--muted);font-size:10px;margin-left:auto">(클릭하면 지도 표시)</span>
         </div>
         ${vx(g.vxIdx, coords)} | POI:${g.poiId}<br>
         휘발유:<b>${won(g.gasoline)}</b> | 경유:${won(g.diesel)} | 등유:${won(g.kerosene)} | LPG:${won(g.lpg)} | 고급:${won(g.premiumGasoline)}<br>
-        <span style="color:var(--muted)">브랜드코드:${g.brandCode} | 주유소형식:${g.stationType} | 도로종별:${g.roadType} | 시설:0x${(g.facilityBits>>>0).toString(16)} | 고급휘발유:${premName(g.premiumGasSale)}(${g.premiumGasSale})${flags.length ? ' | ' + flags.join(' | ') : ''}</span>
+        <span style="color:var(--muted)">${gasStationTypeName(g.stationType)} | 도로종별:${g.roadType} | 고급휘발유:${premName(g.premiumGasSale)}${facs ? ' | ' + facs : ''}${flags.length ? ' | ' + flags.join(' | ') : ''}</span>
       </div>`;
     }).join('');
+    const filterHtml = `<div class="gas3-filter-wrap">
+      <span class="gas3-fbtn on" data-gf="lowest">최저가 ${lowestCount}</span>
+      <span class="gas3-fbtn on" data-gf="self">셀프 ${selfCount}</span>
+      <span class="gas3-fbtn on" data-gf="normal">일반 ${normalCount}</span>
+    </div>`;
     const titleExtra = lowestCount > 0 ? ` <span style="color:#f04452;font-weight:700">최저가 ${lowestCount}개</span>` : '';
-    html += sectionDetail('주유소' + titleExtra, 'GAS3', tvasResult.gasStations.length, rows);
+    html += sectionDetail('주유소' + titleExtra, 'GAS3', gs.length, filterHtml + rows);
   }
 
   // ---- LT2: TSD링크교통정보 ---- //

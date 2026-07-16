@@ -11,6 +11,10 @@ import {
   evChargerLayerKey,
   buildEvPopup,
   buildGasStationPopup,
+  gasStationTypeName,
+  gasStationTypeIcon,
+  gasBrandName,
+  gasFacilities,
   buildRpLinkPopup,
   rpLinkStyle,
 } from '../DltLogViewer/js/tvas-renderer.js';
@@ -737,7 +741,8 @@ test('buildRo4SegmentPopup_shows_segment_and_ro4_info', () => {
 // 일반 경로는 충전소(ES3) 대신 주유소(GAS3)를 표시한다. 팝업은 주유소명·유가
 // (0원 항목 제외)·셀프/최저가 등을 보여주고 경유지 추가 버튼을 포함한다.
 const GAS = {
-  vxIdx: 39, brandCode: 1, roadType: 5, premiumGasSale: 1, isLowestPrice: 1,
+  vxIdx: 39, stationType: 0, brandCode: 1, facilityBits: 9, roadType: 5,
+  premiumGasSale: 1, isLowestPrice: 1,
   locX: 45732470, locY: 13502790, gasoline: 1999, diesel: 1995, kerosene: 0,
   lpg: 0, premiumGasoline: 2548, truckDiscount: 0, cardDiscount: 1, isSelf: 1,
   poiId: 203924, name: '힐탑셀프',
@@ -751,16 +756,29 @@ test('buildGasStationPopup_shows_name_and_nonzero_prices', () => {
   assert.match(html, /2,548/);   // 고급휘발유
 });
 
-test('buildGasStationPopup_shows_all_price_labels_and_codes', () => {
-  // 아이콘 선택 시 모든 정보 표시 — 0원 항목도 라벨은 노출(값은 '-'), 코드값도 표시
+test('buildGasStationPopup_shows_all_info_with_code_table_names', () => {
+  // 아이콘 선택 시 모든 정보 표시 — 0원 항목도 라벨 노출, 코드는 명칭으로 표시
   const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
   assert.match(html, /등유/);          // 0원이어도 라벨 표시
   assert.match(html, /LPG/);
-  assert.match(html, /브랜드코드/);
   assert.match(html, /주유소형식/);
+  assert.match(html, /주유소/);        // stationType 0 → '주유소'
+  assert.match(html, /브랜드/);
+  assert.match(html, /SK/);            // brandCode 1 → 'SK'
+  assert.match(html, /편의시설/);
+  assert.match(html, /세차/);          // facilityBits 9 → 세차
+  assert.match(html, /화장실/);        // + 화장실
   assert.match(html, /도로종별/);
   assert.match(html, /고급휘발유 판매/);
-  assert.match(html, /시설정보/);
+});
+
+test('buildGasStationPopup_facilities_decode_bitfield', () => {
+  // 9 = 1(세차) + 8(화장실). 경정비/편의점/주차 는 없어야 함.
+  const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
+  assert.match(html, /세차/);
+  assert.match(html, /화장실/);
+  assert.doesNotMatch(html, /경정비/);
+  assert.doesNotMatch(html, /편의점/);
 });
 
 test('buildGasStationPopup_marks_self_and_lowest_price', () => {
@@ -772,4 +790,37 @@ test('buildGasStationPopup_marks_self_and_lowest_price', () => {
 test('buildGasStationPopup_includes_add_waypoint_button_with_index', () => {
   const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
   assert.match(html, /_addGasWaypoint\(2\)/);
+});
+
+// ---- GAS3 코드테이블 헬퍼 ------------------------------------------------- //
+
+test('gasStationTypeName_maps_codes', () => {
+  assert.equal(gasStationTypeName(0), '주유소');
+  assert.equal(gasStationTypeName(1), '충전소');
+  assert.equal(gasStationTypeName(2), '주유소+충전소');
+});
+
+test('gasStationTypeIcon_maps_codes', () => {
+  assert.equal(gasStationTypeIcon(0), '⛽');
+  assert.equal(gasStationTypeIcon(1), '⚡');
+  assert.equal(gasStationTypeIcon(2), '⛽⚡');
+});
+
+test('gasBrandName_maps_codes', () => {
+  assert.equal(gasBrandName(0), '없음');
+  assert.equal(gasBrandName(1), 'SK');
+  assert.equal(gasBrandName(2), 'GS');
+  assert.equal(gasBrandName(4), 'S-OIL');
+  assert.equal(gasBrandName(22), '알뜰주유소');
+  assert.equal(gasBrandName(24), 'EX주유소');
+});
+
+test('gasFacilities_decodes_bitfield', () => {
+  // 9 = 세차(1) + 화장실(8)
+  const f9 = gasFacilities(9).map(x => x.name);
+  assert.deepEqual(f9, ['세차', '화장실']);
+  // 0 → 없음
+  assert.deepEqual(gasFacilities(0), []);
+  // 31 = 전부 (1+2+4+8+16)
+  assert.deepEqual(gasFacilities(31).map(x => x.name), ['세차', '경정비', '편의점', '화장실', '주차']);
 });

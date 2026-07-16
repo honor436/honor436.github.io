@@ -1288,16 +1288,47 @@ export function gasStationColor(gas) {
   return gas && gas.isLowestPrice === 1 ? '#f04452' : '#f59e0b';
 }
 
-// 고급휘발유 판매유무 코드. 그 외 코드(주유소형식/브랜드/시설정보/도로종별)는
-// 별도 코드테이블 미확보라 원본 코드값을 그대로 표시한다.
+// ---- GAS3 코드테이블 -------------------------------------------------------
 const GAS_PREMIUM_SALE = { 0: '미조사', 1: '판매', 2: '미판매' };
+// 주유소 형식
+const GAS_STATION_TYPES = { 0: '주유소', 1: '충전소', 2: '주유소+충전소' };
+export function gasStationTypeName(t) { return GAS_STATION_TYPES[t] ?? ('코드' + t); }
+export function gasStationTypeIcon(t) { return t === 1 ? '⚡' : t === 2 ? '⛽⚡' : '⛽'; }
+// 주유소 브랜드코드
+const GAS_BRANDS = {
+  0: '없음', 1: 'SK', 2: 'GS', 3: 'H-OIL', 4: 'S-OIL', 5: 'T-OIL', 6: '무폴',
+  7: 'SK-GAS', 8: 'GS-GAS', 9: 'H-GAS', 10: 'S-OIL GAS', 11: 'LPG 무폴', 12: '미확인',
+  13: 'E1', 14: 'SK인천정유', 15: 'SK인천정유GAS', 16: 'NC-OIL', 17: 'NC-OIL GAS',
+  18: 'NH-OIL', 19: 'NH-OIL GAS', 20: 'sevenD-OIL', 21: 'sevenD-OIL GAS',
+  22: '알뜰주유소', 23: 'EX충전소', 24: 'EX주유소',
+};
+export function gasBrandName(b) { return GAS_BRANDS[b] ?? ('코드' + b); }
+// 브랜드 대표색(아이콘 칩 배경)
+const GAS_BRAND_COLORS = {
+  1: '#e2231a', 7: '#e2231a', 14: '#e2231a', 15: '#e2231a',      // SK 계열 빨강
+  2: '#f47216', 8: '#f47216',                                    // GS 주황
+  3: '#003a70', 9: '#003a70',                                    // 현대 남색
+  4: '#e50012', 10: '#e50012',                                   // S-OIL 빨강
+  22: '#1f9e5a', 23: '#1f9e5a', 24: '#1f9e5a',                   // 알뜰/EX 녹색
+};
+export function gasBrandColor(b) { return GAS_BRAND_COLORS[b] || '#64748b'; }
+// 시설정보 비트 (1 세차 / 2 경정비 / 4 편의점 / 8 화장실 / 16 주차)
+const GAS_FACILITY_BITS = [[1, '세차', '🧼'], [2, '경정비', '🔧'], [4, '편의점', '🏪'], [8, '화장실', '🚻'], [16, '주차', '🅿️']];
+export function gasFacilities(bits) {
+  return GAS_FACILITY_BITS.filter(([b]) => (bits & b) !== 0).map(([, name, icon]) => ({ name, icon }));
+}
 
 let gasStationMarkers = [];
+
+// 브랜드 칩 HTML(색 배경 + 브랜드명). 아이콘 자산 없이 브랜드를 시각적으로 구분.
+function gasBrandChip(b) {
+  return `<span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;color:#fff;background:${gasBrandColor(b)}">${esc(gasBrandName(b))}</span>`;
+}
 
 // 주유소 아이콘 선택 시 모든 정보를 표시한다.
 export function buildGasStationPopup(gas, lat, lon, idx) {
   const won = v => (v > 0 ? `<b>${v.toLocaleString('ko-KR')}</b>원` : '-');
-  const row = (label, val) => `<tr><td style="color:#8b95a1;padding:2px 0;width:78px">${label}</td><td>${val}</td></tr>`;
+  const row = (label, val) => `<tr><td style="color:#8b95a1;padding:2px 0;width:82px">${label}</td><td>${val}</td></tr>`;
   const isLowest = gas.isLowestPrice === 1;
   const flags = [];
   if (gas.isSelf) flags.push('<b style="color:#3182f6">셀프</b>');
@@ -1305,11 +1336,13 @@ export function buildGasStationPopup(gas, lat, lon, idx) {
   if (gas.truckDiscount) flags.push('화물차 우대');
   if (gas.owinMember) flags.push('오윈 가맹');
   if (gas.muffinMember) flags.push('머핀 가맹');
+  const facs = gasFacilities(gas.facilityBits);
 
   let popup = `<div style="font-size:12px;line-height:1.6;max-width:320px">`;
   popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
-  popup += `<span style="font-size:20px">⛽</span>`;
+  popup += `<span style="font-size:20px">${gasStationTypeIcon(gas.stationType)}</span>`;
   popup += `<b style="font-size:15px">${esc(gas.name || '주유소')}</b>`;
+  popup += ` ${gasBrandChip(gas.brandCode)}`;
   if (isLowest) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">최저가</span>`;
   popup += `</div>`;
   popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
@@ -1319,14 +1352,14 @@ export function buildGasStationPopup(gas, lat, lon, idx) {
   popup += row('등유', won(gas.kerosene));
   popup += row('LPG', won(gas.lpg));
   popup += row('고급휘발유', won(gas.premiumGasoline));
-  popup += row('고급휘발유 판매', `${GAS_PREMIUM_SALE[gas.premiumGasSale] ?? gas.premiumGasSale} (${gas.premiumGasSale})`);
+  popup += row('고급휘발유 판매', `${GAS_PREMIUM_SALE[gas.premiumGasSale] ?? gas.premiumGasSale}`);
   // 구분/부가
   popup += row('구분', flags.join(' · ') || '일반');
-  // 코드값(코드테이블 미확보 — 원본 코드 표시)
-  popup += row('브랜드코드', gas.brandCode);
-  popup += row('주유소형식', gas.stationType);
+  // 형식/브랜드/시설
+  popup += row('주유소형식', `${gasStationTypeIcon(gas.stationType)} ${gasStationTypeName(gas.stationType)}`);
+  popup += row('브랜드', `${gasBrandName(gas.brandCode)} <span style="color:#8b95a1">(${gas.brandCode})</span>`);
+  popup += row('편의시설', facs.length ? facs.map(f => `${f.icon} ${f.name}`).join(' · ') : '-');
   popup += row('도로종별', gas.roadType);
-  popup += row('시설정보', `0x${(gas.facilityBits >>> 0).toString(16)} (${gas.facilityBits})`);
   // 식별/위치
   if (gas.poiId) popup += row('POI', gas.poiId);
   if (gas.vxIdx != null) popup += row('VX index', `VX${gas.vxIdx}`);
@@ -1350,7 +1383,7 @@ function renderGasStations(layers, coords, gasStations) {
     const isLowest = gas.isLowestPrice === 1;
     const size = isLowest ? 32 : 26;
     const bg = gasStationColor(gas);
-    const iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:${bg};border-radius:8px;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⛽</div>`;
+    const iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:${bg};border-radius:8px;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">${gasStationTypeIcon(gas.stationType)}</div>`;
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
       zIndexOffset: isLowest ? 1200 : 400,

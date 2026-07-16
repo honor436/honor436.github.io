@@ -10,6 +10,7 @@ import {
   buildCongestionLabels,
   evChargerLayerKey,
   buildEvPopup,
+  buildGasStationPopup,
   buildRpLinkPopup,
   rpLinkStyle,
 } from '../DltLogViewer/js/tvas-renderer.js';
@@ -729,4 +730,40 @@ test('buildRo4SegmentPopup_shows_segment_and_ro4_info', () => {
   assert.match(html, /국도/);     // roadType 2
   assert.match(html, /800/);     // roadLength
   assert.match(html, /200/);     // energyConsumption
+});
+
+// ---- buildGasStationPopup (GAS3 주유소 팝업) ------------------------------ //
+//
+// 일반 경로는 충전소(ES3) 대신 주유소(GAS3)를 표시한다. 팝업은 주유소명·유가
+// (0원 항목 제외)·셀프/최저가 등을 보여주고 경유지 추가 버튼을 포함한다.
+const GAS = {
+  vxIdx: 39, brandCode: 1, roadType: 5, premiumGasSale: 1, isLowestPrice: 1,
+  locX: 45732470, locY: 13502790, gasoline: 1999, diesel: 1995, kerosene: 0,
+  lpg: 0, premiumGasoline: 2548, truckDiscount: 0, cardDiscount: 1, isSelf: 1,
+  poiId: 203924, name: '힐탑셀프',
+};
+
+test('buildGasStationPopup_shows_name_and_nonzero_prices', () => {
+  const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
+  assert.match(html, /힐탑셀프/);
+  assert.match(html, /1,999/);   // 휘발유 (천단위 콤마)
+  assert.match(html, /1,995/);   // 경유
+  assert.match(html, /2,548/);   // 고급휘발유
+});
+
+test('buildGasStationPopup_omits_zero_price_rows', () => {
+  const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
+  assert.doesNotMatch(html, /등유/); // kerosene 0 → 표시 안 함
+  assert.doesNotMatch(html, /LPG/);  // lpg 0 → 표시 안 함
+});
+
+test('buildGasStationPopup_marks_self_and_lowest_price', () => {
+  const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
+  assert.match(html, /셀프/);
+  assert.match(html, /최저가/);
+});
+
+test('buildGasStationPopup_includes_add_waypoint_button_with_index', () => {
+  const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
+  assert.match(html, /_addGasWaypoint\(2\)/);
 });

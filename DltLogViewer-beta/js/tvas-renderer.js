@@ -1288,36 +1288,49 @@ export function gasStationColor(gas) {
   return gas && gas.isLowestPrice === 1 ? '#f04452' : '#f59e0b';
 }
 
-const GAS_BRAND_NAMES = {
-  0: '기타', 1: 'SK에너지', 2: 'GS칼텍스', 3: '현대오일뱅크', 4: 'S-OIL',
-  5: '알뜰(농협)', 6: '알뜰(도로공사)', 7: '자가상표', 8: 'SK가스', 9: 'E1',
-};
+// 고급휘발유 판매유무 코드. 그 외 코드(주유소형식/브랜드/시설정보/도로종별)는
+// 별도 코드테이블 미확보라 원본 코드값을 그대로 표시한다.
+const GAS_PREMIUM_SALE = { 0: '미조사', 1: '판매', 2: '미판매' };
 
 let gasStationMarkers = [];
 
+// 주유소 아이콘 선택 시 모든 정보를 표시한다.
 export function buildGasStationPopup(gas, lat, lon, idx) {
-  const won = v => v.toLocaleString('ko-KR');
-  const priceRow = (label, v) => (v > 0 ? `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">${label}</td><td><b>${won(v)}</b>원</td></tr>` : '');
+  const won = v => (v > 0 ? `<b>${v.toLocaleString('ko-KR')}</b>원` : '-');
+  const row = (label, val) => `<tr><td style="color:#8b95a1;padding:2px 0;width:78px">${label}</td><td>${val}</td></tr>`;
   const isLowest = gas.isLowestPrice === 1;
+  const flags = [];
+  if (gas.isSelf) flags.push('<b style="color:#3182f6">셀프</b>');
+  if (gas.cardDiscount) flags.push('<span style="color:#10b981">제휴카드 할인</span>');
+  if (gas.truckDiscount) flags.push('화물차 우대');
+  if (gas.owinMember) flags.push('오윈 가맹');
+  if (gas.muffinMember) flags.push('머핀 가맹');
 
-  let popup = `<div style="font-size:12px;line-height:1.6;max-width:300px">`;
+  let popup = `<div style="font-size:12px;line-height:1.6;max-width:320px">`;
   popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
   popup += `<span style="font-size:20px">⛽</span>`;
   popup += `<b style="font-size:15px">${esc(gas.name || '주유소')}</b>`;
   if (isLowest) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">최저가</span>`;
   popup += `</div>`;
   popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
-  const brand = GAS_BRAND_NAMES[gas.brandCode];
-  if (brand) popup += `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">브랜드</td><td>${esc(brand)}</td></tr>`;
-  popup += priceRow('휘발유', gas.gasoline);
-  popup += priceRow('경유', gas.diesel);
-  popup += priceRow('등유', gas.kerosene);
-  popup += priceRow('LPG', gas.lpg);
-  popup += priceRow('고급휘발유', gas.premiumGasoline);
-  popup += `<tr><td style="color:#8b95a1;padding:2px 0">구분</td><td>${gas.isSelf ? '<b style="color:#3182f6">셀프</b>' : '일반'}${gas.cardDiscount ? ' · <span style="color:#10b981">제휴카드 할인</span>' : ''}${gas.truckDiscount ? ' · 화물차 우대' : ''}</td></tr>`;
-  if (gas.poiId) popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${gas.poiId}</td></tr>`;
-  if (gas.vxIdx != null) popup += `<tr><td style="color:#8b95a1;padding:2px 0">VX index</td><td>VX${gas.vxIdx}</td></tr>`;
-  popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
+  // 유가 (전 항목)
+  popup += row('휘발유', won(gas.gasoline));
+  popup += row('경유', won(gas.diesel));
+  popup += row('등유', won(gas.kerosene));
+  popup += row('LPG', won(gas.lpg));
+  popup += row('고급휘발유', won(gas.premiumGasoline));
+  popup += row('고급휘발유 판매', `${GAS_PREMIUM_SALE[gas.premiumGasSale] ?? gas.premiumGasSale} (${gas.premiumGasSale})`);
+  // 구분/부가
+  popup += row('구분', flags.join(' · ') || '일반');
+  // 코드값(코드테이블 미확보 — 원본 코드 표시)
+  popup += row('브랜드코드', gas.brandCode);
+  popup += row('주유소형식', gas.stationType);
+  popup += row('도로종별', gas.roadType);
+  popup += row('시설정보', `0x${(gas.facilityBits >>> 0).toString(16)} (${gas.facilityBits})`);
+  // 식별/위치
+  if (gas.poiId) popup += row('POI', gas.poiId);
+  if (gas.vxIdx != null) popup += row('VX index', `VX${gas.vxIdx}`);
+  popup += row('좌표', `${lat.toFixed(6)}, ${lon.toFixed(6)}`);
   popup += `</table>`;
   if (idx != null) {
     popup += `<button onclick="window._addGasWaypoint(${idx})" style="margin-top:8px;width:100%;padding:6px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🚩 경유지 추가</button>`;
@@ -1342,9 +1355,19 @@ function renderGasStations(layers, coords, gasStations) {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
       zIndexOffset: isLowest ? 1200 : 400,
     }).bindPopup(buildGasStationPopup(gas, lat, lon, idx), { maxWidth: 300 });
-    gasStationMarkers.push({ marker, lat, lon, name: gas.name || '주유소' });
+    gasStationMarkers.push({ marker, lat, lon, name: gas.name || '주유소', layerKey: 'gasStation' });
     if (lg) marker.addTo(lg);
   }
+}
+
+// Pan/zoom to a gas station from the list and open its popup.
+export function showGasStationOnMap(map, idx) {
+  const m = gasStationMarkers[idx];
+  if (!m) return;
+  const lg = tvasLayers[m.layerKey];
+  if (lg && !map.hasLayer(lg)) lg.addTo(map);
+  map.setView([m.lat, m.lon], 17, { animate: true });
+  m.marker.openPopup();
 }
 
 // Return a gas station's coords + name for adding it as a route waypoint.

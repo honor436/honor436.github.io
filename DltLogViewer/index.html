@@ -2378,7 +2378,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, getGasStationWaypoint, routeLineMode } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
@@ -4044,6 +4044,12 @@ window._showEvCharger = function(idx) {
   showEvChargerOnMap(map, idx);
 };
 
+window._showGasStation = function(idx) {
+  const map = getMap();
+  if (!map) return;
+  showGasStationOnMap(map, idx);
+};
+
 // Add EV charger as a via waypoint from its popup button
 window._addEvWaypoint = function(idx) {
   const wp = getEvChargerWaypoint(idx);
@@ -5222,6 +5228,34 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
     </div>`;
     const titleExtra = mustCount > 0 ? ` <span style="color:#f04452;font-weight:700">필수 ${mustCount}개</span>` : '';
     html += sectionDetail('전기차 충전소' + titleExtra, 'ES3', tvasResult.evChargers.length, filterHtml + rows);
+  }
+
+  // ---- GAS3: 주유소 (일반 경로) ---- //
+  if (tvasResult.gasStations && tvasResult.gasStations.length > 0) {
+    const won = v => (v > 0 ? v.toLocaleString() + '원' : '-');
+    const premName = (v) => ({0:'미조사',1:'판매',2:'미판매'}[v] ?? v);
+    const lowestCount = tvasResult.gasStations.filter(g => g.isLowestPrice === 1).length;
+    const rows = tvasResult.gasStations.map((g, i) => {
+      const flags = [];
+      if (g.isSelf) flags.push('셀프');
+      if (g.cardDiscount) flags.push('제휴카드할인');
+      if (g.truckDiscount) flags.push('화물차우대');
+      if (g.owinMember) flags.push('오윈가맹');
+      if (g.muffinMember) flags.push('머핀가맹');
+      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);cursor:pointer" onclick="window._showGasStation(${i})">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">⛽</span>
+          <b style="font-size:12px;color:var(--text)">${esc(g.name || '주유소')}</b>
+          ${g.isLowestPrice ? '<span style="color:#fff;background:#f04452;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700">최저가</span>' : ''}
+          <span style="color:var(--muted);font-size:10px;margin-left:auto">(클릭하면 지도 표시)</span>
+        </div>
+        ${vx(g.vxIdx, coords)} | POI:${g.poiId}<br>
+        휘발유:<b>${won(g.gasoline)}</b> | 경유:${won(g.diesel)} | 등유:${won(g.kerosene)} | LPG:${won(g.lpg)} | 고급:${won(g.premiumGasoline)}<br>
+        <span style="color:var(--muted)">브랜드코드:${g.brandCode} | 주유소형식:${g.stationType} | 도로종별:${g.roadType} | 시설:0x${(g.facilityBits>>>0).toString(16)} | 고급휘발유:${premName(g.premiumGasSale)}(${g.premiumGasSale})${flags.length ? ' | ' + flags.join(' | ') : ''}</span>
+      </div>`;
+    }).join('');
+    const titleExtra = lowestCount > 0 ? ` <span style="color:#f04452;font-weight:700">최저가 ${lowestCount}개</span>` : '';
+    html += sectionDetail('주유소' + titleExtra, 'GAS3', tvasResult.gasStations.length, rows);
   }
 
   // ---- LT2: TSD링크교통정보 ---- //

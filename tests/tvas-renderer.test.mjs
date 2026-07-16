@@ -751,10 +751,16 @@ test('buildGasStationPopup_shows_name_and_nonzero_prices', () => {
   assert.match(html, /2,548/);   // 고급휘발유
 });
 
-test('buildGasStationPopup_omits_zero_price_rows', () => {
+test('buildGasStationPopup_shows_all_price_labels_and_codes', () => {
+  // 아이콘 선택 시 모든 정보 표시 — 0원 항목도 라벨은 노출(값은 '-'), 코드값도 표시
   const html = buildGasStationPopup(GAS, 37.5, 127.03, 2);
-  assert.doesNotMatch(html, /등유/); // kerosene 0 → 표시 안 함
-  assert.doesNotMatch(html, /LPG/);  // lpg 0 → 표시 안 함
+  assert.match(html, /등유/);          // 0원이어도 라벨 표시
+  assert.match(html, /LPG/);
+  assert.match(html, /브랜드코드/);
+  assert.match(html, /주유소형식/);
+  assert.match(html, /도로종별/);
+  assert.match(html, /고급휘발유 판매/);
+  assert.match(html, /시설정보/);
 });
 
 test('buildGasStationPopup_marks_self_and_lowest_price', () => {

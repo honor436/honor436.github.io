@@ -1882,6 +1882,7 @@
       <span class="tvas-ltog on" data-tl="lane">차로</span>
       <span class="tvas-ltog on" data-tl="evChargerOnRoute">충전소(경로상)</span>
       <span class="tvas-ltog on" data-tl="evChargerNearRoute">충전소(경로주변)</span>
+      <span class="tvas-ltog on" data-tl="gasStation">주유소</span>
       <span class="tvas-ltog on" data-tl="direction">방면</span>
       <span class="tvas-ltog on" data-tl="roadName">도로명</span>
       <span class="tvas-ltog on" data-tl="waypoint">경유지</span>
@@ -2382,7 +2383,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, routeLineMode } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, getGasStationWaypoint, routeLineMode } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
@@ -3988,7 +3989,7 @@ function currentRouteMode() {
 function rerenderRouteLayers() {
   const map = getMap();
   if (!map || !lastTvasResult || !lastCoords) return;
-  renderTvasRoute(map, lastTvasResult, lastCoords, 0, { currentEnergy: lastReqCurrentEnergy, routeMode: currentRouteMode() });
+  renderTvasRoute(map, lastTvasResult, lastCoords, 0, { currentEnergy: lastReqCurrentEnergy, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
   applyPersistedLayerToggles();
 }
 // 교통정보 / RO4 는 상호 배타 모드 토글: 켜면 다른 모드는 끈다.
@@ -4053,6 +4054,14 @@ window._addEvWaypoint = function(idx) {
   const wp = getEvChargerWaypoint(idx);
   if (!wp) return;
   setWaypoint('via', wp.lat, wp.lon, wp.name, 18); // 충전소 경유지 rpFlag = 18
+  const map = getMap();
+  if (map) map.closePopup();
+};
+
+window._addGasWaypoint = function(idx) {
+  const wp = getGasStationWaypoint(idx);
+  if (!wp) return;
+  setWaypoint('via', wp.lat, wp.lon, wp.name, 18); // 주유소 경유지 rpFlag = 18
   const map = getMap();
   if (map) map.closePopup();
 };
@@ -4749,7 +4758,7 @@ tvasSendBtn.addEventListener('click', async () => {
     let reqCurrentEnergy = null;
     try { reqCurrentEnergy = JSON.parse(tvasBody.value).currentEnergy; } catch {}
     // 경로선 모드(교통정보/RO4)는 이전 선택 유지
-    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy, routeMode: currentRouteMode() });
+    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
 
     // Save coords for VX click navigation + 모드 변경 시 재렌더용 상태 보관
     lastCoords = coords;

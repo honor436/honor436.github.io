@@ -23,6 +23,7 @@ let tvasLayers = {
   lane: null,          // 차로안내
   evChargerOnRoute: null,   // 전기차 충전소 (경로상, onRoute === 0)
   evChargerNearRoute: null, // 전기차 충전소 (경로주변, onRoute !== 0)
+  gasStation: null,         // 주유소 (GAS3, 일반 경로)
   direction: null,     // 방면 명칭 라벨
   roadName: null,      // 도로 명칭 라벨
   waypoint: null,      // 경유지
@@ -468,7 +469,7 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0,
   clearTvasRoute(map);
 
   const { header, guidancePoints, dangerAreas, tollGates, restAreas,
-          directionNames, intersectionNames, laneGuidance, evChargers, routeSummary,
+          directionNames, intersectionNames, laneGuidance, evChargers, gasStations, routeSummary,
           waypoints, incidents, congestion, forcedReroute,
           trafficInfo, cityBoundary, highwayMode, rpLinks,
           truckWidth, truckHeight, truckWeight, complexIntersections, roads } = tvasResult;
@@ -488,7 +489,12 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0,
     if (tollGates && tollGates.length > 0) renderTollGates(tvasLayers.tollgate, resolvedCoords, tollGates);
     if (restAreas && restAreas.length > 0) renderRestAreas(tvasLayers.restArea, resolvedCoords, restAreas);
     if (laneGuidance && laneGuidance.length > 0) renderLaneGuidance(tvasLayers.lane, resolvedCoords, laneGuidance);
-    if (evChargers && evChargers.length > 0) renderEvChargers(tvasLayers, resolvedCoords, evChargers);
+    // 일반 경로는 충전소(ES3) 대신 주유소(GAS3)를 표시한다. EV 경로는 충전소 유지.
+    if (opts.routeType === 'normal') {
+      if (gasStations && gasStations.length > 0) renderGasStations(tvasLayers, resolvedCoords, gasStations);
+    } else {
+      if (evChargers && evChargers.length > 0) renderEvChargers(tvasLayers, resolvedCoords, evChargers);
+    }
     renderDirectionNames(tvasLayers.direction, resolvedCoords, directionNames);
     renderRoadNames(tvasLayers.roadName, resolvedCoords, summaryRoadNames);
     renderWaypoints(tvasLayers.waypoint, resolvedCoords, waypoints);
@@ -1273,6 +1279,79 @@ export function showEvChargerOnMap(map, idx) {
   if (lg && !map.hasLayer(lg)) lg.addTo(map);
   map.setView([lat, lon], 17, { animate: true });
   marker.openPopup();
+}
+
+// ---- GAS3 주유소 (일반 경로 — 충전소 대신 표시) --------------------------- //
+
+// 주유소 마커 색: 최저가=빨강(강조), 일반=주황.
+export function gasStationColor(gas) {
+  return gas && gas.isLowestPrice === 1 ? '#f04452' : '#f59e0b';
+}
+
+const GAS_BRAND_NAMES = {
+  0: '기타', 1: 'SK에너지', 2: 'GS칼텍스', 3: '현대오일뱅크', 4: 'S-OIL',
+  5: '알뜰(농협)', 6: '알뜰(도로공사)', 7: '자가상표', 8: 'SK가스', 9: 'E1',
+};
+
+let gasStationMarkers = [];
+
+export function buildGasStationPopup(gas, lat, lon, idx) {
+  const won = v => v.toLocaleString('ko-KR');
+  const priceRow = (label, v) => (v > 0 ? `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">${label}</td><td><b>${won(v)}</b>원</td></tr>` : '');
+  const isLowest = gas.isLowestPrice === 1;
+
+  let popup = `<div style="font-size:12px;line-height:1.6;max-width:300px">`;
+  popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">`;
+  popup += `<span style="font-size:20px">⛽</span>`;
+  popup += `<b style="font-size:15px">${esc(gas.name || '주유소')}</b>`;
+  if (isLowest) popup += ` <span style="color:#fff;background:#f04452;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">최저가</span>`;
+  popup += `</div>`;
+  popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
+  const brand = GAS_BRAND_NAMES[gas.brandCode];
+  if (brand) popup += `<tr><td style="color:#8b95a1;padding:2px 0;width:70px">브랜드</td><td>${esc(brand)}</td></tr>`;
+  popup += priceRow('휘발유', gas.gasoline);
+  popup += priceRow('경유', gas.diesel);
+  popup += priceRow('등유', gas.kerosene);
+  popup += priceRow('LPG', gas.lpg);
+  popup += priceRow('고급휘발유', gas.premiumGasoline);
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">구분</td><td>${gas.isSelf ? '<b style="color:#3182f6">셀프</b>' : '일반'}${gas.cardDiscount ? ' · <span style="color:#10b981">제휴카드 할인</span>' : ''}${gas.truckDiscount ? ' · 화물차 우대' : ''}</td></tr>`;
+  if (gas.poiId) popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${gas.poiId}</td></tr>`;
+  if (gas.vxIdx != null) popup += `<tr><td style="color:#8b95a1;padding:2px 0">VX index</td><td>VX${gas.vxIdx}</td></tr>`;
+  popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
+  popup += `</table>`;
+  if (idx != null) {
+    popup += `<button onclick="window._addGasWaypoint(${idx})" style="margin-top:8px;width:100%;padding:6px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🚩 경유지 추가</button>`;
+  }
+  popup += `</div>`;
+  return popup;
+}
+
+function renderGasStations(layers, coords, gasStations) {
+  gasStationMarkers = [];
+  const lg = layers.gasStation;
+  for (let idx = 0; idx < gasStations.length; idx++) {
+    const gas = gasStations[idx];
+    const pos = resolveEvCoord(gas, coords);   // locX/locY/vxIdx 규약이 ES3 와 동일
+    if (!pos) { gasStationMarkers.push(null); continue; }
+    const { lat, lon } = pos;
+    const isLowest = gas.isLowestPrice === 1;
+    const size = isLowest ? 32 : 26;
+    const bg = gasStationColor(gas);
+    const iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:${bg};border-radius:8px;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⛽</div>`;
+    const marker = L.marker([lat, lon], {
+      icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
+      zIndexOffset: isLowest ? 1200 : 400,
+    }).bindPopup(buildGasStationPopup(gas, lat, lon, idx), { maxWidth: 300 });
+    gasStationMarkers.push({ marker, lat, lon, name: gas.name || '주유소' });
+    if (lg) marker.addTo(lg);
+  }
+}
+
+// Return a gas station's coords + name for adding it as a route waypoint.
+export function getGasStationWaypoint(idx) {
+  const m = gasStationMarkers[idx];
+  if (!m) return null;
+  return { lat: m.lat, lon: m.lon, name: m.name };
 }
 
 export function buildLanePopup(tl, c) {

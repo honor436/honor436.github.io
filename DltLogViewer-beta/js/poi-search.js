@@ -133,6 +133,72 @@ export function derivePoiDetailUrl(searchUrl) {
   return origin ? origin[1] + POI_DETAIL_PATH : POI_DETAIL_PATH;
 }
 
+// ---- 카테고리 검색 (findpoisbyroute/v2, 반경 카테고리 POI) ---------------- //
+//
+// 한 좌표(WGS84 lat/lon)를 중심으로 반경 내 카테고리 POI를 검색한다.
+// referrer_code 가 카테고리를 결정한다(예: radiusSearchPoiev = EV 충전소).
+// 좌표 규약이 findpois 와 달리 WGS84 lat/lon 이고, 엔드포인트도
+// /poi/search/findpoisbyroute/v2 로 분리돼 있다.
+
+export const FINDPOISBYROUTE_V2_PATH = '/tmap-channel/poi/search/findpoisbyroute/v2';
+
+// 카테고리 검색 요청 헤더(제공된 v2 샘플 기준 — svcType 113). reqTime 은
+// 전송 시점에 채운다(빈 문자열이면 UI 가 현재시간을 넣는다).
+function categorySearchHeader() {
+  return {
+    appLaunchCount: 1,
+    appVersion: '3.20.600',
+    buildNo: '320600',
+    carrier: 'T-Mobile',
+    deviceId: '0-1-c42f91826d949fef2f2b5006e2f8404127e13189656dcec41311b1c4dce78430',
+    modelNo: 'BMW Flavoured AOSP on arm64 Emulator',
+    osType: 'AND',
+    osVersion: '14',
+    pushDeviceKey: '',
+    reqTime: '',
+    resolution: 'QUAD_HD',
+    screenHeight: 1218,
+    screenWidth: 2560,
+    svcType: 113,
+    using: 'MAIN',
+  };
+}
+
+/**
+ * 카테고리 검색(findpoisbyroute/v2) 요청 바디 생성.
+ * 중심 좌표(WGS84) 한 점을 start/end/user 모두에 넣어 반경(radius=-1, 자동)
+ * 내 카테고리 POI 를 거리순으로 조회한다.
+ * @param {{ lat?:number, lon?:number, referrerCode?:string, pageNo?:number, pageSize?:number }} [opts]
+ */
+export function buildCategorySearchBody({
+  lat = 37.50873166666667,
+  lon = 127.03258666666666,
+  referrerCode = 'radiusSearchPoiev',
+  pageNo = 1,
+  pageSize = 70,
+} = {}) {
+  const center = () => ({ lat: Number(lat), lon: Number(lon) });
+  return {
+    direction: 'all',
+    end_point: center(),
+    ev_charge_type: '',
+    ev_kw_minvalue: 0,
+    ev_pnc_oem: '',
+    ev_pnc_yn: 'N',
+    ev_public_type: 'public',
+    header: categorySearchHeader(),
+    open_now_yn: 'N',
+    operator_id: '',
+    page_no: pageNo,
+    page_size: pageSize,
+    radius: '-1',
+    referrer_code: referrerCode,
+    sort: 'distance',
+    start_point: center(),
+    user_point: center(),
+  };
+}
+
 // ---- request headers ------------------------------------------------------ //
 
 function nowReqTime14() {

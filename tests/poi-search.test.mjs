@@ -14,6 +14,8 @@ import {
   buildPoiDetailBody,
   derivePoiDetailUrl,
   resolveRpFlag,
+  buildCategorySearchBody,
+  FINDPOISBYROUTE_V2_PATH,
 } from '../DltLogViewer/js/poi-search.js';
 
 // ---- buildPoiSearchUrl ---------------------------------------------------- //
@@ -330,4 +332,55 @@ test('resolveRpFlag_ignores_empty_or_nan_poi_rpFlag', () => {
   assert.equal(resolveRpFlag('via', null), 18);
   assert.equal(resolveRpFlag('via', ''), 18);
   assert.equal(resolveRpFlag('dest', 'abc'), 16);
+});
+
+// ---- 카테고리 검색 (findpoisbyroute/v2) ----------------------------------- //
+//
+// 한 좌표(WGS84 lat/lon)를 중심으로 반경 내 카테고리 POI를 검색한다.
+// referrer_code 가 카테고리를 결정(예: radiusSearchPoiev = EV 충전소).
+// 경로는 검색(findpois)의 /poi/search 와 다른 /poi/search/findpoisbyroute/v2.
+
+test('FINDPOISBYROUTE_V2_PATH_is_v2_endpoint', () => {
+  assert.equal(FINDPOISBYROUTE_V2_PATH, '/tmap-channel/poi/search/findpoisbyroute/v2');
+});
+
+test('buildCategorySearchBody_sets_center_point_on_start_end_user', () => {
+  const body = buildCategorySearchBody({ lat: 37.50873166666667, lon: 127.03258666666666 });
+  assert.deepEqual(body.start_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
+  assert.deepEqual(body.end_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
+  assert.deepEqual(body.user_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
+});
+
+test('buildCategorySearchBody_defaults_ev_radius_search_referrer', () => {
+  const body = buildCategorySearchBody();
+  assert.equal(body.referrer_code, 'radiusSearchPoiev');
+});
+
+test('buildCategorySearchBody_has_fixed_radius_search_fields', () => {
+  const body = buildCategorySearchBody();
+  assert.equal(body.direction, 'all');
+  assert.equal(body.sort, 'distance');
+  assert.equal(body.radius, '-1');
+  assert.equal(body.page_no, 1);
+  assert.equal(body.page_size, 70);
+});
+
+test('buildCategorySearchBody_carries_ev_filter_defaults', () => {
+  const body = buildCategorySearchBody();
+  assert.equal(body.ev_public_type, 'public');
+  assert.equal(body.ev_pnc_yn, 'N');
+  assert.equal(body.ev_kw_minvalue, 0);
+  assert.equal(body.open_now_yn, 'N');
+});
+
+test('buildCategorySearchBody_header_svctype_113_with_empty_reqtime', () => {
+  const body = buildCategorySearchBody();
+  assert.ok(body.header, 'category search body must carry a header');
+  assert.equal(body.header.svcType, 113);
+  assert.equal(body.header.reqTime, '');
+});
+
+test('buildCategorySearchBody_referrer_code_is_overridable', () => {
+  const body = buildCategorySearchBody({ referrerCode: 'radiusSearchPoi' });
+  assert.equal(body.referrer_code, 'radiusSearchPoi');
 });

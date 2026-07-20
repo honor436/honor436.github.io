@@ -106,3 +106,27 @@ test('REQUEST_TYPES_isochrone_sample_body_matches_contours_request', () => {
   assert.equal(JSON.parse(body.consumptionParam).batteryCapacity, 80000);
   assert.equal(body.header.reqTime, '');
 });
+
+// ---- 카테고리 검색 (findpoisbyroute/v2) ----------------------------------- //
+//
+// 새 메뉴: 카테고리 검색 → /tmap-channel/poi/search/findpoisbyroute/v2
+
+test('REQUEST_TYPES_includes_category_search', () => {
+  const t = getRequestType('categorysearch');
+  assert.ok(t, '카테고리 검색 메뉴가 등록되어 있어야 한다');
+  assert.equal(t.label, '카테고리 검색');
+  assert.equal(t.path, '/tmap-channel/poi/search/findpoisbyroute/v2');
+  assert.equal(t.method, 'POST');
+  assert.notEqual(t.implemented, false);
+});
+
+test('REQUEST_TYPES_category_search_sample_body_matches_radius_search_request', () => {
+  const body = getRequestType('categorysearch').sampleBody();
+  assert.equal(body.referrer_code, 'radiusSearchPoiev');
+  assert.equal(body.sort, 'distance');
+  assert.equal(body.radius, '-1');
+  assert.equal(body.page_size, 70);
+  assert.ok(body.start_point && typeof body.start_point.lat === 'number');
+  assert.equal(body.header.svcType, 113);
+  assert.equal(body.header.reqTime, '');
+});

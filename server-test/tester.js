@@ -9,7 +9,7 @@
 
 'use strict';
 
-import { buildPoiSearchBody, buildPoiDetailBody } from '../DltLogViewer/js/poi-search.js';
+import { buildPoiSearchBody, buildPoiDetailBody, buildCategorySearchBody, FINDPOISBYROUTE_V2_PATH } from '../DltLogViewer/js/poi-search.js';
 import { buildIsochroneBody } from '../DltLogViewer/js/route-request.js';
 
 // 환경 → 호스트. 라벨은 UI 드롭다운에 그대로 노출.
@@ -61,6 +61,13 @@ export const REQUEST_TYPES = [
     method: 'POST',
     path: '/tmap-channel/rsd/route/isochrone',
     sampleBody: buildIsochroneBody,
+  },
+  {
+    id: 'categorysearch',
+    label: '카테고리 검색',
+    method: 'POST',
+    path: FINDPOISBYROUTE_V2_PATH,
+    sampleBody: () => buildCategorySearchBody(),
   },
   {
     id: 'poisbyroute',

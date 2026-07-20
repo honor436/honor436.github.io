@@ -14,6 +14,17 @@
   // SHA-256("mns1234") — 비밀번호 평문은 소스에 두지 않음
   var HASH = 'f4ae2d8c0ea877f403e06bf5a4e9b98e798cacb2f5d0d2fdf07d5dabf21572fe';
 
+  // 공지 팝업: 비밀번호 화면에서 한 번만 노출(닫으면 localStorage 에 기록).
+  // 문구를 갱신하면 버전(v뒤 숫자)을 올려 다시 보이게 한다.
+  var NOTICE_KEY = 'h436_notice_v1';
+  var NOTICE_ITEMS = [
+    '<b>주유소(GAS3) 표시</b> — 일반 경로에 주유소 마커·팝업·리스트·필터',
+    '<b>카테고리 검색</b> — 서버 테스트에 반경 카테고리 POI 검색 추가',
+    '<b>경로탐색 일반/EV 분리</b> — 요청 포맷 분리로 오류 복구·안정화',
+    '<b>충전소(ES3) 개선</b> — 마커 색 구분, 사업자별 충전기·종류 명칭 표시',
+    'MockGPS 좌표 몰림 수정, 역지오코딩 주소 표시 개선',
+  ];
+
   // 이미 인증된 세션이면 아무것도 하지 않음
   try { if (sessionStorage.getItem(KEY) === '1') return; } catch (e) {}
 
@@ -24,7 +35,7 @@
   style.id = 'h436-gate-style';
   style.textContent =
     'body{visibility:hidden!important}html{overflow:hidden!important}' +
-    '#h436-gate{visibility:visible!important}';
+    '#h436-gate,#h436-notice{visibility:visible!important}';
   root.appendChild(style);
 
   function unlock() {
@@ -33,6 +44,41 @@
     if (s && s.parentNode) s.parentNode.removeChild(s);
     var g = document.getElementById('h436-gate');
     if (g && g.parentNode) g.parentNode.removeChild(g);
+  }
+
+  // 비밀번호 화면 위에 공지 팝업을 한 번만 표시. 닫으면 기록해 다시 안 뜸.
+  // 닫힌 뒤에는 비밀번호 입력으로 포커스를 넘긴다.
+  function maybeShowNotice(input) {
+    try { if (localStorage.getItem(NOTICE_KEY) === '1') return; } catch (e) {}
+    if (document.getElementById('h436-notice')) return;
+    var n = document.createElement('div');
+    n.id = 'h436-notice';
+    n.setAttribute('style',
+      'position:fixed;inset:0;z-index:2147483647;visibility:visible;' +
+      'background:rgba(2,6,23,0.72);display:flex;align-items:center;justify-content:center;' +
+      'font-family:"Segoe UI","Noto Sans KR",-apple-system,sans-serif');
+    n.innerHTML =
+      '<div role="dialog" aria-label="최근 업데이트 안내" style="background:#0f172a;border:1px solid rgba(148,163,184,0.18);border-radius:14px;padding:22px 22px 18px;width:min(92vw,420px);box-shadow:0 24px 70px rgba(0,0,0,.6);text-align:left">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<span style="font-size:20px">📢</span>' +
+          '<span style="color:#e2e8f0;font-size:16px;font-weight:800">최근 업데이트</span>' +
+        '</div>' +
+        '<ul style="margin:0 0 16px;padding-left:18px;color:#cbd5e1;font-size:13px;line-height:1.9">' +
+          NOTICE_ITEMS.map(function (t) { return '<li>' + t + '</li>'; }).join('') +
+        '</ul>' +
+        '<button id="h436-notice-close" type="button" style="width:100%;padding:10px;border:none;border-radius:9px;background:#38bdf8;color:#0b1220;font-size:14px;font-weight:800;cursor:pointer">확인</button>' +
+      '</div>';
+    (document.body || root).appendChild(n);
+
+    function close() {
+      try { localStorage.setItem(NOTICE_KEY, '1'); } catch (e) {}
+      if (n.parentNode) n.parentNode.removeChild(n);
+      if (input) { try { input.focus(); } catch (e) {} }
+    }
+    var btn = document.getElementById('h436-notice-close');
+    if (btn) { btn.addEventListener('click', close); btn.focus(); }
+    // 바깥(배경) 클릭으로도 닫기
+    n.addEventListener('click', function (e) { if (e.target === n) close(); });
   }
 
   function sha256hex(str) {
@@ -78,6 +124,7 @@
       });
     });
     input.focus();
+    maybeShowNotice(input);
   }
 
   // body 가 있으면 즉시, 없으면 documentElement 에 바로 붙여 즉시 노출

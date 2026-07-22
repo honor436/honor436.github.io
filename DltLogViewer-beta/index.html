@@ -443,10 +443,30 @@
       top: 12px;
       left: 12px;
       z-index: 1001;
-      width: 360px;
+      width: 380px;
       max-width: calc(100% - 24px);
       font-size: 13px;
     }
+    .poi-search-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .poi-search-actions button {
+      flex: 1;
+      border: none;
+      border-radius: 16px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    }
+    #poi-route-btn { background: #16a34a; color: #fff; }
+    #poi-route-btn:disabled { opacity: 0.5; cursor: default; }
+    #poi-route-opts-toggle { background: #fff; color: #15803d; flex: 0 0 auto; }
+    #poi-route-opts-toggle.active { background: #dcfce7; }
     .poi-search-row {
       display: flex;
       align-items: center;
@@ -488,6 +508,36 @@
       cursor: pointer;
       white-space: nowrap;
     }
+    #poi-route-opts {
+      display: none; margin-top: 6px; background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3); padding: 10px;
+      max-height: 46vh; overflow-y: auto;
+    }
+    #poi-route-opts.open { display: block; }
+    #poi-results-bar { display: flex; justify-content: flex-end; margin-top: 6px; }
+    #poi-results-bar.hidden { display: none; }
+    #poi-show-req {
+      border: none; background: #fff; color: #334155; font-size: 11px; font-weight: 700;
+      border-radius: 14px; padding: 5px 10px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #poi-show-req.active { background: #e0f2fe; color: #0369a1; }
+    #poi-req-view {
+      display: none; margin-top: 6px; background: #0f172a; color: #cbd5e1;
+      border-radius: 10px; padding: 10px; font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+      max-height: 40vh; overflow: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #poi-req-view.open { display: block; }
+    #poi-route-opts .pro-title { font-size: 11px; font-weight: 700; color: #15803d; margin-bottom: 6px; }
+    #poi-route-opts .pro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+    #poi-route-opts .pro-field { display: flex; flex-direction: column; gap: 2px; }
+    #poi-route-opts .pro-field.full { grid-column: 1 / -1; }
+    #poi-route-opts label { font-size: 10.5px; font-weight: 600; color: #475569; }
+    #poi-route-opts select, #poi-route-opts input {
+      border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 6px;
+      font-size: 11px; color: #0f172a; background: #fff; width: 100%; box-sizing: border-box;
+    }
+    #poi-route-opts .pro-hint { font-size: 10px; color: #94a3b8; margin-top: 8px; line-height: 1.5; }
     #poi-edit-toggle {
       border: none;
       background: #f1f5f9;
@@ -2296,6 +2346,10 @@
       <button id="poi-search-btn" title="검색">검색</button>
       <button id="poi-edit-toggle" title="검색 URL / 요청 데이터 편집">⚙</button>
     </div>
+    <div class="poi-search-actions">
+      <button id="poi-route-btn" title="현재 경로상 POI 검색 (findpoisbyroute) — 경로 없으면 지도 중심 기준">🛣 경로상 POI 검색</button>
+      <button id="poi-route-opts-toggle" title="경로상 POI 검색 옵션 설정">옵션 ⚙</button>
+    </div>
     <div id="poi-edit-area">
       <div class="poi-edit-label">검색 URL</div>
       <input id="poi-url" type="text" spellcheck="false" placeholder="https://...findpois">
@@ -2305,7 +2359,115 @@
       <textarea id="poi-body" spellcheck="false" placeholder="{ ... }"></textarea>
       <button id="poi-send-edited">이 내용으로 전송</button>
     </div>
+    <div id="poi-route-opts">
+      <div class="pro-title">경로상 POI 검색 옵션 (findpoisbyroute)</div>
+      <div class="pro-grid">
+        <div class="pro-field">
+          <label>검색 방식 (referrer_code)</label>
+          <select id="pro-referrer">
+            <option value="routeSearchPoiev">EV 충전소(경로)</option>
+            <option value="radiusSearchPoiev">EV 충전소(반경)</option>
+            <option value="routeSearchMoment">모멘티</option>
+            <option value="routeSearchPickup">픽업</option>
+            <option value="routeSearchPickupDisplay">픽업 노출</option>
+          </select>
+        </div>
+        <div class="pro-field">
+          <label>정렬 (sort)</label>
+          <select id="pro-sort">
+            <option value="distance">가까운 거리순</option>
+            <option value="score">랭킹 점수순</option>
+            <option value="evcharger">사용가능 충전기순</option>
+          </select>
+        </div>
+        <div class="pro-field">
+          <label>반경 radius (KM · 반경검색)</label>
+          <input id="pro-radius" type="text" inputmode="decimal" placeholder="0">
+        </div>
+        <div class="pro-field">
+          <label>버퍼 방향 (direction)</label>
+          <select id="pro-direction">
+            <option value="">기본(미포함)</option>
+            <option value="all">양방향(all)</option>
+            <option value="right">오른쪽(right)</option>
+          </select>
+        </div>
+        <div class="pro-field">
+          <label>page_no</label>
+          <input id="pro-page-no" type="number" min="1" placeholder="1">
+        </div>
+        <div class="pro-field">
+          <label>page_size</label>
+          <input id="pro-page-size" type="number" min="1" value="70" placeholder="70">
+        </div>
+        <div class="pro-field">
+          <label>업종 키워드 (group_keyword)</label>
+          <input id="pro-group-keyword" type="text" placeholder="예: 주유소">
+        </div>
+        <div class="pro-field">
+          <label>경로 전체길이 total_distance (M)</label>
+          <input id="pro-total-distance" type="number" min="0" placeholder="자동">
+        </div>
+        <div class="pro-field">
+          <label>운영기관 (operator_id)</label>
+          <input id="pro-operator-id" type="text" placeholder="예: GS, ST">
+        </div>
+        <div class="pro-field">
+          <label>충전기 타입 (ev_charge_type)</label>
+          <input id="pro-ev-charge-type" type="text" placeholder="예: DC_COMBO">
+        </div>
+        <div class="pro-field">
+          <label>속도 (power_type)</label>
+          <input id="pro-power-type" type="text" placeholder="완속/급속/초급속">
+        </div>
+        <div class="pro-field">
+          <label>충전기 상태 (ev_charge_status)</label>
+          <input id="pro-ev-charge-status" type="text" placeholder="예: CHARGING_STANDBY">
+        </div>
+        <div class="pro-field">
+          <label>공용 구분 (ev_public_type)</label>
+          <input id="pro-ev-public-type" type="text" placeholder="public,semipublic">
+        </div>
+        <div class="pro-field">
+          <label>속도 min (ev_kw_minvalue)</label>
+          <input id="pro-ev-kw-min" type="number" min="0" placeholder="예: 300">
+        </div>
+        <div class="pro-field">
+          <label>티맵플러그 (tmap_private_ev_yn)</label>
+          <select id="pro-tmap-private"><option value="">기본</option><option value="Y">Y</option><option value="N">N</option></select>
+        </div>
+        <div class="pro-field">
+          <label>영업중 (open_now_yn)</label>
+          <select id="pro-open-now"><option value="">기본</option><option value="Y">Y</option><option value="N">N</option></select>
+        </div>
+        <div class="pro-field">
+          <label>티지금 (tnow_display_yn)</label>
+          <select id="pro-tnow-display"><option value="">기본</option><option value="Y">Y</option><option value="N">N</option></select>
+        </div>
+        <div class="pro-field">
+          <label>픽업 (pickup_yn)</label>
+          <select id="pro-pickup"><option value="">기본</option><option value="Y">Y</option><option value="N">N</option></select>
+        </div>
+        <div class="pro-field">
+          <label>PnC (ev_pnc_yn)</label>
+          <select id="pro-ev-pnc-yn"><option value="N">N</option><option value="Y">Y</option></select>
+        </div>
+        <div class="pro-field">
+          <label>PnC OEM (ev_pnc_oem)</label>
+          <input id="pro-ev-pnc-oem" type="text" placeholder="예: BMW">
+        </div>
+        <div class="pro-field full">
+          <label>지도 영역 (geo_polygon)</label>
+          <input id="pro-geo-polygon" type="text" placeholder="좌표 폴리곤 문자열">
+        </div>
+      </div>
+      <div class="pro-hint">설정한 값만 요청 바디에 포함됩니다. '경로 POI' 버튼을 누르면 현재 경로(line_string·link_id)와 이 옵션으로 요청을 구성합니다.</div>
+    </div>
     <div id="poi-status"></div>
+    <div id="poi-results-bar" class="hidden">
+      <button id="poi-show-req" title="마지막 전송 요청의 URL·바디(JSON) 보기">🧾 요청 데이터 보기</button>
+    </div>
+    <pre id="poi-req-view"></pre>
     <div id="poi-results"></div>
   </div>
   <div id="map"></div>
@@ -2399,7 +2561,7 @@ import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
 import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch } from './js/route-request.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag, buildRoutePoiSearchBody, parseRoutePoiResponse, FINDPOISBYROUTE_V2_PATH } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -4149,6 +4311,15 @@ window._addGasWaypoint = function(idx) {
     editTgl.classList.toggle('active');
   });
 
+  // 검색 결과 옆 '요청 데이터 보기' — 마지막 전송 요청(URL·바디 JSON)을 표시.
+  const resultsBar = document.getElementById('poi-results-bar');
+  const showReqBtn = document.getElementById('poi-show-req');
+  const reqView    = document.getElementById('poi-req-view');
+  showReqBtn.addEventListener('click', () => {
+    reqView.classList.toggle('open');
+    showReqBtn.classList.toggle('active');
+  });
+
   // headerText(= "Key: Value" 줄) 를 받아 전송. JSON 헤더가 아니라 테스터 규칙.
   async function runSearch(url, bodyObj, headerText) {
     if (bodyObj && bodyObj.header && !bodyObj.header.reqTime) bodyObj.header.reqTime = nowReqTime();
@@ -4158,6 +4329,9 @@ window._addGasWaypoint = function(idx) {
     urlInput.value = url;
     headersTa.value = headerText;
     bodyTa.value = JSON.stringify(bodyObj, null, 2);
+    // 요청 데이터 보기 뷰 갱신 + 버튼 노출
+    reqView.textContent = `POST ${url}\n\n${JSON.stringify(bodyObj, null, 2)}`;
+    resultsBar.classList.remove('hidden');
 
     setPoiStatus('검색 중...');
     resultsEl.innerHTML = '';
@@ -4184,7 +4358,9 @@ window._addGasWaypoint = function(idx) {
         showRawResponse(raw);
         return;
       }
-      const pois = parsePoiSearchResponse(json);
+      // 경로상 POI(findpoisbyroute) 응답은 poiSearches(snake_case) → 전용 파서
+      const pois = (json && Array.isArray(json.poiSearches))
+        ? parseRoutePoiResponse(json) : parsePoiSearchResponse(json);
       lastPois = pois;
       renderResults(pois);
       setPoiStatus(`${pois.length}건 검색됨`, pois.length ? 'ok' : '');
@@ -4204,6 +4380,74 @@ window._addGasWaypoint = function(idx) {
 
   searchBtn.addEventListener('click', doKeywordSearch);
   kwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doKeywordSearch(); } });
+
+  // ---- 경로상 POI 검색 (findpoisbyroute/v2) ---- //
+  const routeBtn  = document.getElementById('poi-route-btn');
+  const optsTgl   = document.getElementById('poi-route-opts-toggle');
+  const optsPanel = document.getElementById('poi-route-opts');
+
+  optsTgl.addEventListener('click', () => {
+    optsPanel.classList.toggle('open');
+    optsTgl.classList.toggle('active');
+  });
+
+  // 지도 중심(WGS84) → user_point
+  function currentCenterWgs() {
+    const map = getMap();
+    const c = (map && map.getCenter) ? map.getCenter() : { lat: 37.5665, lng: 126.9780 };
+    return { lat: c.lat, lon: c.lng };
+  }
+
+  // findpois URL 의 호스트를 그대로 쓰고 findpoisbyroute/v2 경로를 붙인다.
+  function buildRoutePoiUrl(env) {
+    const base = buildPoiSearchUrl(env);
+    const m = /^(https?:\/\/[^/]+)/i.exec(base);
+    return (m ? m[1] : '') + FINDPOISBYROUTE_V2_PATH;
+  }
+
+  // 옵션 패널 → buildRoutePoiSearchBody options. 빈 값은 빌더가 제외한다.
+  function readRouteOptions() {
+    const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    return {
+      referrerCode:   g('pro-referrer') || 'routeSearchPoiev',
+      sort:           g('pro-sort') || 'distance',
+      radius:         g('pro-radius') || '0',
+      pageNo:         Number(g('pro-page-no')) || 1,
+      pageSize:       Number(g('pro-page-size')) || 70,
+      direction:      g('pro-direction'),
+      groupKeyword:   g('pro-group-keyword'),
+      totalDistance:  g('pro-total-distance'),
+      operatorId:     g('pro-operator-id'),
+      evChargeType:   g('pro-ev-charge-type'),
+      powerType:      g('pro-power-type'),
+      evChargeStatus: g('pro-ev-charge-status'),
+      evPublicType:   g('pro-ev-public-type'),
+      evKwMinvalue:   g('pro-ev-kw-min'),
+      tmapPrivateEvYn: g('pro-tmap-private'),
+      openNowYn:      g('pro-open-now'),
+      tnowDisplayYn:  g('pro-tnow-display'),
+      pickupYn:       g('pro-pickup'),
+      evPncYn:        g('pro-ev-pnc-yn') || 'N',
+      evPncOem:       g('pro-ev-pnc-oem'),
+      geoPolygon:     g('pro-geo-polygon'),
+    };
+  }
+
+  function doRoutePoiSearch() {
+    const opts = { userPoint: currentCenterWgs(), options: readRouteOptions() };
+    if (Array.isArray(lastCoords) && lastCoords.length) {
+      opts.lineStringCoords = lastCoords.map(c => ({ lat: c.lat, lon: c.lon }));
+      const items = lastTvasResult && lastTvasResult.rpLinks && lastTvasResult.rpLinks.items;
+      if (Array.isArray(items) && items.length) {
+        opts.linkIds = items.map(rd => `${rd.meshCode}_${rd.linkId}_${rd.direction}`);
+      }
+      setPoiStatus(`경로상 POI 검색 (경로 ${lastCoords.length}점 · 링크 ${opts.linkIds ? opts.linkIds.length : 0}개)`);
+    } else {
+      setPoiStatus('현재 경로 없음 — 지도 중심 기준 검색');
+    }
+    runSearch(buildRoutePoiUrl(envSel.value), buildRoutePoiSearchBody(opts), headersTa.value);
+  }
+  routeBtn.addEventListener('click', doRoutePoiSearch);
 
   sendEdit.addEventListener('click', () => {
     let bodyObj;

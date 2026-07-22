@@ -14,7 +14,8 @@ import {
   buildPoiDetailBody,
   derivePoiDetailUrl,
   resolveRpFlag,
-  buildCategorySearchBody,
+  buildRoutePoiSearchBody,
+  parseRoutePoiResponse,
   FINDPOISBYROUTE_V2_PATH,
 } from '../DltLogViewer/js/poi-search.js';
 
@@ -107,6 +108,24 @@ test('parsePoiSearchResponse_extracts_pois_from_poiInfo', () => {
 test('parsePoiSearchResponse_returns_empty_for_missing_data', () => {
   assert.deepEqual(parsePoiSearchResponse(null), []);
   assert.deepEqual(parsePoiSearchResponse({}), []);
+});
+
+// 일반 POI 검색(findpois) 응답도 POI 채널이라 snake_case(poiSearches/center_x)로
+// 내려올 수 있다. 이 형태에서 결과가 0건이면 검색이 "동작하지 않는" 것처럼 보인다.
+test('parsePoiSearchResponse_handles_snake_case_poiSearches', () => {
+  const json = { poiSearches: [
+    { poi_id: '1', pkey: '11', name: '스타벅스 강남', org_name: '스타벅스 강남점',
+      center_x: 4573200, center_y: 1350142, full_address_road: '서울 강남구 봉은사로 151', rp_flag: 16 },
+  ] };
+  const pois = parsePoiSearchResponse(json);
+  assert.equal(pois.length, 1);
+  assert.equal(pois[0].name, '스타벅스 강남');
+  assert.equal(pois[0].x, 4573200);
+  assert.equal(pois[0].y, 1350142);
+  assert.equal(pois[0].address, '서울 강남구 봉은사로 151');
+  assert.equal(pois[0].poiId, '1');
+  assert.equal(pois[0].pkey, '11');
+  assert.equal(pois[0].rpFlag, 16);
 });
 
 test('parsePoiSearchResponse_deep_scans_when_shape_differs', () => {
@@ -334,53 +353,150 @@ test('resolveRpFlag_ignores_empty_or_nan_poi_rpFlag', () => {
   assert.equal(resolveRpFlag('dest', 'abc'), 16);
 });
 
-// ---- 카테고리 검색 (findpoisbyroute/v2) ----------------------------------- //
+// ---- 경로상 POI 검색 (findpoisbyroute/v2) --------------------------------- //
 //
-// 한 좌표(WGS84 lat/lon)를 중심으로 반경 내 카테고리 POI를 검색한다.
-// referrer_code 가 카테고리를 결정(예: radiusSearchPoiev = EV 충전소).
-// 경로는 검색(findpois)의 /poi/search 와 다른 /poi/search/findpoisbyroute/v2.
+// 현재 경로가 있으면 vertex 좌표열을 line_string 으로, RPLINK 를 link_id 로 넣고
+// start/end_point 를 채운다. 경로가 없으면 user_point(지도 중심)만 보낸다.
+// 좌표는 WGS84 {lon, lat}, 엔드포인트는 /poi/search/findpoisbyroute/v2.
 
 test('FINDPOISBYROUTE_V2_PATH_is_v2_endpoint', () => {
   assert.equal(FINDPOISBYROUTE_V2_PATH, '/tmap-channel/poi/search/findpoisbyroute/v2');
 });
 
-test('buildCategorySearchBody_sets_center_point_on_start_end_user', () => {
-  const body = buildCategorySearchBody({ lat: 37.50873166666667, lon: 127.03258666666666 });
-  assert.deepEqual(body.start_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
-  assert.deepEqual(body.end_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
-  assert.deepEqual(body.user_point, { lat: 37.50873166666667, lon: 127.03258666666666 });
-});
-
-test('buildCategorySearchBody_defaults_ev_radius_search_referrer', () => {
-  const body = buildCategorySearchBody();
-  assert.equal(body.referrer_code, 'radiusSearchPoiev');
-});
-
-test('buildCategorySearchBody_has_fixed_radius_search_fields', () => {
-  const body = buildCategorySearchBody();
-  assert.equal(body.direction, 'all');
+test('buildRoutePoiSearchBody_has_fixed_route_search_fields', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.5, lon: 127.0 } });
+  assert.equal(body.referrer_code, 'routeSearchPoiev');
   assert.equal(body.sort, 'distance');
-  assert.equal(body.radius, '-1');
+  assert.equal(body.radius, '0');       // 데이터 클래스 기본값
   assert.equal(body.page_no, 1);
-  assert.equal(body.page_size, 70);
+  assert.equal(body.page_size, 1);
 });
 
-test('buildCategorySearchBody_carries_ev_filter_defaults', () => {
-  const body = buildCategorySearchBody();
+// referrer_code / sort / radius / page 는 옵션으로 바꿀 수 있어야 한다.
+test('buildRoutePoiSearchBody_options_override_mode_sort_radius_page', () => {
+  const body = buildRoutePoiSearchBody({
+    userPoint: { lat: 37.5, lon: 127.0 },
+    options: { referrerCode: 'radiusSearchPoiev', sort: 'evcharger', radius: '3', pageNo: 2, pageSize: 30 },
+  });
+  assert.equal(body.referrer_code, 'radiusSearchPoiev');
+  assert.equal(body.sort, 'evcharger');
+  assert.equal(body.radius, '3');
+  assert.equal(body.page_no, 2);
+  assert.equal(body.page_size, 30);
+});
+
+// 데이터 클래스의 선택 필드는 값이 있을 때만 바디에 포함된다.
+test('buildRoutePoiSearchBody_includes_optional_filters_when_set', () => {
+  const body = buildRoutePoiSearchBody({
+    userPoint: { lat: 37.5, lon: 127.0 },
+    options: {
+      direction: 'all', groupKeyword: '주유소', operatorId: 'GS', powerType: '급속',
+      evChargeType: 'DC_COMBO', evChargeStatus: 'CHARGING_STANDBY', openNowYn: 'Y',
+      evPublicType: 'public', evKwMinvalue: 100, pickupYn: 'Y', totalDistance: 12000,
+    },
+  });
+  assert.equal(body.direction, 'all');
+  assert.equal(body.group_keyword, '주유소');
+  assert.equal(body.operator_id, 'GS');
+  assert.equal(body.power_type, '급속');
+  assert.equal(body.ev_charge_type, 'DC_COMBO');
+  assert.equal(body.ev_charge_status, 'CHARGING_STANDBY');
+  assert.equal(body.open_now_yn, 'Y');
   assert.equal(body.ev_public_type, 'public');
-  assert.equal(body.ev_pnc_yn, 'N');
-  assert.equal(body.ev_kw_minvalue, 0);
-  assert.equal(body.open_now_yn, 'N');
+  assert.equal(body.ev_kw_minvalue, 100);
+  assert.equal(body.pickup_yn, 'Y');
+  assert.equal(body.total_distance, 12000);
 });
 
-test('buildCategorySearchBody_header_svctype_113_with_empty_reqtime', () => {
-  const body = buildCategorySearchBody();
-  assert.ok(body.header, 'category search body must carry a header');
+test('buildRoutePoiSearchBody_omits_optional_filters_when_unset', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.5, lon: 127.0 } });
+  for (const k of ['direction', 'group_keyword', 'operator_id', 'power_type', 'ev_charge_type',
+    'ev_charge_status', 'open_now_yn', 'ev_public_type', 'ev_kw_minvalue', 'pickup_yn',
+    'total_distance', 'tmap_private_ev_yn', 'tnow_display_yn', 'geo_polygon']) {
+    assert.equal(k in body, false, `${k} 는 값이 없으면 바디에서 제외돼야 한다`);
+  }
+});
+
+// 한전 PnC 필터는 데이터 클래스 기본값(N/"")으로 항상 포함된다.
+test('buildRoutePoiSearchBody_pnc_defaults_present', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.5, lon: 127.0 } });
+  assert.equal(body.ev_pnc_yn, 'N');
+  assert.equal(body.ev_pnc_oem, '');
+});
+
+test('buildRoutePoiSearchBody_always_sets_user_point', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.56645, lon: 126.98502 } });
+  assert.deepEqual(body.user_point, { lon: 126.98502, lat: 37.56645 });
+});
+
+test('buildRoutePoiSearchBody_without_route_omits_line_string_and_links', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.5, lon: 127.0 } });
+  assert.equal(body.line_string, undefined);
+  assert.equal(body.link_id, undefined);
+  assert.equal(body.start_point, undefined);
+  assert.equal(body.end_point, undefined);
+});
+
+test('buildRoutePoiSearchBody_with_route_builds_line_string_coordinates', () => {
+  const coords = [
+    { lat: 37.566, lon: 126.985 },
+    { lat: 37.567, lon: 126.984 },
+    { lat: 37.568, lon: 126.983 },
+  ];
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.566, lon: 126.985 }, lineStringCoords: coords });
+  assert.equal(Array.isArray(body.line_string), true);
+  assert.equal(body.line_string.length, 1);
+  assert.equal(body.line_string[0].road_type, 0);
+  assert.deepEqual(body.line_string[0].coordinates[0], { lon: 126.985, lat: 37.566 });
+  assert.equal(body.line_string[0].coordinates.length, 3);
+});
+
+test('buildRoutePoiSearchBody_with_route_sets_start_end_from_coords', () => {
+  const coords = [
+    { lat: 37.566, lon: 126.985 },
+    { lat: 37.568, lon: 126.983 },
+  ];
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.566, lon: 126.985 }, lineStringCoords: coords });
+  assert.deepEqual(body.start_point, { lon: 126.985, lat: 37.566 });
+  assert.deepEqual(body.end_point, { lon: 126.983, lat: 37.568 });
+});
+
+test('buildRoutePoiSearchBody_with_route_includes_link_ids', () => {
+  const body = buildRoutePoiSearchBody({
+    userPoint: { lat: 37.566, lon: 126.985 },
+    lineStringCoords: [{ lat: 37.566, lon: 126.985 }, { lat: 37.567, lon: 126.984 }],
+    linkIds: ['4787_763_0', '4787_765_1'],
+  });
+  assert.deepEqual(body.link_id, ['4787_763_0', '4787_765_1']);
+});
+
+test('buildRoutePoiSearchBody_header_svctype_113_with_empty_reqtime', () => {
+  const body = buildRoutePoiSearchBody({ userPoint: { lat: 37.5, lon: 127.0 } });
+  assert.ok(body.header, 'route poi body must carry a header');
   assert.equal(body.header.svcType, 113);
   assert.equal(body.header.reqTime, '');
 });
 
-test('buildCategorySearchBody_referrer_code_is_overridable', () => {
-  const body = buildCategorySearchBody({ referrerCode: 'radiusSearchPoi' });
-  assert.equal(body.referrer_code, 'radiusSearchPoi');
+// ---- parseRoutePoiResponse (poiSearches, snake_case) ---------------------- //
+
+test('parseRoutePoiResponse_maps_poiSearches_to_normalized_pois', () => {
+  const json = { poiSearches: [
+    { poi_id: '11325648', pkey: '1132564801', name: '전기차충전소', org_name: '분데스언주 전기차충전소',
+      center_x: 4573200, center_y: 1350142, full_address_road: '서울 강남구 봉은사로 151', rp_flag: 16 },
+  ] };
+  const pois = parseRoutePoiResponse(json);
+  assert.equal(pois.length, 1);
+  assert.equal(pois[0].name, '전기차충전소');
+  assert.equal(pois[0].x, 4573200);
+  assert.equal(pois[0].y, 1350142);
+  assert.equal(pois[0].address, '서울 강남구 봉은사로 151');
+  assert.equal(pois[0].poiId, '11325648');
+  assert.equal(pois[0].pkey, '1132564801');
+  assert.equal(pois[0].rpFlag, 16);
+});
+
+test('parseRoutePoiResponse_returns_empty_for_missing_data', () => {
+  assert.deepEqual(parseRoutePoiResponse(null), []);
+  assert.deepEqual(parseRoutePoiResponse({}), []);
+  assert.deepEqual(parseRoutePoiResponse({ poiSearches: [] }), []);
 });

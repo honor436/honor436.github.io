@@ -9,7 +9,7 @@
 
 'use strict';
 
-import { buildPoiSearchBody, buildPoiDetailBody, buildCategorySearchBody, FINDPOISBYROUTE_V2_PATH } from '../DltLogViewer/js/poi-search.js';
+import { buildPoiSearchBody, buildPoiDetailBody, buildRoutePoiSearchBody, FINDPOISBYROUTE_V2_PATH } from '../DltLogViewer/js/poi-search.js';
 import { buildIsochroneBody } from '../DltLogViewer/js/route-request.js';
 
 // 환경 → 호스트. 라벨은 UI 드롭다운에 그대로 노출.
@@ -26,17 +26,25 @@ export function buildTestUrl(env, path) {
   return `https://${e.host}:${e.port}${path.startsWith('/') ? path : '/' + path}`;
 }
 
-// poisByRoute 는 정식 포맷 확정 전 — 편집 템플릿(사용자가 채워 전송).
-function poisByRouteSample() {
-  return {
-    name: '',
-    reqCnt: 50,
-    radius: '0',
-    routeVertex: '',         // 경로 vertex (좌표열) — 채워서 사용
-    searchTypCd: 'A',
-    reqSearchEngineInfo: { searchFilterType: '2', searchFrom: 'pth', searchMethod: 'aut.kwd' },
-    header: {},
-  };
+// 경로상 POI 검색 샘플 — 실 경로 대신 편집용 예시 경로(coords + link_id)를 채워
+// findpoisbyroute/v2 형식을 그대로 보여준다. 사용자는 좌표/링크를 갈아끼워 전송.
+function routePoiSample() {
+  const coords = [
+    { lon: 126.98503051471543, lat: 37.56608474300974 },
+    { lon: 126.98445834865241, lat: 37.56606806812341 },
+    { lon: 126.98410005027014, lat: 37.5660652842617 },
+    { lon: 126.98366120401481, lat: 37.566068053832105 },
+    { lon: 126.98341400577341, lat: 37.56607082683843 },
+    { lon: 126.98275296041555, lat: 37.56602082110331 },
+  ];
+  return buildRoutePoiSearchBody({
+    userPoint: { lon: 126.98502349853516, lat: 37.56645202636719 },
+    startPoint: { lon: 126.98502203206233, lat: 37.56641783368988 },
+    endPoint: { lon: 126.9799393522724, lat: 37.56961216075511 },
+    lineStringCoords: coords,
+    linkIds: ['4787_763_0', '4787_765_1', '4787_764_0', '4787_814_1', '4787_813_0'],
+    options: { referrerCode: 'routeSearchPoiev', sort: 'distance', radius: '100' },
+  });
 }
 
 // 요청 타입 레지스트리 — 새 타입은 여기에 항목만 추가하면 메뉴에 노출됨.
@@ -63,19 +71,11 @@ export const REQUEST_TYPES = [
     sampleBody: buildIsochroneBody,
   },
   {
-    id: 'categorysearch',
-    label: '카테고리 검색',
+    id: 'routepoisearch',
+    label: '경로상 POI 검색',
     method: 'POST',
     path: FINDPOISBYROUTE_V2_PATH,
-    sampleBody: () => buildCategorySearchBody(),
-  },
-  {
-    id: 'poisbyroute',
-    label: '경로상 POI (poisByRoute)',
-    method: 'POST',
-    path: '/tmap-channel/poi/search/findpoisbyroute',
-    implemented: false,
-    sampleBody: poisByRouteSample,
+    sampleBody: routePoiSample,
   },
 ];
 

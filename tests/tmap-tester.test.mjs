@@ -45,11 +45,11 @@ test('buildTestUrl_unknown_env_throws', () => {
 //
 // 메뉴는 이 배열로 렌더된다. 새 요청 타입은 항목만 추가하면 메뉴에 노출됨.
 
-test('REQUEST_TYPES_includes_poi_search_detail_and_poisbyroute', () => {
+test('REQUEST_TYPES_includes_poi_search_detail_and_route_poi', () => {
   const ids = REQUEST_TYPES.map(r => r.id);
   assert.ok(ids.includes('findpois'), 'POI 검색');
   assert.ok(ids.includes('findpoidetails'), 'POI 상세');
-  assert.ok(ids.includes('poisbyroute'), 'poisByRoute');
+  assert.ok(ids.includes('routepoisearch'), '경로상 POI 검색');
 });
 
 test('REQUEST_TYPES_each_has_label_and_path', () => {
@@ -72,11 +72,7 @@ test('getRequestType_unknown_returns_null', () => {
   assert.equal(getRequestType('nope'), null);
 });
 
-// ---- 구현 상태 (미구현 표시) ---------------------------------------------- //
-
-test('REQUEST_TYPES_poisbyroute_is_marked_unimplemented', () => {
-  assert.equal(getRequestType('poisbyroute').implemented, false);
-});
+// ---- 구현 상태 ------------------------------------------------------------ //
 
 test('REQUEST_TYPES_poi_search_and_detail_are_implemented', () => {
   assert.notEqual(getRequestType('findpois').implemented, false);
@@ -107,26 +103,32 @@ test('REQUEST_TYPES_isochrone_sample_body_matches_contours_request', () => {
   assert.equal(body.header.reqTime, '');
 });
 
-// ---- 카테고리 검색 (findpoisbyroute/v2) ----------------------------------- //
+// ---- 경로상 POI 검색 (findpoisbyroute/v2) --------------------------------- //
 //
-// 새 메뉴: 카테고리 검색 → /tmap-channel/poi/search/findpoisbyroute/v2
+// 메뉴: 경로상 POI 검색 → /tmap-channel/poi/search/findpoisbyroute/v2
+// 기존 '카테고리 검색'/'경로상 POI(poisByRoute, 미구현)' 은 이 메뉴로 대체·제거.
 
-test('REQUEST_TYPES_includes_category_search', () => {
-  const t = getRequestType('categorysearch');
-  assert.ok(t, '카테고리 검색 메뉴가 등록되어 있어야 한다');
-  assert.equal(t.label, '카테고리 검색');
+test('REQUEST_TYPES_includes_route_poi_search', () => {
+  const t = getRequestType('routepoisearch');
+  assert.ok(t, '경로상 POI 검색 메뉴가 등록되어 있어야 한다');
+  assert.equal(t.label, '경로상 POI 검색');
   assert.equal(t.path, '/tmap-channel/poi/search/findpoisbyroute/v2');
   assert.equal(t.method, 'POST');
   assert.notEqual(t.implemented, false);
 });
 
-test('REQUEST_TYPES_category_search_sample_body_matches_radius_search_request', () => {
-  const body = getRequestType('categorysearch').sampleBody();
-  assert.equal(body.referrer_code, 'radiusSearchPoiev');
+test('REQUEST_TYPES_route_poi_sample_body_matches_route_search_request', () => {
+  const body = getRequestType('routepoisearch').sampleBody();
+  assert.equal(body.referrer_code, 'routeSearchPoiev');
   assert.equal(body.sort, 'distance');
-  assert.equal(body.radius, '-1');
-  assert.equal(body.page_size, 70);
-  assert.ok(body.start_point && typeof body.start_point.lat === 'number');
+  assert.equal(body.radius, '100');
+  assert.equal(body.page_size, 1);
+  assert.ok(Array.isArray(body.line_string) && body.line_string.length > 0, '샘플은 line_string 을 포함해 형식을 보여준다');
+  assert.ok(Array.isArray(body.link_id) && body.link_id.length > 0, '샘플은 link_id 를 포함한다');
   assert.equal(body.header.svcType, 113);
-  assert.equal(body.header.reqTime, '');
+});
+
+test('REQUEST_TYPES_removes_old_category_and_poisbyroute', () => {
+  assert.equal(getRequestType('categorysearch'), null, '카테고리 검색은 제거됨');
+  assert.equal(getRequestType('poisbyroute'), null, '기존 경로상 POI(poisByRoute) 미구현 메뉴는 제거됨');
 });

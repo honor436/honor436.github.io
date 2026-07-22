@@ -133,18 +133,18 @@ export function derivePoiDetailUrl(searchUrl) {
   return origin ? origin[1] + POI_DETAIL_PATH : POI_DETAIL_PATH;
 }
 
-// ---- 카테고리 검색 (findpoisbyroute/v2, 반경 카테고리 POI) ---------------- //
+// ---- 경로상 POI 검색 (findpoisbyroute/v2) --------------------------------- //
 //
-// 한 좌표(WGS84 lat/lon)를 중심으로 반경 내 카테고리 POI를 검색한다.
-// referrer_code 가 카테고리를 결정한다(예: radiusSearchPoiev = EV 충전소).
-// 좌표 규약이 findpois 와 달리 WGS84 lat/lon 이고, 엔드포인트도
-// /poi/search/findpoisbyroute/v2 로 분리돼 있다.
+// 현재 경로가 있으면 vertex 좌표열을 line_string(단일 세그먼트) 으로, RPLINK 를
+// link_id("mesh_link_dir") 로 넣고 start/end_point 를 채운다. 경로가 없으면
+// user_point(지도 중심)만 보낸다. 좌표는 WGS84 {lon, lat}.
+// 엔드포인트는 findpois 의 /poi/search 와 다른 /poi/search/findpoisbyroute/v2.
 
 export const FINDPOISBYROUTE_V2_PATH = '/tmap-channel/poi/search/findpoisbyroute/v2';
 
-// 카테고리 검색 요청 헤더(제공된 v2 샘플 기준 — svcType 113). reqTime 은
-// 전송 시점에 채운다(빈 문자열이면 UI 가 현재시간을 넣는다).
-function categorySearchHeader() {
+// 경로상 POI 요청 헤더(채널 app 컨텍스트, svcType 113). reqTime 은 전송 시점에
+// 채운다(빈 문자열이면 UI 가 현재시간을 넣는다).
+function routePoiHeader() {
   return {
     appLaunchCount: 1,
     appVersion: '3.20.600',
@@ -164,39 +164,132 @@ function categorySearchHeader() {
   };
 }
 
+function toLonLat(p) {
+  return { lon: Number(p.lon), lat: Number(p.lat) };
+}
+
+// referrer_code 모드 — FindEvPoisByRouteRequest 주석 기준.
+export const ROUTE_POI_REFERRER_CODES = [
+  { code: 'routeSearchPoiev',        label: 'EV 충전소(경로)' },
+  { code: 'radiusSearchPoiev',       label: 'EV 충전소(반경)' },
+  { code: 'routeSearchMoment',       label: '모멘티' },
+  { code: 'routeSearchPickup',       label: '픽업' },
+  { code: 'routeSearchPickupDisplay', label: '픽업 노출' },
+];
+export const ROUTE_POI_SORTS = ['distance', 'score', 'evcharger'];
+
 /**
- * 카테고리 검색(findpoisbyroute/v2) 요청 바디 생성.
- * 중심 좌표(WGS84) 한 점을 start/end/user 모두에 넣어 반경(radius=-1, 자동)
- * 내 카테고리 POI 를 거리순으로 조회한다.
- * @param {{ lat?:number, lon?:number, referrerCode?:string, pageNo?:number, pageSize?:number }} [opts]
+ * 경로상 POI 검색(findpoisbyroute/v2) 요청 바디 생성.
+ * FindEvPoisByRouteRequest 포맷. 경로 지오메트리(userPoint/lineStringCoords/…)와
+ * 검색 옵션(options)을 받아, 값이 있는 필드만 바디에 담는다.
+ *
+ * @param {Object} arg
+ * @param {{lat:number,lon:number}} arg.userPoint          사용자 현재 좌표(항상 포함)
+ * @param {Array<{lat:number,lon:number}>} [arg.lineStringCoords] 경로 궤적 좌표열
+ * @param {string[]} [arg.linkIds]                          경로 링크("mesh_link_dir")
+ * @param {{lat:number,lon:number}} [arg.startPoint]        기본: 좌표열 첫 점
+ * @param {{lat:number,lon:number}} [arg.endPoint]          기본: 좌표열 끝 점
+ * @param {Object} [arg.options]  referrerCode, sort, pageNo, pageSize, radius, direction,
+ *   groupKeyword, totalDistance, operatorId, evChargeType, powerType, evChargeStatus,
+ *   tmapPrivateEvYn, tnowDisplayYn, openNowYn, evPublicType, evPncYn, evPncOem,
+ *   evKwMinvalue, pickupYn, geoPolygon
  */
-export function buildCategorySearchBody({
-  lat = 37.50873166666667,
-  lon = 127.03258666666666,
-  referrerCode = 'radiusSearchPoiev',
-  pageNo = 1,
-  pageSize = 70,
+export function buildRoutePoiSearchBody({
+  userPoint,
+  lineStringCoords = null,
+  linkIds = null,
+  startPoint = null,
+  endPoint = null,
+  options = {},
 } = {}) {
-  const center = () => ({ lat: Number(lat), lon: Number(lon) });
-  return {
-    direction: 'all',
-    end_point: center(),
-    ev_charge_type: '',
-    ev_kw_minvalue: 0,
-    ev_pnc_oem: '',
-    ev_pnc_yn: 'N',
-    ev_public_type: 'public',
-    header: categorySearchHeader(),
-    open_now_yn: 'N',
-    operator_id: '',
+  const o = options || {};
+  const {
+    referrerCode = 'routeSearchPoiev',
+    sort = 'distance',
+    pageNo = 1,
+    pageSize = 1,
+    radius = '0',                 // 데이터 클래스 기본값
+    evPncYn = 'N',                // 비-null 기본값 → 항상 포함
+    evPncOem = '',
+  } = o;
+
+  const hasRoute = Array.isArray(lineStringCoords) && lineStringCoords.length > 0;
+  const body = {
     page_no: pageNo,
     page_size: pageSize,
-    radius: '-1',
     referrer_code: referrerCode,
-    sort: 'distance',
-    start_point: center(),
-    user_point: center(),
+    sort,
+    radius: String(radius),
   };
+  if (hasRoute) {
+    body.line_string = [{
+      road_type: 0,
+      distance: 0,
+      coordinates: lineStringCoords.map(toLonLat),
+      time: 0,
+    }];
+    body.start_point = toLonLat(startPoint || lineStringCoords[0]);
+    body.end_point = toLonLat(endPoint || lineStringCoords[lineStringCoords.length - 1]);
+  }
+  body.user_point = userPoint ? toLonLat(userPoint) : { lon: 0, lat: 0 };
+  if (hasRoute && Array.isArray(linkIds) && linkIds.length) {
+    body.link_id = linkIds.slice();
+  }
+
+  // 값이 있을 때만 담는 선택 필드 (빈 문자열/undefined/null 은 제외).
+  const put = (key, val) => {
+    if (val !== undefined && val !== null && val !== '') body[key] = val;
+  };
+  put('direction', o.direction);
+  put('group_keyword', o.groupKeyword);
+  put('operator_id', o.operatorId);
+  put('ev_charge_type', o.evChargeType);
+  put('power_type', o.powerType);
+  put('ev_charge_status', o.evChargeStatus);
+  put('tmap_private_ev_yn', o.tmapPrivateEvYn);
+  put('tnow_display_yn', o.tnowDisplayYn);
+  put('open_now_yn', o.openNowYn);
+  put('ev_public_type', o.evPublicType);
+  put('pickup_yn', o.pickupYn);
+  put('geo_polygon', o.geoPolygon);
+  if (o.totalDistance !== undefined && o.totalDistance !== null && o.totalDistance !== '') {
+    body.total_distance = Number(o.totalDistance);
+  }
+  if (o.evKwMinvalue !== undefined && o.evKwMinvalue !== null && o.evKwMinvalue !== '') {
+    body.ev_kw_minvalue = Number(o.evKwMinvalue);
+  }
+
+  body.ev_pnc_yn = evPncYn;
+  body.ev_pnc_oem = evPncOem;
+  body.header = routePoiHeader();
+  return body;
+}
+
+/**
+ * findpoisbyroute 응답(poiSearches, snake_case)을 findpois 와 같은
+ * { name, x, y, address, poiId, pkey, rpFlag } 형태로 정규화한다.
+ * 좌표는 center_x/center_y(SK 정수)를 사용한다.
+ */
+export function parseRoutePoiResponse(json) {
+  if (!json || typeof json !== 'object') return [];
+  const list = Array.isArray(json.poiSearches) ? json.poiSearches
+    : (Array.isArray(json.poiSearchs) ? json.poiSearchs : deepFindPoiArray(json));
+  if (!Array.isArray(list)) return [];
+  return list.map(raw => {
+    const x = Number(raw.center_x), y = Number(raw.center_y);
+    return {
+      name: raw.name || raw.org_name || '',
+      x: Number.isFinite(x) && x !== 0 ? x : null,
+      y: Number.isFinite(y) && y !== 0 ? y : null,
+      address: raw.full_address_road || raw.full_address_jibun || '',
+      tel: '',
+      poiId: raw.poi_id,
+      pkey: raw.pkey,
+      rpFlag: raw.rp_flag,
+      distance: raw.distance,
+      raw,
+    };
+  }).filter(p => p.name && p.x != null && p.y != null);
 }
 
 // ---- request headers ------------------------------------------------------ //
@@ -329,12 +422,15 @@ export function coerceJson(text) {
 
 // ---- response parsing ----------------------------------------------------- //
 
-const NAME_KEYS = ['name', 'poiName', 'bldName', 'fullName'];
-const ADDR_KEYS = ['fullAddressRoad', 'roadName', 'fullAddress', 'newAddress', 'address', 'addr'];
+// findpois / findpoisbyroute 는 같은 POI 채널이라 camelCase·snake_case 가 섞여
+// 내려올 수 있다. 두 표기를 모두 후보로 둔다.
+const NAME_KEYS = ['name', 'poiName', 'bldName', 'fullName', 'org_name', 'orgName'];
+const ADDR_KEYS = ['fullAddressRoad', 'roadName', 'fullAddress', 'newAddress', 'address', 'addr',
+  'full_address_road', 'full_address_jibun', 'fullAddressJibun'];
 const TEL_KEYS  = ['tel', 'telNo', 'telNumber'];
-// 좌표 후보 (우선순위 순). 각 쌍 [xKey, yKey].
+// 좌표 후보 (우선순위 순). 각 쌍 [xKey, yKey]. SK 정수 좌표 기준.
 const COORD_PAIRS = [
-  ['noorX', 'noorY'], ['frontX', 'frontY'], ['centerX', 'centerY'],
+  ['noorX', 'noorY'], ['frontX', 'frontY'], ['centerX', 'centerY'], ['center_x', 'center_y'],
   ['navX', 'navY'], ['posX', 'posY'], ['x', 'y'],
 ];
 
@@ -383,9 +479,9 @@ function normalizePoi(raw) {
     y: coords.y,
     address: pick(raw, ADDR_KEYS) || '',
     tel: pick(raw, TEL_KEYS) || '',
-    poiId: pick(raw, ['poiId', 'id', 'poiID']),
+    poiId: pick(raw, ['poiId', 'id', 'poiID', 'poi_id']),
     pkey: pick(raw, ['pkey', 'pKey', 'navSeqPkey']),
-    rpFlag: pick(raw, ['rpFlag', 'rpflag']),
+    rpFlag: pick(raw, ['rpFlag', 'rpflag', 'rp_flag']),
     raw,
   };
 }
@@ -402,6 +498,8 @@ export function parsePoiSearchResponse(json) {
     json?.poiInfo?.poi,
     json?.poiList,
     json?.polist,
+    json?.poiSearches,
+    json?.poiSearchs,
   ];
   let list = direct.find(Array.isArray) || deepFindPoiArray(json);
   if (!Array.isArray(list)) return [];

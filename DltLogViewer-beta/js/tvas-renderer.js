@@ -929,21 +929,92 @@ function renderBatteryDepletion(lg, coords, roads, currentEnergy) {
   }).bindPopup(buildBatteryDepletionPopup(d, roads[d.segmentIndex], currentEnergy)).addTo(lg);
 }
 
-function renderGuidancePoints(lg, coords, guidancePoints, directionNames, intersectionNames) {
+// 안내점 단건 상세 HTML (팝업 본문 공용).
+function guidanceDetailHtml(gp, coords, directionNames, intersectionNames) {
+  const c = coords[gp.vxIndex];
+  let dirName = '', intName = '';
+  if (directionNames) { const dn = directionNames.find(d => d.lastVxIdx >= gp.vxIndex); if (dn) dirName = dn.name; }
+  if (intersectionNames) { const cn = intersectionNames.find(d => d.lastVxIdx >= gp.vxIndex); if (cn) intName = cn.name; }
+  let h = `<b>${esc(guidanceName(gp.guidanceCode))}</b> (코드: ${gp.guidanceCode})`;
+  if (gp.continuousTurnCode > 0) h += `<br>연속회전: ${gp.continuousTurnCode === 1 ? '고속' : '일반'}`;
+  if (dirName) h += `<br>방면: ${esc(dirName)}`;
+  if (intName) h += `<br>교차로: ${esc(intName)}`;
+  h += `<br>VX: ${gp.vxIndex}<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+  return h;
+}
+
+/**
+ * 같은 좌표(=같은 vxIndex)에 겹치는 안내점을 그룹으로 묶는다.
+ * 반환: [[gp,...], ...] (처음 등장한 좌표 순서 유지). vxIndex 범위 밖은 제외.
+ */
+export function groupGuidancePointsByCoord(guidancePoints, coords) {
+  const groups = [];
+  const byKey = new Map();
   for (const gp of guidancePoints) {
     if (gp.vxIndex >= coords.length) continue;
     const c = coords[gp.vxIndex];
-    let dirName = '', intName = '';
-    if (directionNames) { const dn = directionNames.find(d => d.lastVxIdx >= gp.vxIndex); if (dn) dirName = dn.name; }
-    if (intersectionNames) { const cn = intersectionNames.find(d => d.lastVxIdx >= gp.vxIndex); if (cn) intName = cn.name; }
-    let popup = `<b>${esc(guidanceName(gp.guidanceCode))}</b> (코드: ${gp.guidanceCode})`;
-    if (gp.continuousTurnCode > 0) popup += `<br>연속회전: ${gp.continuousTurnCode === 1 ? '고속' : '일반'}`;
-    if (dirName) popup += `<br>방면: ${esc(dirName)}`;
-    if (intName) popup += `<br>교차로: ${esc(intName)}`;
-    popup += `<br>VX: ${gp.vxIndex}<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
-    L.marker([c.lat, c.lon], {
-      icon: L.divIcon({ className: '', html: guidanceIconHtml(gp.guidanceCode), iconSize: [22, 22], iconAnchor: [11, 11] }),
-    }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
+    const key = `${c.lat.toFixed(6)},${c.lon.toFixed(6)}`;
+    const existing = byKey.get(key);
+    if (existing) existing.push(gp);
+    else { const arr = [gp]; byKey.set(key, arr); groups.push(arr); }
+  }
+  return groups;
+}
+
+/**
+ * 겹친 안내점 팝업 내용 HTML. 상단에 선택 탭(1..n), 아래에 선택된 안내점 상세.
+ * idx 는 범위를 벗어나면 클램프한다. 탭 버튼은 data-gp-idx 로 식별.
+ */
+export function buildGuidanceChooserHtml(gps, idx, coords, directionNames, intersectionNames) {
+  const sel = Math.max(0, Math.min(idx | 0, gps.length - 1));
+  const tabs = gps.map((gp, i) =>
+    `<button type="button" data-gp-idx="${i}" style="border:none;border-radius:6px;padding:3px 9px;cursor:pointer;` +
+    `font-weight:700;font-size:11px;background:${i === sel ? '#3182f6' : '#eef2f7'};color:${i === sel ? '#fff' : '#334155'}">${i + 1}</button>`
+  ).join('');
+  const header =
+    `<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eef2f7">` +
+      `<div style="color:#ef4444;font-weight:700;font-size:11px;margin-bottom:4px">📍 겹친 안내점 ${gps.length}개 — 선택</div>` +
+      `<div style="display:flex;gap:4px;flex-wrap:wrap">${tabs}</div>` +
+    `</div>`;
+  return header + `<div>${guidanceDetailHtml(gps[sel], coords, directionNames, intersectionNames)}</div>`;
+}
+
+function renderGuidancePoints(lg, coords, guidancePoints, directionNames, intersectionNames) {
+  for (const gps of groupGuidancePointsByCoord(guidancePoints, coords)) {
+    const c = coords[gps[0].vxIndex];
+    const multi = gps.length > 1;
+    const iconInner = guidanceIconHtml(gps[0].guidanceCode);
+    const html = multi
+      ? `<div style="position:relative;width:22px;height:22px">${iconInner}` +
+        `<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border-radius:8px;` +
+        `font-size:9px;font-weight:800;min-width:14px;height:14px;line-height:14px;text-align:center;padding:0 2px;` +
+        `box-shadow:0 0 0 1px #fff">${gps.length}</span></div>`
+      : iconInner;
+    const marker = L.marker([c.lat, c.lon], {
+      icon: L.divIcon({ className: '', html, iconSize: [22, 22], iconAnchor: [11, 11] }),
+    });
+    if (!multi) {
+      marker.bindPopup(guidanceDetailHtml(gps[0], coords, directionNames, intersectionNames), { maxWidth: 300 });
+    } else {
+      // 겹친 안내점: 탭으로 하나씩 선택해 볼 수 있는 팝업(DOM 엘리먼트).
+      const el = document.createElement('div');
+      el.style.fontSize = '12px';
+      el.style.minWidth = '210px';
+      let idx = 0;
+      const draw = () => {
+        el.innerHTML = buildGuidanceChooserHtml(gps, idx, coords, directionNames, intersectionNames);
+        el.querySelectorAll('[data-gp-idx]').forEach(btn => {
+          btn.addEventListener('click', ev => {
+            ev.stopPropagation();
+            idx = Number(btn.getAttribute('data-gp-idx'));
+            draw();
+          });
+        });
+      };
+      draw();
+      marker.bindPopup(el, { maxWidth: 320 });
+    }
+    marker.addTo(lg);
   }
 }
 

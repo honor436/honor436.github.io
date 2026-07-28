@@ -83,6 +83,17 @@ export function resolveRpFlag(kind, poiRpFlag) {
   return kind === 'dest' ? 16 : 18;
 }
 
+/**
+ * 경로요청 POI ID 결정: 검색/상세에서 받은 poiId 를 문자열로 정규화한다.
+ * POI 가 아닌 지점(지도 우클릭 등)은 값이 없으므로 null 을 돌려주고,
+ * 호출측이 destPoiId 를 비우거나 경유지 poiID 를 생략하게 한다.
+ */
+export function resolvePoiId(poiId) {
+  if (poiId == null) return null;
+  const s = String(poiId).trim();
+  return s === '' ? null : s;
+}
+
 // ---- POI detail ----------------------------------------------------------- //
 
 // POI 상세 요청 헤더(제공된 상세 샘플 기준 — 검색과 svcType/appVersion 등이 다름).
@@ -122,6 +133,10 @@ export function buildPoiDetailBody({ name, poiId, pkey, findOption = 'PKEY' }) {
 
 // 실제 POI 상세 엔드포인트 경로 (검색의 /poi/search/findpois 와 다름).
 export const POI_DETAIL_PATH = '/tmap-channel/poi/detailinfo/findpoidetailinfoforauto';
+
+// pkey 없이 poiId 만으로 상세를 조회할 때 쓰는 findOption.
+// 충전소(ES3)·주유소(GAS3)는 경로 응답에 poiId 만 있어 이 옵션을 쓴다.
+export const POI_DETAIL_FIND_BY_POI_ID = 'POI_ID';
 
 /**
  * 상세 URL 도출: 검색 URL 의 호스트(스킴+호스트+포트)를 그대로 쓰고
@@ -276,11 +291,11 @@ export function parseRoutePoiResponse(json) {
     : (Array.isArray(json.poiSearchs) ? json.poiSearchs : deepFindPoiArray(json));
   if (!Array.isArray(list)) return [];
   return list.map(raw => {
-    const x = Number(raw.center_x), y = Number(raw.center_y);
+    const coords = pickCoords(raw) || { x: null, y: null };
     return {
       name: raw.name || raw.org_name || '',
-      x: Number.isFinite(x) && x !== 0 ? x : null,
-      y: Number.isFinite(y) && y !== 0 ? y : null,
+      x: coords.x,
+      y: coords.y,
       address: raw.full_address_road || raw.full_address_jibun || '',
       tel: '',
       poiId: raw.poi_id,
@@ -429,8 +444,12 @@ const ADDR_KEYS = ['fullAddressRoad', 'roadName', 'fullAddress', 'newAddress', '
   'full_address_road', 'full_address_jibun', 'fullAddressJibun'];
 const TEL_KEYS  = ['tel', 'telNo', 'telNumber'];
 // 좌표 후보 (우선순위 순). 각 쌍 [xKey, yKey]. SK 정수 좌표 기준.
+// 경유지·목적지로 쓰는 좌표는 안내 좌표(navX1/navY1)가 우선이고, 없으면
+// 중심 좌표(centerX/centerY). 그 뒤는 다른 응답 형태를 위한 예비 후보.
 const COORD_PAIRS = [
-  ['noorX', 'noorY'], ['frontX', 'frontY'], ['centerX', 'centerY'], ['center_x', 'center_y'],
+  ['navX1', 'navY1'], ['nav_x1', 'nav_y1'],
+  ['centerX', 'centerY'], ['center_x', 'center_y'],
+  ['noorX', 'noorY'], ['frontX', 'frontY'],
   ['navX', 'navY'], ['posX', 'posY'], ['x', 'y'],
 ];
 
@@ -504,4 +523,45 @@ export function parsePoiSearchResponse(json) {
   let list = direct.find(Array.isArray) || deepFindPoiArray(json);
   if (!Array.isArray(list)) return [];
   return list.map(normalizePoi).filter(p => p.name && p.x != null && p.y != null);
+}
+
+/**
+ * POI 상세 응답 → { name, x, y, address, tel, poiId, pkey, rpFlag, raw } 또는 null.
+ * 경유지·목적지 설정에 필요한 값만 뽑는다. 좌표 규칙은 검색과 동일
+ * (navX1/navY1 우선, 없으면 centerX/centerY). 상세 응답 형태가 채널/버전마다
+ * 달라 대표 컨테이너를 먼저 보고, 없으면 트리를 훑어 좌표가 있는 객체를 찾는다.
+ */
+export function parsePoiDetailResponse(json) {
+  if (!json || typeof json !== 'object') return null;
+  const direct = [
+    json?.poiDetailInfo,
+    json?.poiDetail,
+    json?.poiInfo,
+    json?.result,
+    json,
+  ];
+  for (const cand of direct) {
+    if (cand && typeof cand === 'object' && !Array.isArray(cand) && pickCoords(cand)) {
+      return normalizePoi(cand);
+    }
+  }
+  const arr = deepFindPoiArray(json);
+  if (arr && arr.length) return normalizePoi(arr[0]);
+  const obj = deepFindCoordObject(json);
+  return obj ? normalizePoi(obj) : null;
+}
+
+// 트리에서 유효 좌표를 가진 첫 객체를 찾는다 (명칭은 없어도 됨).
+function deepFindCoordObject(json) {
+  const queue = [json];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (Array.isArray(cur)) {
+      for (const v of cur) if (v && typeof v === 'object') queue.push(v);
+    } else if (cur && typeof cur === 'object') {
+      if (pickCoords(cur)) return cur;
+      for (const v of Object.values(cur)) if (v && typeof v === 'object') queue.push(v);
+    }
+  }
+  return null;
 }

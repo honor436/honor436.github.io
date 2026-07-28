@@ -514,13 +514,14 @@
       max-height: 46vh; overflow-y: auto;
     }
     #poi-route-opts.open { display: block; }
-    #poi-results-bar { display: flex; justify-content: flex-end; margin-top: 6px; }
+    #poi-results-bar { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
     #poi-results-bar.hidden { display: none; }
-    #poi-show-req {
+    #poi-show-req, #poi-close-results {
       border: none; background: #fff; color: #334155; font-size: 11px; font-weight: 700;
       border-radius: 14px; padding: 5px 10px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     }
     #poi-show-req.active { background: #e0f2fe; color: #0369a1; }
+    #poi-close-results:hover { background: #fee2e2; color: #b91c1c; }
     #poi-req-view {
       display: none; margin-top: 6px; background: #0f172a; color: #cbd5e1;
       border-radius: 10px; padding: 10px; font-family: ui-monospace, Menlo, Consolas, monospace;
@@ -2466,6 +2467,7 @@
     <div id="poi-status"></div>
     <div id="poi-results-bar" class="hidden">
       <button id="poi-show-req" title="마지막 전송 요청의 URL·바디(JSON) 보기">🧾 요청 데이터 보기</button>
+      <button id="poi-close-results" title="검색 결과 닫기">✕ 닫기</button>
     </div>
     <pre id="poi-req-view"></pre>
     <div id="poi-results"></div>
@@ -2561,7 +2563,7 @@ import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
 import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch } from './js/route-request.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, derivePoiDetailUrl, resolveRpFlag, buildRoutePoiSearchBody, parseRoutePoiResponse, FINDPOISBYROUTE_V2_PATH } from './js/poi-search.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, parsePoiDetailResponse, POI_DETAIL_FIND_BY_POI_ID, derivePoiDetailUrl, resolveRpFlag, resolvePoiId, buildRoutePoiSearchBody, parseRoutePoiResponse, FINDPOISBYROUTE_V2_PATH } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3857,15 +3859,15 @@ function addViaMarker(lat, lon, idx) {
   wpMarkers.vias[idx] = marker;
 }
 
-function setWaypoint(type, lat, lon, name, rpFlag) {
+function setWaypoint(type, lat, lon, name, rpFlag, poiId) {
   let wp;
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    wp = { lat, lon, name, rpFlag };
+    wp = { lat, lon, name, rpFlag, poiId };
     routeWaypoints.vias.push(wp);
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
-    wp = { lat, lon, name, rpFlag };
+    wp = { lat, lon, name, rpFlag, poiId };
     routeWaypoints[type] = wp;
     const map = getMap();
     if (!map) return;
@@ -4049,12 +4051,15 @@ function applyWaypointsToBody() {
       if (routeWaypoints.dest.name) body.destName = routeWaypoints.dest.name;
       // 목적지 rpFlag: POI(검색/상세) 값 우선, 없으면 16
       body.destRpFlag = resolveRpFlag('dest', routeWaypoints.dest.rpFlag);
+      // 목적지 poiId: POI 검색 결과 값. POI 가 아닌 지점이면 기본 바디의
+      // 샘플 ID 가 남지 않도록 비운다.
+      body.destPoiId = resolvePoiId(routeWaypoints.dest.poiId) ?? '';
     }
     // 경유지 반영
     if (routeWaypoints.vias.length > 0) {
       body.wayPoints = routeWaypoints.vias.map((v, i) => {
         const sk = wgs84ToSkCoord(v.lat, v.lon);
-        return {
+        const wp = {
           x: sk[0],
           y: sk[1],
           wayPointName: v.name || ('경유지' + (i + 1)),
@@ -4062,6 +4067,10 @@ function applyWaypointsToBody() {
           // 경유지 rpFlag: POI(검색/상세) 값 우선, 없으면 18
           rpFlag: resolveRpFlag('via', v.rpFlag),
         };
+        // 경유지 poiID: POI 검색 결과일 때만 넣는다.
+        const pid = resolvePoiId(v.poiId);
+        if (pid != null) wp.poiID = pid;
+        return wp;
       });
     } else {
       delete body.wayPoints;
@@ -4250,21 +4259,18 @@ window._showGasStation = function(idx) {
   showGasStationOnMap(map, idx);
 };
 
-// Add EV charger as a via waypoint from its popup button
+// Add EV charger as a via waypoint from its popup button.
+// poiId 로 POI 상세를 조회해 그 결과(좌표·명칭·rpFlag·poiId)로 설정한다.
 window._addEvWaypoint = function(idx) {
   const wp = getEvChargerWaypoint(idx);
   if (!wp) return;
-  setWaypoint('via', wp.lat, wp.lon, wp.name, 18); // 충전소 경유지 rpFlag = 18
-  const map = getMap();
-  if (map) map.closePopup();
+  window._setWpFromPoiId('via', wp.poiId, wp);
 };
 
 window._addGasWaypoint = function(idx) {
   const wp = getGasStationWaypoint(idx);
   if (!wp) return;
-  setWaypoint('via', wp.lat, wp.lon, wp.name, 18); // 주유소 경유지 rpFlag = 18
-  const map = getMap();
-  if (map) map.closePopup();
+  window._setWpFromPoiId('via', wp.poiId, wp);
 };
 
 // ---- POI keyword search (Google-Maps style 검색창) ---- //
@@ -4318,6 +4324,15 @@ window._addGasWaypoint = function(idx) {
   showReqBtn.addEventListener('click', () => {
     reqView.classList.toggle('open');
     showReqBtn.classList.toggle('active');
+  });
+
+  // 검색 결과 닫기 — 결과 목록·요청 데이터 뷰·상태문구를 모두 정리한다.
+  document.getElementById('poi-close-results').addEventListener('click', () => {
+    resultsEl.innerHTML = '';
+    reqView.classList.remove('open');
+    showReqBtn.classList.remove('active');
+    resultsBar.classList.add('hidden');
+    setPoiStatus('');
   });
 
   // headerText(= "Key: Value" 줄) 를 받아 전송. JSON 헤더가 아니라 테스터 규칙.
@@ -4550,9 +4565,50 @@ window._addGasWaypoint = function(idx) {
   window._poiSetWp = function(type) {
     const p = window._poiPending;
     if (!p) return;
-    setWaypoint(type, p.lat, p.lon, p.name, p.rpFlag);
+    setWaypoint(type, p.lat, p.lon, p.name, p.rpFlag, p.poiId);
     const map = getMap();
     if (map) map.closePopup();
+  };
+
+  // poiId 만 있는 지점(충전소 ES3 / 주유소 GAS3)을 POI 상세로 조회해
+  // 그 결과(좌표·명칭·rpFlag·poiId)로 경유지/목적지를 설정한다.
+  // 상세 조회가 실패하면 fallback(마커 좌표·명칭)으로 설정해 버튼이 먹통이 되지 않게 한다.
+  window._setWpFromPoiId = async function(type, poiId, fallback) {
+    const fb = fallback || {};
+    const map = getMap();
+    const applyFallback = (why) => {
+      if (fb.lat == null || fb.lon == null) { setPoiStatus(why, 'error'); return; }
+      setWaypoint(type, fb.lat, fb.lon, fb.name, undefined, poiId);
+      setPoiStatus(`${why} — 마커 좌표로 설정했습니다.`, 'error');
+    };
+    if (poiId == null) { applyFallback('poiId 가 없어 상세 조회를 건너뜁니다.'); if (map) map.closePopup(); return; }
+
+    const url = derivePoiDetailUrl(urlInput.value.trim() || buildPoiSearchUrl(envSel.value));
+    const body = buildPoiDetailBody({ name: fb.name || '', poiId, findOption: POI_DETAIL_FIND_BY_POI_ID });
+    if (body.header) body.header.reqTime = nowReqTime();
+    const { headers } = parseHeaderText(headersTa.value);
+    setPoiStatus(`상세 조회 중... (poiId ${poiId})`);
+    try {
+      const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      const buf = await resp.arrayBuffer();
+      const raw = decodeTmapBody(new Uint8Array(buf), resp.headers.get('content-type') || '');
+      if (!resp.ok) { applyFallback(`상세 HTTP ${resp.status} ${resp.statusText}`); showRawResponse(raw); return; }
+      const json = coerceJson(raw);
+      const d = json ? parsePoiDetailResponse(json) : null;
+      if (!d) {
+        applyFallback(extractTmapErrorHint(raw) || '상세 응답에서 좌표를 찾지 못했습니다.');
+        showRawResponse(raw);
+        return;
+      }
+      const wgs = skCoordToWgs84(d.x, d.y);
+      if (!wgs) { applyFallback('상세 좌표 변환 실패'); return; }
+      setWaypoint(type, wgs[0], wgs[1], d.name || fb.name, d.rpFlag, d.poiId ?? poiId);
+      setPoiStatus(`상세 조회로 설정: ${d.name || fb.name || poiId}`, 'ok');
+    } catch (e) {
+      applyFallback('상세 조회 실패 (CORS/프록시 필요할 수 있음): ' + e.message);
+    } finally {
+      if (map) map.closePopup();
+    }
   };
 })();
 

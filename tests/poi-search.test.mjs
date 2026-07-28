@@ -12,8 +12,11 @@ import {
   decodeTmapBody,
   extractTmapErrorHint,
   buildPoiDetailBody,
+  parsePoiDetailResponse,
+  POI_DETAIL_FIND_BY_POI_ID,
   derivePoiDetailUrl,
   resolveRpFlag,
+  resolvePoiId,
   buildRoutePoiSearchBody,
   parseRoutePoiResponse,
   FINDPOISBYROUTE_V2_PATH,
@@ -293,6 +296,55 @@ test('buildPoiDetailBody_coerces_ids_to_string', () => {
   assert.equal(body.pkey, '1018546001');
 });
 
+// 충전소·주유소(TVAS)는 pkey 가 없고 poiId 만 있으므로 POI_ID 로 조회한다.
+test('buildPoiDetailBody_supports_poiId_lookup_option', () => {
+  const body = buildPoiDetailBody({ name: '충전소', poiId: 11325648, findOption: POI_DETAIL_FIND_BY_POI_ID });
+  assert.equal(body.findOption, POI_DETAIL_FIND_BY_POI_ID);
+  assert.equal(body.poiId, '11325648');
+  assert.equal(body.pkey, '');
+});
+
+// ---- parsePoiDetailResponse ----------------------------------------------- //
+//
+// 상세 응답에서 경유지 설정에 필요한 값(좌표·명칭·rpFlag·poiId)을 뽑는다.
+// 좌표 규칙은 검색과 같다: navX1/navY1 우선, 없으면 centerX/centerY.
+
+test('parsePoiDetailResponse_extracts_waypoint_fields', () => {
+  const json = { poiDetailInfo: {
+    name: '분데스언주 전기차충전소', navX1: '4573250', navY1: '1350100',
+    centerX: '4573200', centerY: '1350142', rpFlag: 7, poiId: '11325648',
+  } };
+  const d = parsePoiDetailResponse(json);
+  assert.equal(d.name, '분데스언주 전기차충전소');
+  assert.equal(d.x, 4573250);
+  assert.equal(d.y, 1350100);
+  assert.equal(d.rpFlag, 7);
+  assert.equal(d.poiId, '11325648');
+});
+
+test('parsePoiDetailResponse_falls_back_to_centerX_centerY', () => {
+  const json = { poiDetailInfo: { name: '센터폴백', centerX: '4573200', centerY: '1350142' } };
+  const d = parsePoiDetailResponse(json);
+  assert.equal(d.x, 4573200);
+  assert.equal(d.y, 1350142);
+});
+
+test('parsePoiDetailResponse_deep_scans_when_shape_differs', () => {
+  const json = { result: { data: { poi: [
+    { name: '깊은곳', navX1: 4570000, navY1: 1340000, rpFlag: 3 },
+  ] } } };
+  const d = parsePoiDetailResponse(json);
+  assert.equal(d.name, '깊은곳');
+  assert.equal(d.x, 4570000);
+  assert.equal(d.rpFlag, 3);
+});
+
+test('parsePoiDetailResponse_returns_null_without_coords', () => {
+  assert.equal(parsePoiDetailResponse(null), null);
+  assert.equal(parsePoiDetailResponse({}), null);
+  assert.equal(parsePoiDetailResponse({ poiDetailInfo: { name: '좌표없음' } }), null);
+});
+
 // ---- derivePoiDetailUrl --------------------------------------------------- //
 //
 // 상세 URL 은 검색 URL 의 호스트를 그대로 쓰고 실제 상세 경로
@@ -351,6 +403,46 @@ test('resolveRpFlag_ignores_empty_or_nan_poi_rpFlag', () => {
   assert.equal(resolveRpFlag('via', null), 18);
   assert.equal(resolveRpFlag('via', ''), 18);
   assert.equal(resolveRpFlag('dest', 'abc'), 16);
+});
+
+// ---- poiId (destPoiId / wayPoint poiID) ----------------------------------- //
+//
+// 검색 결과의 poiId 를 목적지 destPoiId, 경유지 poiID 로 넣는다. POI 가 아닌
+// 지점(지도 우클릭 등)은 값이 없으므로 null 을 돌려 호출측이 비우게 한다.
+
+test('resolvePoiId_returns_string_for_present_value', () => {
+  assert.equal(resolvePoiId('10185460'), '10185460');
+  assert.equal(resolvePoiId(10185460), '10185460');
+});
+
+test('resolvePoiId_returns_null_when_absent', () => {
+  assert.equal(resolvePoiId(null), null);
+  assert.equal(resolvePoiId(undefined), null);
+  assert.equal(resolvePoiId(''), null);
+  assert.equal(resolvePoiId('   '), null);
+});
+
+// ---- 경유지/목적지 좌표: navX1/navY1 우선, 없으면 centerX/centerY ---------- //
+//
+// 경로 요청의 경유지·목적지는 안내 좌표(navX1/navY1)를 써야 한다. 검색 응답에
+// navX1/navY1 이 있으면 그 값을, 없으면 centerX/centerY 를 사용한다.
+
+test('parsePoiSearchResponse_prefers_navX1_navY1', () => {
+  const json = { poiInfo: { pois: { poi: [
+    { name: '행당대림', navX1: '4575900', navY1: '1351400', centerX: '4575887', centerY: '1351438' },
+  ] } } };
+  const p = parsePoiSearchResponse(json)[0];
+  assert.equal(p.x, 4575900);
+  assert.equal(p.y, 1351400);
+});
+
+test('parsePoiSearchResponse_falls_back_to_centerX_centerY_when_navX1_missing', () => {
+  const json = { poiInfo: { pois: { poi: [
+    { name: '행당대림', centerX: '4575887', centerY: '1351438' },
+  ] } } };
+  const p = parsePoiSearchResponse(json)[0];
+  assert.equal(p.x, 4575887);
+  assert.equal(p.y, 1351438);
 });
 
 // ---- 경로상 POI 검색 (findpoisbyroute/v2) --------------------------------- //
@@ -499,4 +591,14 @@ test('parseRoutePoiResponse_returns_empty_for_missing_data', () => {
   assert.deepEqual(parseRoutePoiResponse(null), []);
   assert.deepEqual(parseRoutePoiResponse({}), []);
   assert.deepEqual(parseRoutePoiResponse({ poiSearches: [] }), []);
+});
+
+test('parseRoutePoiResponse_prefers_nav_x1_nav_y1', () => {
+  const json = { poiSearches: [
+    { name: '전기차충전소', nav_x1: 4573250, nav_y1: 1350100,
+      center_x: 4573200, center_y: 1350142 },
+  ] };
+  const p = parseRoutePoiResponse(json)[0];
+  assert.equal(p.x, 4573250);
+  assert.equal(p.y, 1350100);
 });

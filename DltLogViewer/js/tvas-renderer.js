@@ -1327,7 +1327,7 @@ function renderEvChargers(layers, coords, evChargers) {
       zIndexOffset: zOff,
     }).bindPopup(popup, { maxWidth: 320 });
 
-    evChargerMarkers.push({ marker, lat, lon, name: ev.name || '충전소', isMust, layerKey });
+    evChargerMarkers.push({ marker, lat, lon, name: ev.name || '충전소', isMust, layerKey, poiId: ev.poiId });
 
     // Add every charger to its category layer so the category toggle
     // (경로상/경로주변) fully controls visibility.
@@ -1335,11 +1335,12 @@ function renderEvChargers(layers, coords, evChargers) {
   }
 }
 
-// Return a charger's coords + name for adding it as a route waypoint.
+// Return a charger's coords + name + poiId for adding it as a route waypoint.
+// poiId 는 상세 조회 키로 쓰인다. 0/음수는 ID 없음(Int32 기본값)으로 본다.
 export function getEvChargerWaypoint(idx) {
   const m = evChargerMarkers[idx];
   if (!m) return null;
-  return { lat: m.lat, lon: m.lon, name: m.name };
+  return { lat: m.lat, lon: m.lon, name: m.name, poiId: m.poiId > 0 ? m.poiId : null };
 }
 
 // Pan/zoom to a charger from the list and open its popup.
@@ -1459,7 +1460,7 @@ function renderGasStations(layers, coords, gasStations) {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
       zIndexOffset: isLowest ? 1200 : 400,
     }).bindPopup(buildGasStationPopup(gas, lat, lon, idx), { maxWidth: 300 });
-    gasStationMarkers.push({ marker, lat, lon, name: gas.name || '주유소', layerKey: 'gasStation' });
+    gasStationMarkers.push({ marker, lat, lon, name: gas.name || '주유소', layerKey: 'gasStation', poiId: gas.poiId });
     if (lg) marker.addTo(lg);
   }
 }
@@ -1474,11 +1475,12 @@ export function showGasStationOnMap(map, idx) {
   m.marker.openPopup();
 }
 
-// Return a gas station's coords + name for adding it as a route waypoint.
+// Return a gas station's coords + name + poiId for adding it as a route waypoint.
+// poiId 는 상세 조회 키로 쓰인다. 0/음수는 ID 없음(Int32 기본값)으로 본다.
 export function getGasStationWaypoint(idx) {
   const m = gasStationMarkers[idx];
   if (!m) return null;
-  return { lat: m.lat, lon: m.lon, name: m.name };
+  return { lat: m.lat, lon: m.lon, name: m.name, poiId: m.poiId > 0 ? m.poiId : null };
 }
 
 export function buildLanePopup(tl, c) {

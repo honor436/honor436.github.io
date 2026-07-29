@@ -340,7 +340,7 @@ function parseRestAreas(dv, offset, size, charset) {
     const evBrand    = dv.getUint8(base + 5);
     const info       = dv.getUint16(base + 6, true);
     const nameOffset = dv.getInt32(base + 8, true);
-    const poiId      = dv.getInt32(base + 12, true);
+    const poiId      = dv.getUint32(base + 12, true); // UInt32
     let name = '';
     if (blobStart + nameOffset < offset + size) {
       name = readString(dv, blobStart + nameOffset, Math.min(200, offset + size - blobStart - nameOffset), charset);
@@ -570,7 +570,7 @@ export function parseEvChargers(dv, offset, size, charset) {
     if (base + 44 > sectionEnd) break;
     records.push({
       vxIdx:        dv.getUint16(base, true),
-      poiId:        dv.getInt32(base + 2, true),
+      poiId:        dv.getUint32(base + 2, true), // UInt32
       roadType:     dv.getUint8(base + 6),
       locX:         dv.getInt32(base + 7, true),
       locY:         dv.getInt32(base + 11, true),
@@ -687,7 +687,7 @@ export function parseGasStations(dv, offset, size, charset) {
       truckDiscount:   dv.getUint8(base + 30),
       owinMember:      dv.getUint8(base + 31),
       muffinMember:    dv.getUint8(base + 32),
-      poiId:           dv.getInt32(base + 34, true),
+      poiId:           dv.getUint32(base + 34, true), // UInt32
       cardDiscount:    dv.getUint8(base + 38),
       isSelf:          dv.getUint8(base + 39),
     });
@@ -726,8 +726,10 @@ function parseTrafficInfo(dv, offset, size) {
   return items;
 }
 
-function parseWaypoints(dv, offset, size, charset) {
+export function parseWaypoints(dv, offset, size, charset) {
   // WP2: 경유지 지점정보
+  // 헤더 8B → 레코드 16B×n: UShort vxIdx@0, Byte type@2, reserved@3,
+  //   Int x@4, Int y@8, UInt poiId@12.
   const count = dv.getUint16(offset, true);
   const dataStart = offset + 8;
   const items = [];
@@ -739,7 +741,8 @@ function parseWaypoints(dv, offset, size, charset) {
       type:  dv.getUint8(base + 2),
       x:     dv.getInt32(base + 4, true),
       y:     dv.getInt32(base + 8, true),
-      poiId: dv.getInt32(base + 12, true),
+      // poiId 는 UInt32 — 부호있는 정수로 읽으면 큰 ID 가 음수가 된다.
+      poiId: dv.getUint32(base + 12, true),
     });
   }
   return items;

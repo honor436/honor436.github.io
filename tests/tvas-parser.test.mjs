@@ -528,3 +528,53 @@ test('parseGasStations_reads_names_by_offset', () => {
   assert.equal(gs[0].name, 'AAA'); // nameOffset 0
   assert.equal(gs[1].name, 'BB');  // nameOffset 4
 });
+
+// ---- parseWaypoints (WP2 경유지 지점정보) --------------------------------- //
+//
+// 스펙: 헤더 8B(UShort count, Byte type, Byte reserved, Char[4] "WP2")
+//   레코드 16B×n: UShort vxIdx, Byte type, Byte reserved, Int x, Int y, UInt poiId
+// poiId 는 UInt32 다. 상위 비트가 설정된 큰 ID 를 부호있는 정수로 읽으면
+// 음수가 되어 리스트에 비정상 값으로 표시된다.
+import { parseWaypoints } from '../DltLogViewer/js/tvas-parser.js';
+
+function buildWp2Fixture() {
+  // header(8) + record(16)×2 = 40
+  const buf = new ArrayBuffer(40);
+  const dv = new DataView(buf);
+  const b = new Uint8Array(buf);
+  dv.setUint16(0, 2, true);   // count
+  b[2] = 0x01;                // type
+  b[3] = 0;                   // reserved
+  b[4] = 0x57; b[5] = 0x50; b[6] = 0x32; b[7] = 0x00; // "WP2\0"
+  const rec = (base, o) => {
+    dv.setUint16(base + 0, o.vxIdx, true);
+    b[base + 2] = o.type;
+    b[base + 3] = 0;
+    dv.setInt32(base + 4, o.x, true);
+    dv.setInt32(base + 8, o.y, true);
+    dv.setUint32(base + 12, o.poiId, true); // UInt32
+  };
+  // 상위 비트가 설정된 큰 poiId (부호있는 해석 시 음수가 되는 값)
+  rec(8,  { vxIdx: 12, type: 1, x: 4573250, y: 1350100, poiId: 3000000000 });
+  rec(24, { vxIdx: 30, type: 2, x: 4573200, y: 1350142, poiId: 0 });
+  return { dv, size: 40 };
+}
+
+test('parseWaypoints_reads_poiId_as_unsigned', () => {
+  const { dv, size } = buildWp2Fixture();
+  const wps = parseWaypoints(dv, 0, size, 1);
+  assert.equal(wps.length, 2);
+  assert.equal(wps[0].poiId, 3000000000);
+  assert.ok(wps[0].poiId > 0, 'UInt32 poiId 는 음수가 되어서는 안 된다');
+});
+
+test('parseWaypoints_reads_vertex_type_and_coords', () => {
+  const { dv, size } = buildWp2Fixture();
+  const wps = parseWaypoints(dv, 0, size, 1);
+  assert.equal(wps[0].vxIdx, 12);
+  assert.equal(wps[0].type, 1);
+  assert.equal(wps[0].x, 4573250);
+  assert.equal(wps[0].y, 1350100);
+  assert.equal(wps[1].vxIdx, 30);
+  assert.equal(wps[1].poiId, 0);
+});

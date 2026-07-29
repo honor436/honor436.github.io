@@ -2399,7 +2399,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode, formatPoiId } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
@@ -5381,7 +5381,7 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   if (tvasResult.waypoints && tvasResult.waypoints.length > 0) {
     const rows = tvasResult.waypoints.map((wp, i) =>
       `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
-        [${i}] ${vx(wp.vxIdx, coords)} 타입:${wp.type} SK(${wp.x},${wp.y}) POI:${wp.poiId}
+        [${i}] ${vx(wp.vxIdx, coords)} 타입:${wp.type} SK(${wp.x},${wp.y}) POI ID:${formatPoiId(wp.poiId)}
       </div>`
     ).join('');
     html += sectionDetail('경유지', 'WP2', tvasResult.waypoints.length, rows);

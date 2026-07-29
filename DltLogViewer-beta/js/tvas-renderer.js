@@ -1640,16 +1640,33 @@ function waypointIconHtml(index) {
   return `<div style="width:26px;height:26px;line-height:26px;text-align:center;background:#3b82f6;color:#fff;border-radius:50%;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #fff">${index + 1}</div>`;
 }
 
+// TVAS 의 poiId 는 Int32 라 "없음"이 0(또는 음수)로 내려온다. 그대로 노출하면
+// 실제 POI ID 처럼 보이므로 '-' 로 표시한다.
+export function formatPoiId(poiId) {
+  const n = Number(poiId);
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  return String(n);
+}
+
+// 경유지(WP2) 마커 팝업. POI ID 는 값이 없어도 항목을 항상 노출한다.
+export function buildWaypointPopup(wp, c, i) {
+  let html = `<b>🚩 경유지 ${i + 1}</b><br>VX: ${wp.vxIdx}`;
+  if (wp.type) html += `<br>유형: ${wp.type}`;
+  html += `<br><b>POI ID</b>: ${formatPoiId(wp.poiId)}`;
+  if (Number.isFinite(Number(wp.x)) && Number.isFinite(Number(wp.y))) {
+    html += `<br>SK: ${wp.x}, ${wp.y}`;
+  }
+  html += `<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+  return html;
+}
+
 function renderWaypoints(lg, coords, waypoints) {
   if (!waypoints || waypoints.length === 0) return;
   for (let i = 0; i < waypoints.length; i++) {
     const wp = waypoints[i];
     if (typeof wp.vxIdx !== 'number' || wp.vxIdx < 0 || wp.vxIdx >= coords.length) continue;
     const c = coords[wp.vxIdx];
-    let popup = `<b>🚩 경유지 ${i + 1}</b><br>VX: ${wp.vxIdx}`;
-    if (wp.type) popup += `<br>유형: ${wp.type}`;
-    if (wp.poiId) popup += `<br>POI: ${wp.poiId}`;
-    popup += `<br>WGS84: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+    const popup = buildWaypointPopup(wp, c, i);
     L.marker([c.lat, c.lon], {
       icon: L.divIcon({ className: '', html: waypointIconHtml(i), iconSize: [26, 26], iconAnchor: [13, 13] }),
       zIndexOffset: 900,

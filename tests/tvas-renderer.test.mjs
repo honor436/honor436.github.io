@@ -17,6 +17,8 @@ import {
   gasFacilities,
   buildRpLinkPopup,
   rpLinkStyle,
+  buildWaypointPopup,
+  formatPoiId,
 } from '../DltLogViewer/js/tvas-renderer.js';
 
 // ---- buildRouteArrowSpecs ------------------------------------------------- //
@@ -72,6 +74,45 @@ test('buildRouteArrowSpecs_colors_congestion_level_원활_green', () => {
   const coords = [{ lat: 37.0, lon: 127.0 }, { lat: 37.1, lon: 127.1 }];
   const items = [{ startVxIdx: 0, endVxIdx: 1, congestion: '1' }];
   assert.equal(buildRouteArrowSpecs(coords, items)[0].color, GREEN);
+});
+
+// ---- formatPoiId ---------------------------------------------------------- //
+//
+// TVAS 의 poiId 는 Int32 라 "없음"이 0(또는 -1)으로 내려온다. 그 값을 그대로
+// 노출하면 실제 POI ID 처럼 보여 혼란스러우므로 '-' 로 표시한다.
+
+test('formatPoiId_returns_id_for_valid_value', () => {
+  assert.equal(formatPoiId(11325648), '11325648');
+  assert.equal(formatPoiId('11325648'), '11325648');
+});
+
+test('formatPoiId_treats_zero_and_negative_as_absent', () => {
+  assert.equal(formatPoiId(0), '-');
+  assert.equal(formatPoiId(-1), '-');
+  assert.equal(formatPoiId(null), '-');
+  assert.equal(formatPoiId(undefined), '-');
+});
+
+// ---- buildWaypointPopup --------------------------------------------------- //
+//
+// 경유지(WP2) 마커 팝업. POI ID 는 값이 없어도 항상 항목을 노출한다.
+
+test('buildWaypointPopup_always_shows_poi_id_row', () => {
+  const html = buildWaypointPopup({ vxIdx: 12, type: 1, poiId: 11325648 }, { lat: 37.5, lon: 127.1 }, 0);
+  assert.match(html, /POI ID/);
+  assert.match(html, /11325648/);
+});
+
+test('buildWaypointPopup_shows_dash_when_poi_id_absent', () => {
+  const html = buildWaypointPopup({ vxIdx: 12, type: 1, poiId: 0 }, { lat: 37.5, lon: 127.1 }, 0);
+  assert.match(html, /POI ID<\/b>: -/);
+  assert.doesNotMatch(html, /POI ID<\/b>: 0/);
+});
+
+test('buildWaypointPopup_shows_waypoint_number_and_vertex', () => {
+  const html = buildWaypointPopup({ vxIdx: 12, type: 1, poiId: 5 }, { lat: 37.5, lon: 127.1 }, 2);
+  assert.match(html, /경유지 3/);
+  assert.match(html, /12/);
 });
 
 // ---- buildEvPopup --------------------------------------------------------- //

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/auth-gate.js"></script>
+<title>조편성 룰렛</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 class="logo">🎯 조편성 룰렛</h1>
+  <p class="tagline">돌릴 때마다 한 명씩 뽑아 조에 배정하고, 뽑힌 사람은 룰렛에서 사라집니다.</p>
+</header>
+
+<main class="layout">
+  <!-- 왼쪽: 룰렛 -->
+  <section class="stage">
+    <div class="wheel-wrap">
+      <div class="pointer" aria-hidden="true"></div>
+      <div class="wheel-rotor" id="wheel-rotor">
+        <canvas id="wheel" width="520" height="520"></canvas>
+      </div>
+      <button id="spin-btn" class="spin-btn" type="button">
+        <span class="spin-label">돌리기</span>
+      </button>
+    </div>
+
+    <div class="stage-meta">
+      <span class="chip" id="remain-chip">남은 인원 0명</span>
+      <span class="chip" id="last-chip">아직 뽑지 않았습니다</span>
+    </div>
+
+    <p class="hint">스페이스바 또는 <b>돌리기</b> 버튼으로 추첨</p>
+  </section>
+
+  <!-- 오른쪽: 설정 + 결과 -->
+  <aside class="side">
+    <section class="panel" id="setup-panel">
+      <h2 class="panel-title">참가자 명단</h2>
+      <textarea id="names-input" rows="10" spellcheck="false"
+        placeholder="한 줄에 한 명씩 입력하세요 (쉼표 구분도 가능)&#10;홍길동&#10;김철수&#10;이영희"></textarea>
+      <div class="row">
+        <label class="field">
+          조 개수
+          <input id="team-count" type="number" min="2" max="12" step="1" value="4">
+        </label>
+        <span class="counter" id="name-counter">0명</span>
+      </div>
+      <div class="row btns">
+        <button id="start-btn" class="btn primary" type="button">룰렛 시작</button>
+        <button id="sample-btn" class="btn ghost" type="button">샘플 30명</button>
+        <button id="reset-btn" class="btn ghost" type="button">초기화</button>
+      </div>
+      <p class="warn" id="setup-warn" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">조 편성 결과</h2>
+      <div class="teams" id="teams"></div>
+    </section>
+  </aside>
+</main>
+
+<!-- 당첨자 오버레이 -->
+<div class="overlay" id="overlay" hidden>
+  <div class="confetti" id="confetti" aria-hidden="true"></div>
+  <div class="winner-card">
+    <p class="winner-eyebrow" id="winner-eyebrow">당첨</p>
+    <p class="winner-name" id="winner-name">홍길동</p>
+    <p class="winner-team" id="winner-team">1조</p>
+    <div class="row btns center">
+      <button id="next-btn" class="btn primary" type="button">다음 뽑기</button>
+      <button id="close-btn" class="btn ghost" type="button">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+:root {
+  --bg: #0c0f18;
+  --bg-soft: #141a28;
+  --panel: #161d2c;
+  --line: #2a3348;
+  --text: #e8ecf6;
+  --muted: #93a0bd;
+  --accent: #ffcf4a;
+  --accent-2: #ff5f7e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 620px at 12% -10%, #1d2740 0%, transparent 60%),
+    radial-gradient(900px 520px at 105% 0%, #2a1c3a 0%, transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+
+.topbar { padding: 28px 24px 8px; text-align: center; }
+.logo { margin: 0; font-size: 30px; letter-spacing: -0.5px; }
+.tagline { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 28px;
+  align-items: start;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ---------- 룰렛 ---------- */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+.wheel-wrap {
+  position: relative;
+  width: min(560px, 88vw);
+  aspect-ratio: 1;
+}
+
+.wheel-rotor {
+  width: 100%;
+  height: 100%;
+  transform: rotate(0deg);
+  will-change: transform;
+  filter: drop-shadow(0 22px 40px rgba(0, 0, 0, .55));
+}
+#wheel { width: 100%; height: 100%; display: block; }
+
+.pointer {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 17px solid transparent;
+  border-right: 17px solid transparent;
+  border-top: 34px solid var(--accent);
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .6));
+  z-index: 3;
+}
+
+.spin-btn {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 21%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .3);
+  background: linear-gradient(160deg, #2b3550, #10141f);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: clamp(13px, 2vw, 17px);
+  cursor: pointer;
+  z-index: 4;
+  transition: transform .12s ease, box-shadow .2s ease;
+  box-shadow: 0 0 0 6px rgba(12, 15, 24, .55);
+}
+.spin-btn:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.06); }
+.spin-btn:active:not(:disabled) { transform: translate(-50%, -50%) scale(.96); }
+.spin-btn:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
+
+.stage-meta { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.chip {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hint { margin: 0; color: #6d7a97; font-size: 12px; }
+
+/* ---------- 패널 ---------- */
+.side { display: flex; flex-direction: column; gap: 18px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+.panel-title { margin: 0 0 12px; font-size: 15px; color: var(--muted); font-weight: 700; letter-spacing: .3px; }
+
+textarea, input[type="number"] {
+  width: 100%;
+  background: #0f1421;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+textarea:focus, input:focus { outline: 2px solid #3d63d1; outline-offset: 1px; }
+
+.row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.row.btns { flex-wrap: wrap; }
+.row.center { justify-content: center; }
+.field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.field input { width: 72px; }
+.counter { margin-left: auto; font-size: 13px; color: var(--muted); }
+
+.btn {
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #1c2437;
+  color: var(--text);
+  transition: filter .15s ease;
+}
+.btn:hover { filter: brightness(1.18); }
+.btn.primary { background: linear-gradient(150deg, #ffd45c, #ff9f43); color: #2a1c00; border-color: transparent; }
+.btn.ghost { background: transparent; color: var(--muted); }
+.warn { margin: 10px 0 0; color: var(--accent-2); font-size: 13px; }
+
+/* ---------- 조 결과 ---------- */
+.teams { display: grid; gap: 10px; }
+.team {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--team-color, var(--accent));
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #121828;
+}
+.team-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 14px; }
+.team-badge { color: var(--team-color, var(--accent)); }
+.team-count { margin-left: auto; font-size: 12px; color: var(--muted); font-weight: 500; }
+.team-members { margin: 0; padding-left: 20px; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.member { font-size: 13px; color: #cfd8ec; }
+.teams:empty::after {
+  content: "룰렛을 시작하면 여기에 조편성 결과가 쌓입니다.";
+  color: var(--muted); font-size: 13px;
+}
+
+/* ---------- 당첨 오버레이 ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 14, .82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  animation: fade .18s ease;
+}
+.overlay[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+.winner-card { text-align: center; padding: 24px; position: relative; z-index: 2; }
+.winner-eyebrow { margin: 0; color: var(--accent); font-size: 15px; letter-spacing: 6px; font-weight: 700; }
+.winner-name {
+  margin: 10px 0 4px;
+  font-size: clamp(56px, 15vw, 148px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -3px;
+  background: linear-gradient(160deg, #fff 20%, var(--accent) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: pop .45s cubic-bezier(.2, 1.5, .4, 1);
+}
+@keyframes pop { from { transform: scale(.55); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.winner-team { margin: 0 0 22px; font-size: clamp(20px, 4vw, 32px); font-weight: 800; color: var(--winner-team-color, var(--accent)); }
+
+.confetti { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
+.confetti i {
+  position: absolute;
+  top: -12vh;
+  width: 9px; height: 15px;
+  border-radius: 2px;
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  to { transform: translateY(120vh) rotate(720deg); opacity: .1; }
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { order: 2; }
+}

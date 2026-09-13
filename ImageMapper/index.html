@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/auth-gate.js"></script>
+<title>이미지 맵 생성기</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><em>이미지</em>맵 생성기</div>
+    <a class="home-link" href="/">← 도구 목록</a>
+  </div>
+  <nav class="steps">
+    <span class="step on">① 이미지 올리기</span>
+    <span class="step">② 클릭 영역 그리기</span>
+    <span class="step">③ 완료 · 테스트</span>
+  </nav>
+</header>
+
+<main class="layout">
+  <!-- 왼쪽: 이미지 + 영역 편집 -->
+  <section class="stage">
+    <div class="stage-head">
+      <label class="btn primary file-btn">
+        이미지 선택
+        <input id="file-input" type="file" accept="image/*" hidden>
+      </label>
+      <span class="chip" id="file-chip">이미지를 선택하세요</span>
+      <span class="chip" id="area-chip">영역 0개</span>
+      <span class="chip green" id="slice-chip" hidden>분할 0장</span>
+    </div>
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <div class="empty" id="empty-state">
+        <div class="empty-icon">🖼️</div>
+        <p class="empty-title">이미지를 여기에 끌어다 놓으세요</p>
+        <p class="empty-sub">또는 <b>이미지 선택</b> 버튼 · 클립보드에서 <b>Ctrl/⌘+V</b></p>
+        <p class="empty-sub">1MB가 넘으면 자동으로 세로 분할합니다</p>
+      </div>
+      <div class="image-box" id="image-box" hidden>
+        <img id="preview" alt="업로드한 이미지">
+        <div class="slice-guides" id="slice-guides" aria-hidden="true"></div>
+        <div class="overlay" id="overlay"></div>
+      </div>
+    </div>
+
+    <p class="hint">
+      빈 곳을 <b>드래그</b>하면 새 클릭 영역 · 영역을 <b>드래그</b>하면 이동 ·
+      <b>클릭</b>해서 선택 후 <b>Delete</b> 키로 삭제
+    </p>
+  </section>
+
+  <!-- 오른쪽: 분할 · 설정 · 영역 목록 · 결과 -->
+  <aside class="side">
+    <section class="panel" id="slice-panel" hidden>
+      <h2 class="panel-title">
+        분할 이미지
+        <span class="panel-sub">1MB 초과 시 세로 분할</span>
+      </h2>
+      <p class="slice-summary" id="slice-summary"></p>
+      <ul class="slice-list" id="slice-list"></ul>
+      <div class="row btns">
+        <button id="download-slices" class="btn outline" type="button">조각 전체 다운로드</button>
+      </div>
+      <p class="note">화면에서는 조각이 틈 없이 이어 붙어 <b>한 장처럼</b> 보이고, 클릭 영역도 경계를 넘어 그대로 동작합니다.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">출력 설정</h2>
+      <label class="field">
+        맵 이름 (usemap)
+        <input id="map-name" type="text" value="image-map" spellcheck="false">
+      </label>
+      <label class="field">
+        이미지 경로 (생성 코드의 src)
+        <input id="img-src" type="text" placeholder="photo.png" spellcheck="false">
+      </label>
+      <label class="field">
+        테스트 페이지 제목
+        <input id="doc-title" type="text" value="이미지 맵 테스트">
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">
+        클릭 영역
+        <span class="panel-sub">이름은 alt·툴팁, 링크를 비우면 클릭 알림만</span>
+      </h2>
+      <ul class="area-list" id="area-list"></ul>
+      <p class="empty-list" id="area-empty">아직 그린 영역이 없습니다.</p>
+    </section>
+
+    <div class="row btns">
+      <button id="done-btn" class="btn primary" type="button" disabled>완료 — 이미지 맵 생성</button>
+      <button id="test-btn" class="btn dark" type="button" disabled>테스트 페이지 열기</button>
+      <button id="clear-btn" class="btn ghost" type="button">전체 삭제</button>
+    </div>
+    <p class="warn" id="warn" hidden></p>
+
+    <section class="panel" id="code-panel" hidden>
+      <h2 class="panel-title">생성된 이미지 맵 HTML</h2>
+      <textarea id="code-output" rows="12" readonly spellcheck="false"></textarea>
+      <div class="row btns">
+        <button id="copy-btn" class="btn outline" type="button">코드 복사</button>
+        <button id="download-btn" class="btn outline" type="button">테스트 페이지 HTML 다운로드</button>
+      </div>
+      <p class="note">코드의 <code>src</code>는 위 <b>이미지 경로</b> 값입니다. 분할된 경우 <code>photo-1.png</code>처럼 번호가 붙습니다.</p>
+    </section>
+  </aside>
+</main>
+
+<!-- 팝업이 차단됐을 때의 대체 미리보기 -->
+<div class="modal" id="preview-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <b>이미지 맵 테스트</b>
+        <span class="modal-note" id="modal-note" hidden>새 창이 차단되어 여기에 표시합니다</span>
+      </div>
+      <button id="modal-close" class="btn ghost small" type="button">닫기</button>
+    </div>
+    <iframe id="preview-frame" title="이미지 맵 테스트"></iframe>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

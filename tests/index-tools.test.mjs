@@ -28,6 +28,14 @@ test('index_team_roulette_card_has_title', () => {
   assert.match(html, /조편성 룰렛/);
 });
 
+test('index_lists_image_mapper_tool', () => {
+  assert.ok(cardLinks(html).includes('ImageMapper/'), '이미지 맵 생성기 카드가 없다');
+});
+
+test('index_image_mapper_card_has_title', () => {
+  assert.match(html, /이미지 맵 생성기/);
+});
+
 // 공개 도구 페이지는 모두 사이트 비밀번호 게이트를 포함해야 한다.
 
 test('every_tool_page_includes_auth_gate', () => {

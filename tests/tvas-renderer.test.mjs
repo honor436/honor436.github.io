@@ -865,3 +865,168 @@ test('gasFacilities_decodes_bitfield', () => {
   // 31 = 전부 (1+2+4+8+16)
   assert.deepEqual(gasFacilities(31).map(x => x.name), ['세차', '경정비', '편의점', '화장실', '주차']);
 });
+
+// ---- SA3 휴게소 --------------------------------------------------------- //
+//
+// 휴게소안내정보(Byte 2)는 주유소유무 / LPG유무 / 정비소유무 비트다.
+//   bit0(0x01) 주유소, bit1(0x02) LPG, bit2(0x04) 정비소
+// 규격서에 명시된 세 항목만 해석하고, 나머지 비트는 raw 값으로 그대로 노출한다.
+import { restAreaFacilities } from '../DltLogViewer/js/tvas-renderer.js';
+
+test('restAreaFacilities_decodes_주유소_LPG_정비소_bits_in_order', () => {
+  const facs = restAreaFacilities(0x07).map(f => f.name);
+  assert.deepEqual(facs, ['주유소', 'LPG', '정비소']);
+});
+
+test('restAreaFacilities_returns_empty_when_no_bit_set', () => {
+  assert.deepEqual(restAreaFacilities(0), []);
+});
+
+test('restAreaFacilities_decodes_single_bit', () => {
+  assert.deepEqual(restAreaFacilities(0x02).map(f => f.name), ['LPG']);
+  assert.deepEqual(restAreaFacilities(0x04).map(f => f.name), ['정비소']);
+});
+
+// 휴게소 팝업은 SA3 레코드의 모든 필드를 담는다 (진입/진출 보간점, 두 브랜드코드,
+// 안내정보 비트 3종 + raw 값, 명칭 오프셋, POIID).
+import { buildRestAreaPopup, restAreaUnknownInfoBits, restAreaLpgBrandName, restAreaIconHtml } from '../DltLogViewer/js/tvas-renderer.js';
+
+const SA3_SAMPLE = {
+  entryVxIdx: 120, exitVxIdx: 135, gasBrand: 1, lpgBrand: 13,
+  info: 0x0007, nameOffset: 12, poiId: 1234567, name: '안성휴게소',
+};
+const ENTRY = { lat: 37.123456, lon: 127.123456 };
+const EXIT  = { lat: 37.130000, lon: 127.130000 };
+
+test('buildRestAreaPopup_shows_name_and_both_vertex_indices_with_coords', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(html.includes('안성휴게소'));
+  assert.ok(html.includes('VX120'), '진입 보간점 Idx');
+  assert.ok(html.includes('VX135'), '진출 보간점 Idx');
+  assert.ok(html.includes('37.123456, 127.123456'), '진입 좌표');
+  assert.ok(html.includes('37.130000, 127.130000'), '진출 좌표');
+});
+
+test('buildRestAreaPopup_shows_gas_and_lpg_brand_codes_with_names', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(html.includes('주유소 브랜드'));
+  assert.ok(html.includes('SK'), '주유소브랜드코드 1 → SK');
+  assert.ok(html.includes('LPG충전소 브랜드'), '충전소브랜드코드는 LPG충전소 브랜드다');
+  assert.ok(html.includes('E1'), 'LPG 브랜드코드 13 → E1');
+  assert.ok(html.includes('(13)'), 'LPG충전소브랜드코드 raw 값');
+});
+
+test('buildRestAreaPopup_shows_all_three_info_flags_and_raw_value', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(html.includes('주유소 유무'));
+  assert.ok(html.includes('LPG 유무'));
+  assert.ok(html.includes('정비소 유무'));
+  assert.ok(html.includes('0x0007'), '안내정보 raw 값');
+});
+
+test('buildRestAreaPopup_shows_name_offset_and_poiId', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(html.includes('명칭 오프셋'));
+  assert.ok(html.includes('>12<'), 'nameOffset 값');
+  assert.ok(html.includes('POIID'));
+  assert.ok(html.includes('1234567'));
+});
+
+test('buildRestAreaPopup_marks_undefined_info_bits', () => {
+  const html = buildRestAreaPopup({ ...SA3_SAMPLE, info: 0x0107 }, ENTRY, EXIT, 0);
+  assert.ok(html.includes('미정의비트'));
+  assert.ok(html.includes('0x0100'));
+  const clean = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(!clean.includes('미정의비트'));
+});
+
+test('buildRestAreaPopup_works_without_exit_coord', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, null, null);
+  assert.ok(html.includes('VX135'));
+  assert.ok(!html.includes('경유지 추가'), 'idx 없으면 경유지 버튼 미표시');
+});
+
+test('restAreaUnknownInfoBits_masks_documented_bits', () => {
+  assert.equal(restAreaUnknownInfoBits(0x0007), 0);
+  assert.equal(restAreaUnknownInfoBits(0x0108), 0x0108);
+});
+
+test('restAreaLpgBrandName_maps_via_brand_code_table', () => {
+  assert.equal(restAreaLpgBrandName(0), '없음');
+  assert.equal(restAreaLpgBrandName(13), 'E1');        // LPG 브랜드
+  assert.equal(restAreaLpgBrandName(7), 'SK-GAS');     // LPG 브랜드
+  assert.equal(restAreaLpgBrandName(200), '코드200');  // 코드표에 없는 값
+});
+
+test('restAreaIconHtml_badges_are_info_bits_only', () => {
+  const html = restAreaIconHtml(SA3_SAMPLE);
+  assert.ok(html.includes('⛽'), '주유소 배지');
+  assert.ok(html.includes('🛢️'), 'LPG 배지');
+  assert.ok(html.includes('🔧'), '정비소 배지');
+  assert.ok(!html.includes('🔌'), 'EV 충전기 배지는 쓰지 않는다 (SA3 충전소는 LPG충전소)');
+  const plain = restAreaIconHtml({ info: 0, lpgBrand: 0 });
+  assert.ok(!plain.includes('⛽'));
+});
+
+// 휴게소 마커는 경로선을 덮지 않아야 한다. 아이콘 본체는 지점 위쪽에 띄우고,
+// 아래로 뻗은 꼬리(tail)와 작은 점(dot)만 실제 좌표를 가리킨다.
+// → 앵커는 아이콘 박스의 "아래 끝(점)"이어야 하고, 가로는 중앙이어야 한다.
+import { restAreaIconSpec, restAreaSignSvg } from '../DltLogViewer/js/tvas-renderer.js';
+
+test('restAreaIconSpec_anchors_exactly_at_the_tail_tip', () => {
+  const spec = restAreaIconSpec(SA3_SAMPLE);
+  const [w, h] = spec.size;
+  const [ax, ay] = spec.anchor;
+  assert.equal(ax, w / 2, '가로는 말풍선 중앙');
+  assert.equal(ay, h, '앵커 = 꼬리 끝(아이콘 박스 맨 아래) — 말풍선 본체는 지점 위로 떠야 함');
+});
+
+test('restAreaIconHtml_is_speech_bubble_whose_tail_tip_alone_marks_the_point', () => {
+  const html = restAreaIconHtml(SA3_SAMPLE);
+  assert.ok(html.includes('sa3-pin-body'), '말풍선 본체');
+  assert.ok(html.includes('sa3-pin-tail'), '지점을 가리키는 꼬리');
+  assert.ok(!html.includes('sa3-pin-dot'), '지점 위의 별도 점은 없어야 한다 (꼬리 끝만 가리킴)');
+});
+
+// 휴게소 아이콘은 고속도로 휴게소 표지판(감청색 바탕 + 흰 스푼·포크)을 쓴다.
+test('restAreaIconHtml_uses_spoon_fork_sign_svg_not_emoji', () => {
+  const html = restAreaIconHtml(SA3_SAMPLE);
+  assert.ok(html.includes('<svg'), '표지판은 인라인 SVG');
+  assert.ok(html.includes('sa3-sign'), '표지판 식별 클래스');
+  assert.ok(!html.includes('🍽️'), '이모지 아이콘은 쓰지 않는다');
+});
+
+test('restAreaSignSvg_scales_to_requested_size', () => {
+  const svg = restAreaSignSvg(20, 30);
+  assert.ok(svg.includes('width="20"'));
+  assert.ok(svg.includes('height="30"'));
+  assert.ok(svg.includes('sa3-sign'));
+});
+
+test('buildRestAreaPopup_header_uses_sign_svg_not_emoji', () => {
+  const html = buildRestAreaPopup(SA3_SAMPLE, ENTRY, EXIT, 0);
+  assert.ok(html.includes('sa3-sign'), '팝업 헤더도 표지판 아이콘');
+  assert.ok(!html.includes('🍽️'));
+});
+
+test('restAreaIconSpec_width_grows_with_facility_badges', () => {
+  const bare = restAreaIconSpec({ info: 0, lpgBrand: 0 });
+  const full = restAreaIconSpec(SA3_SAMPLE); // 주유소+LPG+정비소
+  assert.ok(full.size[0] > bare.size[0], '배지가 있으면 아이콘이 더 넓어야 한다');
+  assert.equal(full.anchor[0], full.size[0] / 2);
+  assert.equal(bare.anchor[0], bare.size[0] / 2);
+});
+
+test('restAreaIconSpec_height_is_same_regardless_of_badges', () => {
+  const bare = restAreaIconSpec({ info: 0, lpgBrand: 0 });
+  const full = restAreaIconSpec(SA3_SAMPLE);
+  assert.equal(full.size[1], bare.size[1], '배지는 말풍선 안에 들어가므로 높이는 동일');
+});
+
+test('restAreaIconSpec_popupAnchor_opens_above_the_bubble', () => {
+  const spec = restAreaIconSpec(SA3_SAMPLE);
+  const [, ay] = spec.anchor;
+  assert.ok(Array.isArray(spec.popupAnchor), 'popupAnchor 제공');
+  assert.equal(spec.popupAnchor[0], 0);
+  assert.ok(spec.popupAnchor[1] <= -ay, `팝업은 말풍선 위(${spec.popupAnchor[1]})에서 열려야 한다`);
+});

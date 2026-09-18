@@ -529,6 +529,7 @@ export function clearTvasRoute(map) {
     tvasLayers[key] = null;
   });
   selectedRpLink = null;
+  restAreaMarkers = [];   // 경로가 바뀌면 이전 휴게소 마커 참조를 버린다
 }
 
 export function getTvasLayers() { return tvasLayers; }
@@ -1203,16 +1204,165 @@ function renderTollGates(lg, coords, tollGates) {
   }
 }
 
-function renderRestAreas(lg, coords, restAreas) {
-  for (const ra of restAreas) {
-    if (ra.entryVxIdx >= coords.length) continue;
-    const c = coords[ra.entryVxIdx];
-    let popup = `<b>🍴 ${esc(ra.name || '휴게소')}</b><br>VX: ${ra.entryVxIdx}~${ra.exitVxIdx}`;
-    if (ra.poiId) popup += `<br>POI: ${ra.poiId}`;
-    L.marker([c.lat, c.lon], {
-      icon: L.divIcon({ className: '', html: `<div style="width:24px;height:24px;line-height:24px;text-align:center;background:rgba(34,197,94,0.9);border-radius:6px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff">🍴</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
-    }).bindPopup(popup, { maxWidth: 300 }).addTo(lg);
+// ---- SA3 휴게소 안내 ------------------------------------------------------- //
+//
+// 휴게소안내정보(Byte 2)는 주유소유무 / LPG유무 / 정비소유무 비트다.
+//   bit0(0x01) 주유소, bit1(0x02) LPG, bit2(0x04) 정비소
+// 그 외 비트는 규격서에 명시가 없으므로 해석하지 않고 raw 값으로 노출한다.
+const REST_AREA_INFO_BITS = [[0x01, '주유소', '⛽'], [0x02, 'LPG', '🛢️'], [0x04, '정비소', '🔧']];
+
+export function restAreaFacilities(info) {
+  const bits = Number(info) || 0;
+  return REST_AREA_INFO_BITS.filter(([b]) => (bits & b) !== 0).map(([, name, icon]) => ({ name, icon }));
+}
+
+// 안내정보 2바이트 중 해석된 비트를 제외한 나머지(미정의 비트) 값.
+export function restAreaUnknownInfoBits(info) {
+  const known = REST_AREA_INFO_BITS.reduce((m, [b]) => m | b, 0);
+  return (Number(info) || 0) & ~known & 0xFFFF;
+}
+
+// SA3 의 "충전소브랜드코드"는 EV 충전소가 아니라 LPG충전소 브랜드다.
+// 브랜드 코드테이블은 주유소브랜드코드와 같은 표를 참조한다
+// (SK-GAS·GS-GAS·H-GAS·S-OIL GAS·LPG 무폴·E1 등 LPG 브랜드가 같은 표에 들어있다).
+export function restAreaLpgBrandName(b) { return b === 0 ? '없음' : gasBrandName(b); }
+
+let restAreaMarkers = [];
+
+// 휴게소 아이콘 선택 시 SA3 레코드의 모든 필드를 표시한다.
+export function buildRestAreaPopup(ra, entry, exit, idx) {
+  const row = (label, val) => `<tr><td style="color:#8b95a1;padding:2px 0;width:92px">${label}</td><td>${val}</td></tr>`;
+  const yn = (on) => (on ? '<b style="color:#10b981">있음</b>' : '<span style="color:#8b95a1">없음</span>');
+  const hex4 = (v) => '0x' + (Number(v) || 0).toString(16).toUpperCase().padStart(4, '0');
+  const facs = restAreaFacilities(ra.info);
+  const unknown = restAreaUnknownInfoBits(ra.info);
+
+  let popup = `<div style="font-size:12px;line-height:1.6;max-width:340px">`;
+  popup += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">`;
+  popup += restAreaSignSvg(15, 22);
+  popup += `<b style="font-size:15px">${esc(ra.name || '휴게소')}</b>`;
+  popup += `<span style="padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;color:#fff;background:#0d9488">SA3</span>`;
+  for (const f of facs) {
+    popup += `<span style="padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;color:#0f766e;background:rgba(13,148,136,0.18)">${f.icon} ${f.name}</span>`;
   }
+  popup += `</div>`;
+
+  popup += `<table style="width:100%;font-size:11px;line-height:1.5;border-collapse:collapse">`;
+  popup += row('진입 보간점', `VX${ra.entryVxIdx}${entry ? ` <span style="color:#8b95a1">(${entry.lat.toFixed(6)}, ${entry.lon.toFixed(6)})</span>` : ''}`);
+  popup += row('진출 보간점', `VX${ra.exitVxIdx}${exit ? ` <span style="color:#8b95a1">(${exit.lat.toFixed(6)}, ${exit.lon.toFixed(6)})</span>` : ''}`);
+  popup += row('주유소 브랜드', `${esc(gasBrandName(ra.gasBrand))} <span style="color:#8b95a1">(${ra.gasBrand})</span>`);
+  popup += row('LPG충전소 브랜드', `${esc(restAreaLpgBrandName(ra.lpgBrand))} <span style="color:#8b95a1">(${ra.lpgBrand})</span>`);
+  popup += row('주유소 유무', yn(ra.info & 0x01));
+  popup += row('LPG 유무', yn(ra.info & 0x02));
+  popup += row('정비소 유무', yn(ra.info & 0x04));
+  popup += row('안내정보', `${hex4(ra.info)}${unknown ? ` <span style="color:#fbbf24">미정의비트 ${hex4(unknown)}</span>` : ''}`);
+  if (ra.nameOffset != null) popup += row('명칭 오프셋', ra.nameOffset);
+  popup += row('POIID', formatPoiId(ra.poiId));
+  popup += `</table>`;
+  if (idx != null) {
+    popup += `<button onclick="window._addRestAreaWaypoint(${idx})" style="margin-top:8px;width:100%;padding:6px;background:#0d9488;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🚩 경유지 추가</button>`;
+  }
+  popup += `</div>`;
+  return popup;
+}
+
+// 휴게소 표지판 아이콘 (고속도로 휴게소 표지판: 감청색 바탕 + 흰 스푼·포크).
+// 마커·팝업 헤더·리스트에서 같은 그림을 쓰도록 인라인 SVG 로 제공한다.
+const SA3_SIGN_NAVY = '#16367f';
+
+export function restAreaSignSvg(w = 12, h = 18) {
+  return `<svg class="sa3-sign" width="${w}" height="${h}" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="휴게소" style="display:block;flex:0 0 auto">`
+    + `<rect width="24" height="36" rx="2" fill="${SA3_SIGN_NAVY}"/>`
+    + `<ellipse cx="7.6" cy="10.5" rx="4.1" ry="6.2" fill="#fff"/>`
+    + `<rect x="6.2" y="15.5" width="2.8" height="15.5" rx="1.4" fill="#fff"/>`
+    + `<rect x="13.2" y="4.5" width="1.9" height="9" rx="0.9" fill="#fff"/>`
+    + `<rect x="16.05" y="4.5" width="1.9" height="9" rx="0.9" fill="#fff"/>`
+    + `<rect x="18.9" y="4.5" width="1.9" height="9" rx="0.9" fill="#fff"/>`
+    + `<path d="M13.2 12.2h7.6v2.6a3.8 3.8 0 0 1-7.6 0z" fill="#fff"/>`
+    + `<rect x="15.6" y="16.2" width="2.8" height="14.8" rx="1.4" fill="#fff"/>`
+    + `</svg>`;
+}
+
+// 휴게소 마커: 말풍선 본체는 지점 위에 띄우고 꼬리 끝(tip)만 경로상의 보간점을 가리킨다.
+//   [표지판 + 시설배지]   ← 말풍선 본체 (흰 바탕 + 감청 외곽선)
+//            ▼            ← 꼬리 끝 = 앵커 = 보간점 좌표
+// 앵커가 꼬리 끝이므로 아이콘이 경로선 위에 겹쳐 앉지 않는다.
+const SA3_PIN_BUBBLE_H  = 26;
+const SA3_PIN_TAIL_H    = 9;
+const SA3_PIN_TAIL_W    = 14;
+const SA3_PIN_OVERLAP   = 1;    // 꼬리를 본체 아래 테두리에 1px 겹쳐 외곽선을 잇는다
+const SA3_PIN_BASE_W    = 32;   // 표지판 + 좌우 패딩
+const SA3_PIN_BADGE_W   = 12;   // 배지 1개당 추가 폭
+
+// 말풍선에 들어가는 시설 배지 — 안내정보 비트(주유소/LPG/정비소)만 쓴다.
+function restAreaBadgeIcons(ra) {
+  const facs = restAreaFacilities(ra.info);
+  return { icons: facs.map(f => f.icon).join(''), count: facs.length };
+}
+
+export function restAreaIconHtml(ra) {
+  const { icons } = restAreaBadgeIcons(ra);
+  const tw = SA3_PIN_TAIL_W, th = SA3_PIN_TAIL_H;
+  let html = `<div class="sa3-pin" style="display:flex;flex-direction:column;align-items:center;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">`;
+  html += `<div class="sa3-pin-body" style="box-sizing:border-box;height:${SA3_PIN_BUBBLE_H}px;display:flex;align-items:center;gap:3px;padding:0 5px;background:#fff;border:1.5px solid ${SA3_SIGN_NAVY};border-radius:7px;white-space:nowrap">`;
+  html += restAreaSignSvg(12, 18);
+  if (icons) html += `<span style="font-size:10px;letter-spacing:-1px">${icons}</span>`;
+  html += `</div>`;
+  // 꼬리: 감청색 삼각형(외곽선) 안에 흰 삼각형을 얹어 말풍선과 이어 보이게 한다.
+  html += `<div class="sa3-pin-tail" style="position:relative;width:${tw}px;height:${th}px;margin-top:-${SA3_PIN_OVERLAP}px">`;
+  html += `<div style="position:absolute;left:0;top:0;width:0;height:0;border-left:${tw / 2}px solid transparent;border-right:${tw / 2}px solid transparent;border-top:${th}px solid ${SA3_SIGN_NAVY}"></div>`;
+  html += `<div style="position:absolute;left:2px;top:-2px;width:0;height:0;border-left:${tw / 2 - 2}px solid transparent;border-right:${tw / 2 - 2}px solid transparent;border-top:${th - 2.5}px solid #fff"></div>`;
+  html += `</div>`;
+  html += `</div>`;
+  return html;
+}
+
+// divIcon 에 넘길 크기/앵커를 한 곳에서 계산한다 (앵커 = 꼬리 끝).
+export function restAreaIconSpec(ra) {
+  const { count } = restAreaBadgeIcons(ra);
+  const w = SA3_PIN_BASE_W + count * SA3_PIN_BADGE_W;
+  const h = SA3_PIN_BUBBLE_H + SA3_PIN_TAIL_H - SA3_PIN_OVERLAP;
+  return {
+    html: restAreaIconHtml(ra),
+    size: [w, h],
+    anchor: [w / 2, h],
+    // 팝업은 말풍선 위쪽에서 열어 아이콘·경로선을 가리지 않게 한다.
+    popupAnchor: [0, -h - 2],
+  };
+}
+
+function renderRestAreas(lg, coords, restAreas) {
+  restAreaMarkers = [];
+  for (let idx = 0; idx < restAreas.length; idx++) {
+    const ra = restAreas[idx];
+    if (ra.entryVxIdx >= coords.length) { restAreaMarkers.push(null); continue; }
+    const entry = coords[ra.entryVxIdx];
+    const exit = ra.exitVxIdx < coords.length ? coords[ra.exitVxIdx] : null;
+    const spec = restAreaIconSpec(ra);
+    const marker = L.marker([entry.lat, entry.lon], {
+      icon: L.divIcon({ className: '', html: spec.html, iconSize: spec.size, iconAnchor: spec.anchor, popupAnchor: spec.popupAnchor }),
+      zIndexOffset: 500,
+    }).bindPopup(buildRestAreaPopup(ra, entry, exit, idx), { maxWidth: 340 });
+    restAreaMarkers.push({ marker, lat: entry.lat, lon: entry.lon, name: ra.name || '휴게소', poiId: ra.poiId });
+    if (lg) marker.addTo(lg);
+  }
+}
+
+// 리스트 항목 클릭 → 해당 휴게소로 이동하고 팝업을 열어 상세를 표시한다.
+export function showRestAreaOnMap(map, idx) {
+  const m = restAreaMarkers[idx];
+  if (!m) return;
+  const lg = tvasLayers.restArea;
+  if (lg && !map.hasLayer(lg)) lg.addTo(map);
+  map.setView([m.lat, m.lon], 16, { animate: true });
+  m.marker.openPopup();
+}
+
+// 휴게소를 경유지로 추가하기 위한 정보(좌표·명칭·POIID).
+export function getRestAreaWaypoint(idx) {
+  const m = restAreaMarkers[idx];
+  if (!m) return null;
+  return { lat: m.lat, lon: m.lon, name: m.name, poiId: m.poiId > 0 ? m.poiId : null };
 }
 
 /**

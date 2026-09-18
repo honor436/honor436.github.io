@@ -326,28 +326,47 @@ function parseTollGates(dv, offset, size, charset) {
   return tollGates;
 }
 
-function parseRestAreas(dv, offset, size, charset) {
+// SA3: 휴게소 안내. 레이아웃: 헤더(12B) → 휴게소 DATA 24B×n → 휴게소명칭 blob(N).
+//   헤더: UShort count@0, Byte 정보인덱스Type@2(0x02), Byte reserved@3,
+//         Char[4] 정보인덱스ID@4("SA3"), Int 휴게소명칭 실데이터 크기@8
+//   레코드(24B): UShort 진입보간점Idx@0, UShort 진출보간점Idx@2,
+//     Byte 주유소브랜드코드@4, Byte 충전소브랜드코드@5(= LPG충전소 브랜드),
+//     Byte[2] 휴게소안내정보@6(주유소유무/LPG유무/정비소유무 비트),
+//     Int 휴게소명칭오프셋@8, Int POIID@12, Byte[8] reserved@16
+//   명칭 blob: 오프셋 기준 NULL 포함. 방어적으로 offset~다음offset 경계도 함께 적용.
+export function parseRestAreas(dv, offset, size, charset) {
   const count    = dv.getUint16(offset, true);
-  const blobSize = dv.getInt32(offset + 8, true);
+  const nameSize = dv.getInt32(offset + 8, true);
   const dataStart = offset + 12;
-  const blobStart = dataStart + count * 24;
-  const restAreas = [];
+  const sectionEnd = offset + size;
+
+  const records = [];
   for (let i = 0; i < count; i++) {
     const base = dataStart + i * 24;
-    const entryVxIdx = dv.getUint16(base, true);
-    const exitVxIdx  = dv.getUint16(base + 2, true);
-    const gasBrand   = dv.getUint8(base + 4);
-    const evBrand    = dv.getUint8(base + 5);
-    const info       = dv.getUint16(base + 6, true);
-    const nameOffset = dv.getInt32(base + 8, true);
-    const poiId      = dv.getUint32(base + 12, true); // UInt32
-    let name = '';
-    if (blobStart + nameOffset < offset + size) {
-      name = readString(dv, blobStart + nameOffset, Math.min(200, offset + size - blobStart - nameOffset), charset);
-    }
-    restAreas.push({ entryVxIdx, exitVxIdx, gasBrand, evBrand, info, name, poiId });
+    if (base + 24 > sectionEnd) break;
+    records.push({
+      entryVxIdx: dv.getUint16(base, true),
+      exitVxIdx:  dv.getUint16(base + 2, true),
+      gasBrand:   dv.getUint8(base + 4),
+      lpgBrand:   dv.getUint8(base + 5),   // 충전소브랜드코드 = LPG충전소 브랜드
+      info:       dv.getUint16(base + 6, true),
+      nameOffset: dv.getInt32(base + 8, true),
+      poiId:      dv.getUint32(base + 12, true), // UInt32
+    });
   }
-  return restAreas;
+
+  const nameBlobStart = dataStart + count * 24;
+  const nameBlobSize = (nameSize > 0 && nameBlobStart + nameSize <= sectionEnd)
+    ? nameSize : Math.max(0, sectionEnd - nameBlobStart);
+  const nameOffsets = records.map(r => r.nameOffset).filter(o => o >= 0);
+  const readName = (off) => {
+    if (!(off >= 0) || off >= nameBlobSize) return '';
+    const end = nameBlobEnd(nameOffsets, off, nameBlobSize);
+    const len = Math.min(end - off, sectionEnd - (nameBlobStart + off));
+    return len > 0 ? readString(dv, nameBlobStart + off, len, charset) : '';
+  };
+
+  return records.map(r => ({ ...r, name: readName(r.nameOffset) }));
 }
 
 function parseComplexIntersections(dv, offset, size, charset) {

@@ -578,3 +578,92 @@ test('parseWaypoints_reads_vertex_type_and_coords', () => {
   assert.equal(wps[1].vxIdx, 30);
   assert.equal(wps[1].poiId, 0);
 });
+
+// ---- parseRestAreas (SA3 휴게소안내) -------------------------------------- //
+//
+// 스펙(TVAS 규격서 휴게소안내 SA3):
+//   헤더 12B: UShort count(n), Byte 정보인덱스Type(0x02), Byte reserved,
+//             Char[4] 정보인덱스ID("SA3"), Int 휴게소명칭 실데이터 크기
+//   휴게소 DATA 24B×n: UShort 진입보간점Idx, UShort 진출보간점Idx,
+//     Byte 주유소브랜드코드, Byte 충전소브랜드코드(LPG충전소), Byte[2] 휴게소안내정보(비트),
+//     Int 휴게소명칭오프셋, Int POIID, Byte[8] reserved
+//   휴게소명칭 blob N: 휴게소 명칭(NULL 포함), 오프셋 기준.
+import { parseRestAreas } from '../DltLogViewer/js/tvas-parser.js';
+
+function buildSa3Fixture() {
+  // header(12) + record(24)×2 + nameBlob("가A\0BB\0" → "EEE\0FF\0"=7) = 67
+  const buf = new ArrayBuffer(67);
+  const dv = new DataView(buf);
+  const b = new Uint8Array(buf);
+  dv.setUint16(0, 2, true);                            // count
+  b[2] = 0x02;                                         // 정보 인덱스 Type
+  b[3] = 0;                                            // reserved
+  b[4] = 0x53; b[5] = 0x41; b[6] = 0x33; b[7] = 0x00;  // "SA3"
+  dv.setInt32(8, 7, true);                             // 명칭 실데이터 크기
+  const rec = (base, o) => {
+    dv.setUint16(base + 0, o.entryVxIdx, true);
+    dv.setUint16(base + 2, o.exitVxIdx, true);
+    b[base + 4] = o.gasBrand;
+    b[base + 5] = o.lpgBrand;
+    dv.setUint16(base + 6, o.info, true);
+    dv.setInt32(base + 8, o.nameOffset, true);
+    dv.setInt32(base + 12, o.poiId, true);
+    for (let k = 16; k < 24; k++) b[base + k] = 0;     // reserved 8B
+  };
+  rec(12, { entryVxIdx: 120, exitVxIdx: 135, gasBrand: 1, lpgBrand: 13, info: 0x0007,
+    nameOffset: 0, poiId: 1234567 });
+  rec(36, { entryVxIdx: 400, exitVxIdx: 402, gasBrand: 0, lpgBrand: 0, info: 0x0000,
+    nameOffset: 4, poiId: 0 });
+  const nb = 60; // 12 + 48
+  b[nb + 0] = 69; b[nb + 1] = 69; b[nb + 2] = 69; b[nb + 3] = 0; // "EEE\0"
+  b[nb + 4] = 70; b[nb + 5] = 70; b[nb + 6] = 0;                 // "FF\0"
+  return { dv, size: 67 };
+}
+
+test('parseRestAreas_reads_all_records_with_24B_stride', () => {
+  const { dv, size } = buildSa3Fixture();
+  const ras = parseRestAreas(dv, 0, size, 1);
+  assert.equal(ras.length, 2);
+  assert.equal(ras[0].entryVxIdx, 120);
+  assert.equal(ras[0].exitVxIdx, 135);
+  assert.equal(ras[1].entryVxIdx, 400);
+  assert.equal(ras[1].exitVxIdx, 402);
+});
+
+test('parseRestAreas_parses_brand_codes_info_bits_and_poiId', () => {
+  const { dv, size } = buildSa3Fixture();
+  const ras = parseRestAreas(dv, 0, size, 1);
+  assert.equal(ras[0].gasBrand, 1);
+  assert.equal(ras[0].lpgBrand, 13);
+  assert.equal(ras[0].info, 0x0007);
+  assert.equal(ras[0].nameOffset, 0);
+  assert.equal(ras[0].poiId, 1234567);
+  assert.equal(ras[1].gasBrand, 0);
+  assert.equal(ras[1].lpgBrand, 0);
+  assert.equal(ras[1].info, 0);
+  assert.equal(ras[1].nameOffset, 4);
+  assert.equal(ras[1].poiId, 0);
+});
+
+test('parseRestAreas_reads_names_by_offset', () => {
+  const { dv, size } = buildSa3Fixture();
+  const ras = parseRestAreas(dv, 0, size, 1);
+  assert.equal(ras[0].name, 'EEE'); // nameOffset 0
+  assert.equal(ras[1].name, 'FF');  // nameOffset 4
+});
+
+test('parseRestAreas_returns_empty_name_for_out_of_range_offset', () => {
+  const { dv, size } = buildSa3Fixture();
+  // 두 번째 레코드의 명칭 오프셋을 blob 크기보다 크게 만든다 (깨진 응답).
+  dv.setInt32(36 + 8, 9999, true);
+  const ras = parseRestAreas(dv, 0, size, 1);
+  assert.equal(ras.length, 2);
+  assert.equal(ras[1].name, '');
+});
+
+test('parseRestAreas_stops_at_section_end_when_count_overstates_records', () => {
+  const { dv, size } = buildSa3Fixture();
+  dv.setUint16(0, 50, true); // count 과다 (섹션 크기는 레코드 2개 분량)
+  const ras = parseRestAreas(dv, 0, size, 1);
+  assert.equal(ras.length, 2);
+});

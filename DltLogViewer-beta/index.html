@@ -2558,7 +2558,7 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode, formatPoiId } from './js/tvas-renderer.js';
+import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode, formatPoiId, showRestAreaOnMap, getRestAreaWaypoint, restAreaFacilities, restAreaLpgBrandName, restAreaSignSvg } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
@@ -4273,6 +4273,19 @@ window._addGasWaypoint = function(idx) {
   window._setWpFromPoiId('via', wp.poiId, wp);
 };
 
+// 휴게소(SA3) 리스트 클릭 → 지도 이동 + 팝업으로 상세 표시
+window._showRestArea = function(idx) {
+  const map = getMap();
+  if (!map) return;
+  showRestAreaOnMap(map, idx);
+};
+
+window._addRestAreaWaypoint = function(idx) {
+  const wp = getRestAreaWaypoint(idx);
+  if (!wp) return;
+  window._setWpFromPoiId('via', wp.poiId, wp);
+};
+
 // ---- POI keyword search (Google-Maps style 검색창) ---- //
 (function setupPoiSearch() {
   const box = document.getElementById('poi-search-box');
@@ -5395,13 +5408,33 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
   }
 
   // ---- SA3: 휴게소 ---- //
+  // 규격서(휴게소안내 SA3)의 레코드 전 필드를 표시한다:
+  //   진입/진출 보간점 Idx, 주유소브랜드코드, 충전소브랜드코드(LPG충전소),
+  //   안내정보(주유소/LPG/정비소 유무 비트), 명칭 오프셋, POIID.
   if (tvasResult.restAreas && tvasResult.restAreas.length > 0) {
-    const rows = tvasResult.restAreas.map((ra, i) =>
-      `<div style="padding:2px 0;border-bottom:1px solid rgba(148,163,184,0.08)">
-        [${i}] ${vxRange(ra.entryVxIdx, ra.exitVxIdx, coords)} "${esc(ra.name)}" POI:${ra.poiId}
-      </div>`
-    ).join('');
-    html += sectionDetail('휴게소', 'SA3', tvasResult.restAreas.length, rows);
+    const ras = tvasResult.restAreas;
+    const gasCount = ras.filter(r => (r.info & 0x01) !== 0).length;
+    const lpgCount = ras.filter(r => (r.info & 0x02) !== 0).length;
+    const fixCount = ras.filter(r => (r.info & 0x04) !== 0).length;
+    const lpgBrandCount = ras.filter(r => r.lpgBrand > 0).length;
+    const yn = (on) => (on ? '<b style="color:#10b981">유</b>' : '<span style="color:var(--muted)">무</span>');
+    const hex4 = (v) => '0x' + (Number(v) || 0).toString(16).toUpperCase().padStart(4, '0');
+    const rows = ras.map((ra, i) => {
+      const facs = restAreaFacilities(ra.info).map(f => f.icon + f.name).join(' ');
+      return `<div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.08);cursor:pointer" onclick="if(!event.target.closest('.vx-link'))window._showRestArea(${i})">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${restAreaSignSvg(11, 16)}
+          <b style="font-size:12px;color:var(--text)">[${i}] ${esc(ra.name || '휴게소')}</b>
+          ${facs ? `<span style="font-size:10px;color:#0f766e;background:rgba(13,148,136,0.18);padding:1px 6px;border-radius:8px;font-weight:700">${facs}</span>` : ''}
+          <span style="color:var(--muted);font-size:10px;margin-left:auto">(클릭하면 지도 표시)</span>
+        </div>
+        진입 ${vx(ra.entryVxIdx, coords)} → 진출 ${vx(ra.exitVxIdx, coords)}<br>
+        주유소:${yn(ra.info & 0x01)} | LPG:${yn(ra.info & 0x02)} | 정비소:${yn(ra.info & 0x04)} | 안내정보:${hex4(ra.info)}<br>
+        <span style="color:var(--muted)">주유소브랜드:${esc(gasBrandName(ra.gasBrand))}(${ra.gasBrand}) | LPG충전소브랜드:${esc(restAreaLpgBrandName(ra.lpgBrand))}(${ra.lpgBrand}) | 명칭offset:${ra.nameOffset} | POI:${formatPoiId(ra.poiId)}</span>
+      </div>`;
+    }).join('');
+    const summary = `<div style="padding:4px 0;color:var(--muted);font-size:11px">⛽ 주유소 ${gasCount} · 🛢️ LPG ${lpgCount} · 🔧 정비소 ${fixCount} · LPG충전소 브랜드 ${lpgBrandCount}</div>`;
+    html += sectionDetail('휴게소', 'SA3', ras.length, summary + rows);
   }
 
   // ---- TL5: 차로안내 ---- //

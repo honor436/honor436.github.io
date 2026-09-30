@@ -207,3 +207,20 @@ export function buildIsochroneBody() {
     header: isochroneHeader(),
   };
 }
+
+/**
+ * 도착 배터리 SoC 계산용 배터리 용량(100%, Wh).
+ * maxCharge → consumptionParam.batteryCapacity → chargedEnergy/0.8 순. 없으면 null.
+ */
+export function resolveBatteryCapacityWh(body) {
+  if (!body || typeof body !== 'object') return null;
+  const maxCharge = Number(body.maxCharge);
+  if (maxCharge > 0) return maxCharge;
+  // consumptionParam 은 JSON 문자열(또는 객체)
+  let cp = body.consumptionParam;
+  if (typeof cp === 'string') { try { cp = JSON.parse(cp); } catch { cp = null; } }
+  const cap = Number(cp && cp.batteryCapacity);
+  if (cap > 0) return cap;
+  const charged = Number(body.chargedEnergy);
+  return charged > 0 ? charged / 0.8 : null;
+}

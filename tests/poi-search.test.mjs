@@ -602,3 +602,21 @@ test('parseRoutePoiResponse_prefers_nav_x1_nav_y1', () => {
   assert.equal(p.x, 4573250);
   assert.equal(p.y, 1350100);
 });
+
+// findpoisbyroute v2 응답은 camelCase(poiId/rpFlag)로 내려온다.
+// snake_case(poi_id) 만 읽으면 poiId 가 비어 경유지/목적지에 POI ID 가 안 들어간다.
+test('parseRoutePoiResponse_reads_camelCase_poiId', () => {
+  const json = { poiSearches: [
+    { name: '서울역', center_x: 4571200, center_y: 1351142, poiId: '13352869', pkey: '1335286901' },
+  ] };
+  assert.equal(parseRoutePoiResponse(json)[0].poiId, '13352869');
+});
+
+test('parseRoutePoiResponse_reads_camelCase_rpFlag_and_address', () => {
+  const json = { poiSearches: [
+    { name: '서울역', center_x: 4571200, center_y: 1351142, poiId: '13352869', rpFlag: 16, fullAddressRoad: '서울 중구 한강대로 405' },
+  ] };
+  const p = parseRoutePoiResponse(json)[0];
+  assert.equal(p.rpFlag, 16);
+  assert.equal(p.address, '서울 중구 한강대로 405');
+});

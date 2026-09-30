@@ -296,12 +296,13 @@ export function parseRoutePoiResponse(json) {
       name: raw.name || raw.org_name || '',
       x: coords.x,
       y: coords.y,
-      address: raw.full_address_road || raw.full_address_jibun || '',
+      address: pick(raw, ADDR_KEYS) || '',
       tel: '',
-      poiId: raw.poi_id,
+      poiId: pick(raw, ['poi_id', 'poiId', 'poiID', 'id']),
       pkey: raw.pkey,
-      rpFlag: raw.rp_flag,
+      rpFlag: pick(raw, ['rp_flag', 'rpFlag', 'rpflag']),
       distance: raw.distance,
+      isEvCharger: isEvChargerPoi(raw),
       raw,
     };
   }).filter(p => p.name && p.x != null && p.y != null);
@@ -501,8 +502,27 @@ function normalizePoi(raw) {
     poiId: pick(raw, ['poiId', 'id', 'poiID', 'poi_id']),
     pkey: pick(raw, ['pkey', 'pKey', 'navSeqPkey']),
     rpFlag: pick(raw, ['rpFlag', 'rpflag', 'rp_flag']),
+    isEvCharger: isEvChargerPoi(raw),
     raw,
   };
+}
+
+// 전기차 충전소 판단: 급속/완속/초급속 충전기 보유 여부 중 하나라도 'Y'
+const EV_CHARGER_YN_KEYS = ['fastEvChargerYn', 'normalEvChargerYn', 'superFastChargerYn'];
+
+/** POI 원본 객체가 전기차 충전소인지 (위 Y/N 필드 중 하나라도 'Y') */
+export function isEvChargerPoi(raw) {
+  return EV_CHARGER_YN_KEYS.some(k => String(raw?.[k] ?? '').toUpperCase() === 'Y');
+}
+
+/**
+ * 화면에서 쓰는 POI 검색 응답 파싱 진입점.
+ * poiSearches[] 형태(경로상 검색·일반 검색 모두 내려올 수 있음, camelCase/snake_case)는
+ * parseRoutePoiResponse, 그 외는 parsePoiSearchResponse 로 정규화한다.
+ */
+export function parsePoiResults(json) {
+  return (json && Array.isArray(json.poiSearches))
+    ? parseRoutePoiResponse(json) : parsePoiSearchResponse(json);
 }
 
 /**

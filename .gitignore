@@ -4,3 +4,10 @@ node_modules/
 # Symlinks/ad-hoc 실 로그 (커밋 금지)
 DLTLOG
 test-dlt-quick.mjs
+
+# graphify: 머신별 로컬 상태 (그래프 산출물은 커밋)
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cache/ast/
+graphify-out/cache/stat-index.json
+graphify-out/20[0-9][0-9]-*/

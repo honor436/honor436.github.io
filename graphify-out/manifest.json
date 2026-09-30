@@ -1,0 +1,397 @@
+{
+  "DltLogViewer-beta/adb-relay.py": {
+    "mtime": 1784025155.0655284,
+    "ast_hash": "5a98e493418836ec3f3be9040c7afcb3",
+    "semantic_hash": "5a98e493418836ec3f3be9040c7afcb3"
+  },
+  "DltLogViewer-beta/js/build-info.js": {
+    "mtime": 1784025155.0764432,
+    "ast_hash": "359fc45d137f72987ac12b42ec052379",
+    "semantic_hash": "359fc45d137f72987ac12b42ec052379"
+  },
+  "DltLogViewer-beta/js/coordinate.js": {
+    "mtime": 1784025155.07664,
+    "ast_hash": "48391db6f9cfdbb5cd6bad3f58f6e96e",
+    "semantic_hash": "48391db6f9cfdbb5cd6bad3f58f6e96e"
+  },
+  "DltLogViewer-beta/js/dlt-parser.js": {
+    "mtime": 1784025155.076899,
+    "ast_hash": "913e4417904c14205d29135729991439",
+    "semantic_hash": "913e4417904c14205d29135729991439"
+  },
+  "DltLogViewer-beta/js/extractor.js": {
+    "mtime": 1784025155.077068,
+    "ast_hash": "f1c6e000e678698702827127a3bad89e",
+    "semantic_hash": "f1c6e000e678698702827127a3bad89e"
+  },
+  "DltLogViewer-beta/js/map-viewer.js": {
+    "mtime": 1784025155.0772543,
+    "ast_hash": "cc9f8d5478b4d4a2d49f0e5660b4748e",
+    "semantic_hash": "cc9f8d5478b4d4a2d49f0e5660b4748e"
+  },
+  "DltLogViewer-beta/js/mock-gps-playback.js": {
+    "mtime": 1784025277.407437,
+    "ast_hash": "e161bd3b2c6507b517a74bf285a54bce",
+    "semantic_hash": "e161bd3b2c6507b517a74bf285a54bce"
+  },
+  "DltLogViewer-beta/js/poi-search.js": {
+    "mtime": 1785248910.453828,
+    "ast_hash": "68fa255ee48331123a6859ce134b1910",
+    "semantic_hash": "68fa255ee48331123a6859ce134b1910"
+  },
+  "DltLogViewer-beta/js/reverse-geocode.js": {
+    "mtime": 1784025155.0777428,
+    "ast_hash": "a8dbbd725eae5f051ec0aeb278291a99",
+    "semantic_hash": "a8dbbd725eae5f051ec0aeb278291a99"
+  },
+  "DltLogViewer-beta/js/route-request.js": {
+    "mtime": 1784097752.6917667,
+    "ast_hash": "ef58b932fd935e356a6298c67a8eb2b8",
+    "semantic_hash": "ef58b932fd935e356a6298c67a8eb2b8"
+  },
+  "DltLogViewer-beta/js/shp-app.js": {
+    "mtime": 1784025155.0781214,
+    "ast_hash": "77416ad1f3dd7a0a4809ad7bbee3ab56",
+    "semantic_hash": "77416ad1f3dd7a0a4809ad7bbee3ab56"
+  },
+  "DltLogViewer-beta/js/shp-layer.js": {
+    "mtime": 1784025155.0783262,
+    "ast_hash": "4337819c0f4a667ffb8ab06f7e267568",
+    "semantic_hash": "4337819c0f4a667ffb8ab06f7e267568"
+  },
+  "DltLogViewer-beta/js/shp-worker.js": {
+    "mtime": 1784025155.0784965,
+    "ast_hash": "83345115dd0e3ff1192c4c10977ced0b",
+    "semantic_hash": "83345115dd0e3ff1192c4c10977ced0b"
+  },
+  "DltLogViewer-beta/js/traffic-api.js": {
+    "mtime": 1784025155.078666,
+    "ast_hash": "444441e6ea9ae7266dca4be722859ffc",
+    "semantic_hash": "444441e6ea9ae7266dca4be722859ffc"
+  },
+  "DltLogViewer-beta/js/traffic-layer.js": {
+    "mtime": 1784025155.0788264,
+    "ast_hash": "fa67ecedb4ff0ec835ab2209ce2f08ed",
+    "semantic_hash": "fa67ecedb4ff0ec835ab2209ce2f08ed"
+  },
+  "DltLogViewer-beta/js/tvas-parser.js": {
+    "mtime": 1789720969.6836727,
+    "ast_hash": "82bf94c9b43a38854f911546999feb43",
+    "semantic_hash": "82bf94c9b43a38854f911546999feb43"
+  },
+  "DltLogViewer-beta/js/tvas-renderer.js": {
+    "mtime": 1789720969.6845288,
+    "ast_hash": "ec2490097148a15a7482c64983bd13b3",
+    "semantic_hash": "ec2490097148a15a7482c64983bd13b3"
+  },
+  "DltLogViewer-beta/scripts/install.ps1": {
+    "mtime": 1784025155.0795293,
+    "ast_hash": "550716f6a46881b88ab8382920dfbf62",
+    "semantic_hash": "550716f6a46881b88ab8382920dfbf62"
+  },
+  "DltLogViewer-beta/scripts/install.sh": {
+    "mtime": 1784025155.0796938,
+    "ast_hash": "3d4bcdc1d03ee5e06d86f600951a76f1",
+    "semantic_hash": "3d4bcdc1d03ee5e06d86f600951a76f1"
+  },
+  "DltLogViewer/adb-relay.py": {
+    "mtime": 1780036771.157877,
+    "ast_hash": "5a98e493418836ec3f3be9040c7afcb3",
+    "semantic_hash": "5a98e493418836ec3f3be9040c7afcb3"
+  },
+  "DltLogViewer/js/build-info.js": {
+    "mtime": 1790759114.608276,
+    "ast_hash": "359fc45d137f72987ac12b42ec052379",
+    "semantic_hash": ""
+  },
+  "DltLogViewer/js/coordinate.js": {
+    "mtime": 1790758617.452274,
+    "ast_hash": "48391db6f9cfdbb5cd6bad3f58f6e96e",
+    "semantic_hash": "48391db6f9cfdbb5cd6bad3f58f6e96e"
+  },
+  "DltLogViewer/js/dlt-parser.js": {
+    "mtime": 1780036771.1668837,
+    "ast_hash": "913e4417904c14205d29135729991439",
+    "semantic_hash": "913e4417904c14205d29135729991439"
+  },
+  "DltLogViewer/js/extractor.js": {
+    "mtime": 1784025155.0816865,
+    "ast_hash": "f1c6e000e678698702827127a3bad89e",
+    "semantic_hash": "f1c6e000e678698702827127a3bad89e"
+  },
+  "DltLogViewer/js/map-viewer.js": {
+    "mtime": 1780036771.1672103,
+    "ast_hash": "cc9f8d5478b4d4a2d49f0e5660b4748e",
+    "semantic_hash": "cc9f8d5478b4d4a2d49f0e5660b4748e"
+  },
+  "DltLogViewer/js/mock-gps-playback.js": {
+    "mtime": 1784025196.471839,
+    "ast_hash": "e161bd3b2c6507b517a74bf285a54bce",
+    "semantic_hash": "e161bd3b2c6507b517a74bf285a54bce"
+  },
+  "DltLogViewer/js/poi-search.js": {
+    "mtime": 1785248910.458117,
+    "ast_hash": "68fa255ee48331123a6859ce134b1910",
+    "semantic_hash": "68fa255ee48331123a6859ce134b1910"
+  },
+  "DltLogViewer/js/reverse-geocode.js": {
+    "mtime": 1784025155.0823662,
+    "ast_hash": "a8dbbd725eae5f051ec0aeb278291a99",
+    "semantic_hash": "a8dbbd725eae5f051ec0aeb278291a99"
+  },
+  "DltLogViewer/js/route-request.js": {
+    "mtime": 1784097752.6932287,
+    "ast_hash": "ef58b932fd935e356a6298c67a8eb2b8",
+    "semantic_hash": "ef58b932fd935e356a6298c67a8eb2b8"
+  },
+  "DltLogViewer/js/shp-app.js": {
+    "mtime": 1780036771.167471,
+    "ast_hash": "77416ad1f3dd7a0a4809ad7bbee3ab56",
+    "semantic_hash": "77416ad1f3dd7a0a4809ad7bbee3ab56"
+  },
+  "DltLogViewer/js/shp-layer.js": {
+    "mtime": 1780036771.1677115,
+    "ast_hash": "4337819c0f4a667ffb8ab06f7e267568",
+    "semantic_hash": "4337819c0f4a667ffb8ab06f7e267568"
+  },
+  "DltLogViewer/js/shp-worker.js": {
+    "mtime": 1780036771.1678648,
+    "ast_hash": "83345115dd0e3ff1192c4c10977ced0b",
+    "semantic_hash": "83345115dd0e3ff1192c4c10977ced0b"
+  },
+  "DltLogViewer/js/traffic-api.js": {
+    "mtime": 1780036771.1679945,
+    "ast_hash": "444441e6ea9ae7266dca4be722859ffc",
+    "semantic_hash": "444441e6ea9ae7266dca4be722859ffc"
+  },
+  "DltLogViewer/js/traffic-layer.js": {
+    "mtime": 1780036771.1681206,
+    "ast_hash": "fa67ecedb4ff0ec835ab2209ce2f08ed",
+    "semantic_hash": "fa67ecedb4ff0ec835ab2209ce2f08ed"
+  },
+  "DltLogViewer/js/tvas-parser.js": {
+    "mtime": 1789720969.686878,
+    "ast_hash": "82bf94c9b43a38854f911546999feb43",
+    "semantic_hash": "82bf94c9b43a38854f911546999feb43"
+  },
+  "DltLogViewer/js/tvas-renderer.js": {
+    "mtime": 1789720969.6877387,
+    "ast_hash": "ec2490097148a15a7482c64983bd13b3",
+    "semantic_hash": "ec2490097148a15a7482c64983bd13b3"
+  },
+  "DltLogViewer/scripts/install.ps1": {
+    "mtime": 1780036771.1686826,
+    "ast_hash": "550716f6a46881b88ab8382920dfbf62",
+    "semantic_hash": "550716f6a46881b88ab8382920dfbf62"
+  },
+  "DltLogViewer/scripts/install.sh": {
+    "mtime": 1780036771.1688242,
+    "ast_hash": "3d4bcdc1d03ee5e06d86f600951a76f1",
+    "semantic_hash": "3d4bcdc1d03ee5e06d86f600951a76f1"
+  },
+  "ImageMapper/js/app.js": {
+    "mtime": 1789309262.631398,
+    "ast_hash": "b783953896cb623c7468a043cef3eaad",
+    "semantic_hash": "b783953896cb623c7468a043cef3eaad"
+  },
+  "ImageMapper/js/imagemap.js": {
+    "mtime": 1789309262.6319695,
+    "ast_hash": "945914690278541a272f0fd240170db9",
+    "semantic_hash": "945914690278541a272f0fd240170db9"
+  },
+  "TeamRoulette/js/app.js": {
+    "mtime": 1787641550.382259,
+    "ast_hash": "6f6f73e54b85c465c9803cc80ac6b156",
+    "semantic_hash": "6f6f73e54b85c465c9803cc80ac6b156"
+  },
+  "TeamRoulette/js/roulette.js": {
+    "mtime": 1787641550.3824768,
+    "ast_hash": "0cdcefdb9d517ef48e0cf35308620b59",
+    "semantic_hash": "0cdcefdb9d517ef48e0cf35308620b59"
+  },
+  "TeamRoulette/js/wheel.js": {
+    "mtime": 1787641550.382664,
+    "ast_hash": "5ae0eec8a1fa862bdb7711621d92dcb8",
+    "semantic_hash": "5ae0eec8a1fa862bdb7711621d92dcb8"
+  },
+  "auth-gate.js": {
+    "mtime": 1784537054.5337453,
+    "ast_hash": "294559134163ba9ea234f0e5a598392e",
+    "semantic_hash": "294559134163ba9ea234f0e5a598392e"
+  },
+  "js/app.js": {
+    "mtime": 1780036771.169478,
+    "ast_hash": "8e299db195a992ed5154e7b3bba32a3a",
+    "semantic_hash": "8e299db195a992ed5154e7b3bba32a3a"
+  },
+  "package.json": {
+    "mtime": 1780036771.1696024,
+    "ast_hash": "63459dbe72b3164e66666714ae12ae90",
+    "semantic_hash": "63459dbe72b3164e66666714ae12ae90"
+  },
+  "server-test/tester.js": {
+    "mtime": 1784690135.6244097,
+    "ast_hash": "315813a4a7f788685b47f2e1ec68baaa",
+    "semantic_hash": "315813a4a7f788685b47f2e1ec68baaa"
+  },
+  "tests/build-info.test.mjs": {
+    "mtime": 1784025155.0854993,
+    "ast_hash": "91d475aa72af9edf01ee1bf10ec38d0b",
+    "semantic_hash": "91d475aa72af9edf01ee1bf10ec38d0b"
+  },
+  "tests/coordinate.test.mjs": {
+    "mtime": 1790758617.452575,
+    "ast_hash": "d72f215672a37906ac2be26375330b93",
+    "semantic_hash": "d72f215672a37906ac2be26375330b93"
+  },
+  "tests/dlt-channel.test.mjs": {
+    "mtime": 1780036771.1699789,
+    "ast_hash": "001fa7798d94f003e213f1818c5cf024",
+    "semantic_hash": "001fa7798d94f003e213f1818c5cf024"
+  },
+  "tests/dlt-parser.test.mjs": {
+    "mtime": 1780036771.1700613,
+    "ast_hash": "ef070b85e3fe42744f6ff8a5f56ae8fa",
+    "semantic_hash": "ef070b85e3fe42744f6ff8a5f56ae8fa"
+  },
+  "tests/extractor-rpreq.test.mjs": {
+    "mtime": 1780036771.1701818,
+    "ast_hash": "203d47da3cc9bca915d81cf257cc7372",
+    "semantic_hash": "203d47da3cc9bca915d81cf257cc7372"
+  },
+  "tests/imagemap.test.mjs": {
+    "mtime": 1789309262.632862,
+    "ast_hash": "1cca42c0e462eae9935d214e51375795",
+    "semantic_hash": "1cca42c0e462eae9935d214e51375795"
+  },
+  "tests/index-tools.test.mjs": {
+    "mtime": 1789309262.6334085,
+    "ast_hash": "c2cb9348500bb117b90319668457ba65",
+    "semantic_hash": "c2cb9348500bb117b90319668457ba65"
+  },
+  "tests/mock-gps-playback.test.mjs": {
+    "mtime": 1784025162.5728164,
+    "ast_hash": "886385bf415094a5c8af746686eae76d",
+    "semantic_hash": "886385bf415094a5c8af746686eae76d"
+  },
+  "tests/nmea-parser.test.mjs": {
+    "mtime": 1780036771.1703908,
+    "ast_hash": "8e647991cb0255d6aad5177c133c55e9",
+    "semantic_hash": "8e647991cb0255d6aad5177c133c55e9"
+  },
+  "tests/poi-search.test.mjs": {
+    "mtime": 1785248910.4590547,
+    "ast_hash": "5445d8e1a75d27ee8f3f8e4c23e65878",
+    "semantic_hash": "5445d8e1a75d27ee8f3f8e4c23e65878"
+  },
+  "tests/roulette.test.mjs": {
+    "mtime": 1790758617.4533236,
+    "ast_hash": "33310bfcbe06ec601e7d1c4087295529",
+    "semantic_hash": "33310bfcbe06ec601e7d1c4087295529"
+  },
+  "tests/route-request.test.mjs": {
+    "mtime": 1784097752.693612,
+    "ast_hash": "740b75ba8734e56a3f33ee83e8a2558c",
+    "semantic_hash": "740b75ba8734e56a3f33ee83e8a2558c"
+  },
+  "tests/rplabel-parser.test.mjs": {
+    "mtime": 1780036771.170473,
+    "ast_hash": "dee661948b4d4825599bc12825c97fe8",
+    "semantic_hash": "dee661948b4d4825599bc12825c97fe8"
+  },
+  "tests/tmap-tester.test.mjs": {
+    "mtime": 1784690135.6253252,
+    "ast_hash": "ab2e27f760efcb72db9b6bf97fc44d81",
+    "semantic_hash": "ab2e27f760efcb72db9b6bf97fc44d81"
+  },
+  "tests/traffic-api.test.mjs": {
+    "mtime": 1780036771.1706185,
+    "ast_hash": "587ab8f2b8a4b138f6c3d091cf5e02f9",
+    "semantic_hash": "587ab8f2b8a4b138f6c3d091cf5e02f9"
+  },
+  "tests/tvas-guidance-overlap.test.mjs": {
+    "mtime": 1784694083.3909175,
+    "ast_hash": "3b8f7d4821e204dcd5b937cf1415878a",
+    "semantic_hash": "3b8f7d4821e204dcd5b937cf1415878a"
+  },
+  "tests/tvas-parser.test.mjs": {
+    "mtime": 1789720969.688364,
+    "ast_hash": "4365a225ee11ddc7278b8f0fd3ba1944",
+    "semantic_hash": "4365a225ee11ddc7278b8f0fd3ba1944"
+  },
+  "tests/tvas-renderer.test.mjs": {
+    "mtime": 1789720969.6889322,
+    "ast_hash": "962ec2734db014f1d516734cd196a161",
+    "semantic_hash": "962ec2734db014f1d516734cd196a161"
+  },
+  "CLAUDE.md": {
+    "mtime": 1790759146.2320967,
+    "ast_hash": "8e6e114217aecb4c1aaab73919fe7e09",
+    "semantic_hash": ""
+  },
+  "DltLogViewer-beta/help.html": {
+    "mtime": 1789720969.681682,
+    "ast_hash": "c4dc3477fac55ff35c0d1dec7c47964b",
+    "semantic_hash": "c4dc3477fac55ff35c0d1dec7c47964b"
+  },
+  "DltLogViewer-beta/index.html": {
+    "mtime": 1789720969.682833,
+    "ast_hash": "8fba48c5294b9c78249891256aab0fcd",
+    "semantic_hash": "8fba48c5294b9c78249891256aab0fcd"
+  },
+  "DltLogViewer/help.html": {
+    "mtime": 1789720969.6851223,
+    "ast_hash": "c4dc3477fac55ff35c0d1dec7c47964b",
+    "semantic_hash": "c4dc3477fac55ff35c0d1dec7c47964b"
+  },
+  "DltLogViewer/index.html": {
+    "mtime": 1789720969.6861856,
+    "ast_hash": "526ff4adb7a3d747648f5041fb1a1b08",
+    "semantic_hash": "526ff4adb7a3d747648f5041fb1a1b08"
+  },
+  "ImageMapper/index.html": {
+    "mtime": 1789309262.6310177,
+    "ast_hash": "edfc7b0f8588225a282fe8fcf72fbe2b",
+    "semantic_hash": "edfc7b0f8588225a282fe8fcf72fbe2b"
+  },
+  "README.md": {
+    "mtime": 1780036771.1689126,
+    "ast_hash": "eb680924849efb2f4fde1b2c71bcf3b2",
+    "semantic_hash": "eb680924849efb2f4fde1b2c71bcf3b2"
+  },
+  "TeamRoulette/index.html": {
+    "mtime": 1787641550.3819778,
+    "ast_hash": "2a1ceafe69cb79938986650252c8b47a",
+    "semantic_hash": "2a1ceafe69cb79938986650252c8b47a"
+  },
+  "cjmarket.html": {
+    "mtime": 1784025155.0839036,
+    "ast_hash": "92005d8a8f2341209db778aa5782638b",
+    "semantic_hash": "92005d8a8f2341209db778aa5782638b"
+  },
+  "dlt-map-viewer_v3.html": {
+    "mtime": 1784025155.0842457,
+    "ast_hash": "be5d6538f9a1788d158cd2faa6319cd1",
+    "semantic_hash": "be5d6538f9a1788d158cd2faa6319cd1"
+  },
+  "index.html": {
+    "mtime": 1789309262.6324146,
+    "ast_hash": "c9e8093b758a882ba9304985cc418379",
+    "semantic_hash": "c9e8093b758a882ba9304985cc418379"
+  },
+  "sample.html": {
+    "mtime": 1784025155.0850093,
+    "ast_hash": "a5a24f4f19773ec8960a5ceb63d904f4",
+    "semantic_hash": "a5a24f4f19773ec8960a5ceb63d904f4"
+  },
+  "server-test/index.html": {
+    "mtime": 1784025155.0852406,
+    "ast_hash": "7d630c5a35388c75e9efc7adb22002e6",
+    "semantic_hash": "7d630c5a35388c75e9efc7adb22002e6"
+  },
+  ".githooks/pre-commit": {
+    "mtime": 1790759138.3444514,
+    "ast_hash": "9591dc8aaa6eded5f64539b5e4bc1b1a",
+    "semantic_hash": ""
+  }
+}

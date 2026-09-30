@@ -135,3 +135,11 @@ test("parseDltTimestamp empty returns null", () => {
 브라우저 통합 검증용 실 로그. 커밋 금지, `.gitignore` 대상:
 
 - `/Users/a201010147/Documents/Project/Claude/honor436.github.io/DLTLOG/1020/1020.dlt`
+
+## 지식 그래프 (graphify)
+
+- `graphify-out/`(graph.json·graph.html·GRAPH_REPORT.md)은 커밋 대상이다. 코드 구조 질문은 그래프를 먼저 참고한다.
+- `.githooks/pre-commit`이 커밋 시 코드 그래프를 AST로 재빌드해 같은 커밋에 포함한다. 새 클론에서는 한 번 활성화:
+  `git config core.hooksPath .githooks`
+- 훅은 코드만 갱신한다. 문서(.html/.md) 내용이 바뀌면 `/graphify . --update`로 의미 추출을 수동 갱신한다.
+- 훅 건너뛰기: `GRAPHIFY_SKIP_HOOK=1 git commit ...`

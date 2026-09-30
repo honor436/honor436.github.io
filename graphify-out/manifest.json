@@ -390,8 +390,8 @@
     "semantic_hash": "7d630c5a35388c75e9efc7adb22002e6"
   },
   ".githooks/pre-commit": {
-    "mtime": 1790759138.3444514,
-    "ast_hash": "9591dc8aaa6eded5f64539b5e4bc1b1a",
+    "mtime": 1790759173.400656,
+    "ast_hash": "e000cea092b17da4fc37f179277cc160",
     "semantic_hash": ""
   }
 }

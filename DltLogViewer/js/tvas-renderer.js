@@ -38,6 +38,7 @@ let tvasLayers = {
   truck: null,         // 화물차 제한구간
   complexIntersection: null, // 복잡교차로 (MC4)
   batteryDepletion: null,    // 배터리 방전 예상 위치 (RO4 누적 에너지)
+  arrivalBattery: null,      // 경유지·목적지 도착 예상 배터리 (RO4 누적 에너지)
 };
 
 // ---- Color schemes -------------------------------------------------------- //
@@ -511,6 +512,9 @@ export function renderTvasRoute(map, tvasResult, resolvedCoords, routeIndex = 0,
       renderComplexIntersections(tvasLayers.complexIntersection, resolvedCoords, complexIntersections);
     }
     renderBatteryDepletion(tvasLayers.batteryDepletion, resolvedCoords, roads, opts.currentEnergy);
+    // 배터리 용량(100%, Wh) — 요청 maxCharge 기준 (resolveBatteryCapacityWh). 충전량 환산·SoC% 계산용
+    const capacityWh = Number(opts.capacityWh) > 0 ? Number(opts.capacityWh) : null;
+    renderArrivalBattery(tvasLayers.arrivalBattery, resolvedCoords, roads, waypoints, evChargers, opts.currentEnergy, capacityWh);
   }
 
   // Add all layers to map
@@ -648,6 +652,218 @@ export function findBatteryDepletion(roads, currentEnergy) {
     }
   }
   return null;
+}
+
+const _finiteSum = (list, key) =>
+  (Array.isArray(list) ? list : []).reduce((s, it) => {
+    const v = Number(it && it[key]);
+    return Number.isFinite(v) ? s + v : s;
+  }, 0);
+
+/** RO4 도로 정보 전체 에너지 소모량 합계 (Wh). 회생(음수) 구간도 그대로 합산. */
+export function sumRoadEnergy(roads) {
+  return _finiteSum(roads, 'energyConsumption');
+}
+
+/** RS7 경로요약 전체 에너지 소모량 합계 (W). */
+export function sumRouteSummaryEnergy(items) {
+  return _finiteSum(items, 'energy');
+}
+
+/**
+ * 경유지·목적지 도착 시 예상 배터리량.
+ * 현재 배터리(currentEnergy, Wh)에서 지점까지의 RO4 누적 에너지 소모
+ * (lastVxIdx ≤ 지점 vxIdx 인 구간 합)를 뺀다. 지점 전에 충전소가 있으면
+ * 마지막 충전소에서 목표 충전량(targetSoc)까지 충전된 뒤 소모한 것으로 본다.
+ * @param {{roads:Array, currentEnergy:number, capacityWh?:number,
+ *          chargers?:Array<{vxIdx:number, targetSoc:number}>,
+ *          points:Array<{label:string, vxIdx:number, atChargerVx?:number}>}} p
+ *   atChargerVx: 지점과 같은 자리 충전소의 vxIdx — 그 충전은 도착 후라 반영하지 않는다.
+ * @returns {Array<{label:string, vxIdx:number, consumedWh:number, remainingWh:number, percent:number|null}>}
+ */
+export function predictArrivalBattery({ roads, currentEnergy, capacityWh, chargers, points }) {
+  const battery = Number(currentEnergy);
+  if (!Array.isArray(points) || points.length === 0 || !Number.isFinite(battery)) return [];
+  const list = Array.isArray(roads) ? roads : [];
+  const cap = Number(capacityWh) > 0 ? Number(capacityWh) : null;
+  const usedUpTo = (vx) => _finiteSum(list.filter(r => r.lastVxIdx <= vx), 'energyConsumption');
+  // 필수 충전소: 목표 SoC 로 충전 (용량을 알 때만 Wh 로 환산 가능)
+  const stops = cap
+    ? (Array.isArray(chargers) ? chargers : []).filter(c => Number(c.targetSoc) > 0).sort((a, b) => a.vxIdx - b.vxIdx)
+    : [];
+  return points.map(pt => {
+    const consumedWh = usedUpTo(pt.vxIdx);
+    // 지점 자신이 충전소(atChargerVx)면 그 충전은 도착 이후이므로 제외
+    const lastStop = stops.filter(c => c.vxIdx <= pt.vxIdx && c.vxIdx !== pt.atChargerVx).pop();
+    const remainingWh = lastStop
+      ? cap * Number(lastStop.targetSoc) / 100 - (consumedWh - usedUpTo(lastStop.vxIdx))
+      : battery - consumedWh;
+    const percent = cap ? Math.round(remainingWh / cap * 1000) / 10 : null;
+    return { ...pt, consumedWh, remainingWh, percent };
+  });
+}
+
+/**
+ * RO4 에너지 소모량 기준 도착 배터리 (ES3 SoC 를 쓰지 않는 직접 계산).
+ * 출발 currentEnergy 에서 RO4 누적 소모를 빼고, 지점 전에 지난 충전소마다
+ * 예상 충전량(chargeSoc)% × 용량을 더한다. 지점 자신이 충전소(atChargerVx)면 그 충전은 제외.
+ * 용량을 모르면 충전량을 Wh 로 바꿀 수 없어 충전 없이 계산한다.
+ */
+export function predictEnergyChain({ roads, currentEnergy, capacityWh, chargers, points }) {
+  const battery = Number(currentEnergy);
+  if (!Array.isArray(points) || points.length === 0 || !Number.isFinite(battery)) return [];
+  const list = Array.isArray(roads) ? roads : [];
+  const cap = Number(capacityWh) > 0 ? Number(capacityWh) : null;
+  const stops = cap ? (Array.isArray(chargers) ? chargers : []).filter(c => Number(c.chargeSoc) > 0) : [];
+  return points.map(pt => {
+    const consumedWh = _finiteSum(list.filter(r => r.lastVxIdx <= pt.vxIdx), 'energyConsumption');
+    const chargedWh = stops
+      .filter(c => c.vxIdx <= pt.vxIdx && c.vxIdx !== pt.atChargerVx)
+      .reduce((s, c) => s + cap * Number(c.chargeSoc) / 100, 0);
+    const remainingWh = battery - consumedWh + chargedWh;
+    const percent = cap ? Math.round(remainingWh / cap * 1000) / 10 : null;
+    return { ...pt, consumedWh, remainingWh, percent };
+  });
+}
+
+// 배터리 잔량 색: 부족(≤0)=빨강, 20% 이하=주황, 그 외=초록
+function _batteryColor(pred) {
+  if (pred.remainingWh <= 0) return '#dc2626';
+  if (pred.percent != null && pred.percent <= 20) return '#f59e0b';
+  return '#16a34a';
+}
+
+/** 경로상 도착 예상 배터리 말풍선 HTML (지점명 · SoC% · Wh). side: 'left' | 'right' */
+// SoC% (용량을 모르면 Wh)
+const _socText = (p) => (p.percent != null ? `${p.percent}%` : `${Math.round(p.remainingWh).toLocaleString()} Wh`);
+const _whText = (p) => `${Math.round(p.remainingWh).toLocaleString()} Wh`;
+
+// 표시 명칭: TVAS 원본 데이터 이름 사용
+const LABEL_ES3 = 'ES3 충전소 도달 시 SoC';
+const LABEL_RO4 = 'RO4 에너지 소모량';
+
+// energy: predictEnergyChain 결과(RO4 에너지 소모량 기준). 있으면 ES3 도달 SoC 기준과 나란히 표시.
+export function arrivalBatteryLabelHtml(pred, side, energy) {
+  if (!energy) {
+    const pct = pred.percent != null ? ` ${pred.percent}%` : '';
+    const inner = `<div style="font-weight:800">🔋 ${esc(pred.label)} 도착${pct}</div>` +
+      `<div style="font-size:10px;opacity:.9">${_whText(pred)}</div>`;
+    return sideBubbleHtml(side, _batteryColor(pred), inner);
+  }
+  const inner = `<div style="font-weight:800">🔋 ${esc(pred.label)} 도착</div>` +
+    `<div>${LABEL_ES3} 기준 <b>${_socText(pred)}</b> <span style="font-size:10px;opacity:.9">(${_whText(pred)})</span></div>` +
+    `<div>${LABEL_RO4} 기준 <b>${_socText(energy)}</b> <span style="font-size:10px;opacity:.9">(${_whText(energy)})</span></div>`;
+  return sideBubbleHtml(side, _batteryColor(pred), inner);
+}
+
+/**
+ * 말풍선을 둘 쪽: 경로가 이어지는 방향의 반대편.
+ * 다음 보간점이 동쪽이면 'left', 서쪽이면 'right'. 마지막 점은 들어온 방향으로 판단.
+ */
+export function bubbleSide(coords, vxIdx) {
+  const cur = coords[vxIdx], next = coords[vxIdx + 1], prev = coords[vxIdx - 1];
+  if (next) return next.lon > cur.lon ? 'left' : 'right';
+  // 마지막 점: 들어온 경로가 있는 쪽의 반대편
+  if (prev) return prev.lon < cur.lon ? 'right' : 'left';
+  return 'right';
+}
+
+/**
+ * 지점 옆 말풍선 (divIcon 기준점 = 지점). 말풍선은 지점 위쪽 좌/우에 떠서
+ * 경로선을 덮지 않고, 꼬리가 지점을 가리킨다. side: 'left' | 'right'.
+ */
+function sideBubbleHtml(side, color, innerHtml) {
+  const isLeft = side === 'left';
+  const pos = isLeft ? 'right:10px' : 'left:10px';
+  const tail = isLeft
+    ? `right:-5px;border-right:2px solid #fff;border-bottom:2px solid #fff`
+    : `left:-5px;border-left:2px solid #fff;border-bottom:2px solid #fff`;
+  return `<div data-side="${isLeft ? 'left' : 'right'}" style="position:absolute;bottom:8px;${pos};pointer-events:auto">` +
+    `<div style="position:relative;background:${color};color:#fff;border:2px solid #fff;border-radius:10px;padding:3px 8px;font-size:11px;line-height:1.35;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.45)">` +
+      innerHtml +
+      `<span style="position:absolute;bottom:-5px;${tail};width:8px;height:8px;background:${color};transform:rotate(${isLeft ? '-45deg' : '45deg'})"></span>` +
+    `</div></div>`;
+}
+
+/** 충전소 도착 예상 SoC → 목표 충전량 말풍선 (buildChargerSocPlan 결과 사용) */
+// energy: 이 충전소 도착(충전 전) RO4 에너지 소모량 기준 값. 있으면 ES3 도달 SoC 와 나란히 표시.
+export function chargerSocBubbleHtml(ev, soc, side, energy) {
+  const head = `<div style="font-weight:800">⚡ ${esc(ev.name || '충전소')} <span style="opacity:.85">(+${soc.chargeSoc}%)</span></div>`;
+  if (!energy || energy.percent == null) {
+    return sideBubbleHtml(side, '#f04452', head +
+      `<div>도착 ${soc.arrivalSoc}% → 목표 <b>${soc.targetSoc}%</b></div>`);
+  }
+  const eTarget = Math.round((energy.percent + soc.chargeSoc) * 10) / 10;
+  return sideBubbleHtml(side, '#f04452', head +
+    `<div>${LABEL_ES3} ${soc.arrivalSoc}% → 목표 <b>${soc.targetSoc}%</b></div>` +
+    `<div>${LABEL_RO4} ${energy.percent}% → 목표 <b>${eTarget}%</b></div>`);
+}
+
+// 두 WGS84 좌표 사이 거리(m)
+function _distM(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// 경유지와 같은 자리로 보는 충전소 거리(m)
+const SAME_SPOT_M = 50;
+
+/**
+ * 도착 배터리 계산 지점: WP2 경유지(순서대로) + 목적지(경로 마지막 보간점).
+ * 지점에서 50m 이내 충전 지점(stops)이 있으면 atChargerVx 로 표시한다.
+ */
+export function arrivalBatteryPoints(waypoints, coords, stops) {
+  const n = coords ? coords.length : 0;
+  if (n === 0) return [];
+  const list = Array.isArray(stops) ? stops : [];
+  const withCharger = (pt) => {
+    const hit = list.find(st => coords[st.vxIdx] && _distM(coords[st.vxIdx], coords[pt.vxIdx]) <= SAME_SPOT_M);
+    return hit ? { ...pt, atChargerVx: hit.vxIdx } : pt;
+  };
+  const vias = (Array.isArray(waypoints) ? waypoints : [])
+    .filter(w => w.vxIdx >= 0 && w.vxIdx < n)
+    .map((w, i) => withCharger({ label: '경유지' + (i + 1), vxIdx: w.vxIdx }));
+  return [...vias, withCharger({ label: '목적지', vxIdx: n - 1 })];
+}
+
+/**
+ * ES3 충전소별 SoC 계획 (입력 순서 유지).
+ * arrivalSoc = ES3 충전소 도달 시 SoC (앞선 충전소 충전은 이미 반영된 값)
+ * chargeSoc  = 예상 충전량(expectedSoc)
+ * targetSoc  = arrivalSoc + chargeSoc (목표 충전량)
+ */
+export function buildChargerSocPlan(evChargers) {
+  return (Array.isArray(evChargers) ? evChargers : []).map(ev => {
+    const arrivalSoc = Number(ev.arrivalSoc) || 0;
+    const chargeSoc = Number(ev.expectedSoc) > 0 ? Number(ev.expectedSoc) : 0;
+    return { vxIdx: ev.vxIdx, arrivalSoc, chargeSoc, targetSoc: arrivalSoc + chargeSoc };
+  });
+}
+
+/** 예상 충전량이 있는 충전소 → 충전 반영 지점 [{vxIdx, arrivalSoc, chargeSoc, targetSoc}] (경로 순서) */
+export function chargingStops(evChargers) {
+  return buildChargerSocPlan(evChargers)
+    .filter(p => p.chargeSoc > 0 && p.vxIdx != null)
+    .sort((a, b) => a.vxIdx - b.vxIdx)
+    .map(p => ({ vxIdx: p.vxIdx, arrivalSoc: p.arrivalSoc, chargeSoc: p.chargeSoc, targetSoc: p.targetSoc }));
+}
+
+/** 도착 예상 배터리 마커 팝업 HTML */
+export function buildArrivalBatteryPopup(pred, energy) {
+  const pct = (p) => (p.percent != null ? ` (${p.percent}%)` : '');
+  let html = `<b>🔋 ${esc(pred.label)} 도착 예상 배터리</b>` +
+    (energy
+      ? `<br>${LABEL_ES3} 기준: <b style="color:${_batteryColor(pred)}">${_whText(pred)}${pct(pred)}</b>` +
+        `<br><span style="color:#64748b;font-size:10px">직전 충전소 (ES3 도달 시 SoC + ES3 예상 충전량) − RO4 에너지 소모량</span>` +
+        `<br>${LABEL_RO4} 기준: <b style="color:${_batteryColor(energy)}">${_whText(energy)}${pct(energy)}</b>` +
+        `<br><span style="color:#64748b;font-size:10px">currentEnergy − RO4 에너지 소모량 + ES3 예상 충전량 × 용량(maxCharge)</span>`
+      : `<br>도착 예상: <b style="color:${_batteryColor(pred)}">${_whText(pred)}${pct(pred)}</b>`) +
+    `<br>누적 소모: ${Math.round(pred.consumedWh).toLocaleString()} Wh (RO4 합산)` +
+    `<br>VX ${pred.vxIdx}`;
+  if (pred.remainingWh <= 0) html += `<br><b style="color:#dc2626">⚠ 배터리 부족 — 도착 전 방전 예상</b>`;
+  return html;
 }
 
 export function buildRangeSegments(coords, items) {
@@ -909,6 +1125,54 @@ export function buildBatteryDepletionPopup(d, road, currentEnergy) {
     html += `<hr style="margin:5px 0;border:none;border-top:1px solid rgba(148,163,184,.4)">` + buildRo4InfoHtml(road);
   }
   return html;
+}
+
+// 경유지·목적지 도착 예상 배터리(RO4 누적 소모 + 충전소 충전 반영)와
+// 충전소 도착/목표 SoC 를 경로 옆 말풍선으로 표시.
+function renderArrivalBattery(lg, coords, roads, waypoints, evChargers, currentEnergy, capacityWh) {
+  if (!lg || !coords || coords.length === 0) return;
+  const stops = chargingStops(evChargers);
+  const hasRoads = Array.isArray(roads) && roads.length > 0;
+  const points = arrivalBatteryPoints(waypoints, coords, stops);
+  // RO4 가 없으면 도착 배터리는 계산하지 않고 충전소 SoC 말풍선만 표시
+  const preds = hasRoads ? predictArrivalBattery({ roads, currentEnergy, capacityWh, chargers: stops, points }) : [];
+  // RO4 에너지 소모량 기준(ES3 SoC 없이 직접 계산): 경유지·목적지 + 각 충전소 도착(충전 전)
+  const energyOf = (pts) => (hasRoads ? predictEnergyChain({ roads, currentEnergy, capacityWh, chargers: stops, points: pts }) : []);
+  const energyPreds = energyOf(points);
+  const energyAtStop = new Map(
+    energyOf(stops.map(st => ({ label: '충전소', vxIdx: st.vxIdx, atChargerVx: st.vxIdx }))).map(e => [e.vxIdx, e])
+  );
+  // 말풍선: 기준점 = 지점, 말풍선은 경로 반대편(좌/우)에 뜬다
+  const bubble = (c, html, popup) => L.marker([c.lat, c.lon], {
+    icon: L.divIcon({ className: '', html, iconSize: [0, 0], iconAnchor: [0, 0] }),
+    zIndexOffset: 1300,
+  }).bindPopup(popup).addTo(lg);
+  const opposite = (side) => (side === 'left' ? 'right' : 'left');
+  preds.forEach((pred, i) => {
+    const c = coords[pred.vxIdx];
+    if (!c) return;
+    // 같은 자리 충전소 말풍선과 겹치지 않게 반대편에 둔다
+    const side = pred.atChargerVx != null
+      ? opposite(bubbleSide(coords, pred.atChargerVx))
+      : bubbleSide(coords, pred.vxIdx);
+    const energy = energyPreds[i];
+    bubble(c, arrivalBatteryLabelHtml(pred, side, energy), buildArrivalBatteryPopup(pred, energy));
+  });
+  // 충전소: ES3 충전소 도달 시 SoC → 목표 충전량
+  const evs = Array.isArray(evChargers) ? evChargers : [];
+  const plan = buildChargerSocPlan(evs);
+  evs.forEach((ev, i) => {
+    const soc = plan[i];
+    if (!(soc.chargeSoc > 0) || ev.vxIdx == null || !coords[ev.vxIdx]) return;
+    const c = coords[ev.vxIdx];
+    const energy = energyAtStop.get(ev.vxIdx);
+    const eLine = energy && energy.percent != null
+      ? `<br>${LABEL_RO4} 기준 도착: ${energy.percent}% (${Math.round(energy.remainingWh).toLocaleString()} Wh) → 목표 ${Math.round((energy.percent + soc.chargeSoc) * 10) / 10}%`
+      : '';
+    const popup = `<b>⚡ ${esc(ev.name || '충전소')}</b><br>${LABEL_ES3}: ${soc.arrivalSoc}%` +
+      `<br>ES3 예상 충전량: +${soc.chargeSoc}%<br>목표 (${LABEL_ES3} + ES3 예상 충전량): <b>${soc.targetSoc}%</b>${eLine}<br>VX ${ev.vxIdx}`;
+    bubble(c, chargerSocBubbleHtml(ev, soc, bubbleSide(coords, ev.vxIdx), energy), popup);
+  });
 }
 
 // 배터리 방전 예상 위치: RO4 누적 에너지 소모가 현재 배터리를 넘어서는 지점에 마커.
@@ -1383,7 +1647,8 @@ export function evChargerColor(ev) {
 // Store individual charger markers for show/hide from list
 let evChargerMarkers = [];
 
-export function buildEvPopup(ev, lat, lon, idx) {
+// socPlan: buildChargerSocPlan 결과. 없으면 이 충전소 값만으로 계산.
+export function buildEvPopup(ev, lat, lon, idx, socPlan) {
   const isMust = ev.mustCharge === 1;
   const speedName = {0:'정보없음',1:'완속',2:'급속',3:'초급속'}[ev.chargeSpeed] || '';
   let sockets = [];
@@ -1406,7 +1671,9 @@ export function buildEvPopup(ev, lat, lon, idx) {
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전기</td><td><b>${ev.availChargers}</b>/${ev.totalChargers} (${speedName})</td></tr>`;
   if (ev.chargeTime) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전시간</td><td>${Math.floor(ev.chargeTime/60)}분 ${ev.chargeTime%60}초</td></tr>`;
   if (ev.chargePower) popup += `<tr><td style="color:#8b95a1;padding:2px 0">충전 파워</td><td>${ev.chargePower} kW</td></tr>`;
-  if (ev.arrivalSoc) popup += `<tr><td style="color:#8b95a1;padding:2px 0">SoC</td><td>도착 ${ev.arrivalSoc}% → ${ev.expectedSoc}%</td></tr>`;
+  // 충전소 도착 시 배터리량 + 예상 충전량 = 목표 충전량
+  const soc = socPlan || buildChargerSocPlan([ev])[0];
+  if (ev.arrivalSoc || soc.chargeSoc) popup += `<tr><td style="color:#8b95a1;padding:2px 0">SoC</td><td>도착 ${soc.arrivalSoc}% + 충전 <b>${soc.chargeSoc}%</b> = 목표 <b>${soc.targetSoc}%</b></td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">POI</td><td>${ev.poiId}</td></tr>`;
   if (ev.vxIdx != null) popup += `<tr><td style="color:#8b95a1;padding:2px 0">VX index</td><td>VX${ev.vxIdx}</td></tr>`;
   popup += `<tr><td style="color:#8b95a1;padding:2px 0">좌표</td><td>${lat.toFixed(6)}, ${lon.toFixed(6)}</td></tr>`;
@@ -1444,6 +1711,7 @@ function resolveEvCoord(ev, coords) {
 
 function renderEvChargers(layers, coords, evChargers) {
   evChargerMarkers = [];
+  const socPlan = buildChargerSocPlan(evChargers);   // 도착(ES3 충전소 도달 시 SoC)/목표 SoC
   for (let idx = 0; idx < evChargers.length; idx++) {
     const ev = evChargers[idx];
     const pos = resolveEvCoord(ev, coords);
@@ -1471,7 +1739,7 @@ function renderEvChargers(layers, coords, evChargers) {
       iconHtml = `<div style="width:${size}px;height:${size}px;line-height:${size}px;text-align:center;background:${bg};border-radius:8px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:1px solid #fff;color:#fff">⚡</div>`;
     }
 
-    const popup = buildEvPopup(ev, lat, lon, idx);
+    const popup = buildEvPopup(ev, lat, lon, idx, socPlan[idx]);
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({ className: '', html: iconHtml, iconSize: [size, isMust ? size+16 : size], iconAnchor: [size/2, isMust ? (size+16)/2 : size/2] }),
       zIndexOffset: zOff,

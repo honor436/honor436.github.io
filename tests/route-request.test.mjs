@@ -346,3 +346,25 @@ test('buildIsoBodyFromEvBattery_falls_back_when_no_saved_ev', () => {
   assert.equal(out.contoursEnergy, DEF.currentEnergy); // 6970
   assert.equal(out.contoursMeters, DEF.currentRange);  // 47000
 });
+
+// ---- resolveBatteryCapacityWh (배터리 100% 용량) --------------------------- //
+//
+// 도착 배터리 SoC 계산용 용량: maxCharge → consumptionParam.batteryCapacity → chargedEnergy/0.8.
+// (실 응답 검증: maxCharge 69770 이면 ES3 도달 SoC 와 RO4 에너지 계산이 일치, chargedEnergy/0.8 은 과대)
+
+import { resolveBatteryCapacityWh } from '../DltLogViewer/js/route-request.js';
+
+test('resolveBatteryCapacityWh_prefers_maxCharge', () => {
+  assert.equal(resolveBatteryCapacityWh({ maxCharge: 69770, chargedEnergy: 60400 }), 69770);
+});
+
+test('resolveBatteryCapacityWh_falls_back_to_consumptionParam_batteryCapacity', () => {
+  const body = { consumptionParam: '{"aux":1200.0,"batteryCapacity":69770,"batteryTemperature":-30}', chargedEnergy: 60400 };
+  assert.equal(resolveBatteryCapacityWh(body), 69770);
+});
+
+test('resolveBatteryCapacityWh_last_resort_chargedEnergy_over_0_8_or_null', () => {
+  assert.equal(resolveBatteryCapacityWh({ chargedEnergy: 60400 }), 75500);
+  assert.equal(resolveBatteryCapacityWh({ consumptionParam: 'not json' }), null);
+  assert.equal(resolveBatteryCapacityWh(null), null);
+});

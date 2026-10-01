@@ -1421,11 +1421,33 @@
     /* ---- Waypoint badges ---- */
     #tvas-waypoints-bar {
       display: flex;
+      flex-direction: column;
       gap: 6px;
-      flex-wrap: wrap;
       min-height: 28px;
-      align-items: center;
     }
+    /* ---- 출발/경유/목적지 세로 카드 ---- */
+    .wp-empty { color: var(--muted); font-size: 11px; padding: 4px 0; }
+    .wp-card { border: 1px solid var(--border); border-left: 3px solid var(--wp-color); border-radius: 8px; background: var(--surface); --wp-color: #f59e0b; }
+    .wp-card.depart { --wp-color: #22c55e; }
+    .wp-card.dest   { --wp-color: #ef4444; }
+    .wp-card-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; user-select: none; font-size: 12px; }
+    .wp-caret { color: var(--muted); font-size: 10px; width: 10px; }
+    .wp-chip { min-width: 22px; text-align: center; padding: 1px 5px; border-radius: 10px; background: var(--wp-color); color: #fff; font-size: 10px; font-weight: 800; }
+    .wp-card-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
+    .wp-del { background: none; border: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; }
+    .wp-del:hover { color: var(--danger); }
+    .wp-card-body { display: flex; flex-direction: column; gap: 4px; padding: 2px 10px 8px 26px; }
+    .wp-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+    .wp-row > span { width: 110px; flex-shrink: 0; }
+    .wp-row input[type=text] { flex: 1; min-width: 0; background: rgba(15,23,42,0.8); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 11px; padding: 3px 6px; }
+    .wp-row input[type=text].invalid { border-color: var(--danger); }
+    .wp-row code { color: var(--text); font-size: 11px; }
+    .wp-check input { accent-color: var(--accent); }
+    /* ---- CORS 설치 버튼 + ? 안내 ---- */
+    .cors-install-row { display: flex; gap: 6px; }
+    .cors-install-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; background: #3182f6; color: #fff; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; }
+    .cors-help-btn { width: 34px; flex-shrink: 0; border: 1px solid #fbbf24; background: #fef3c7; color: #78350f; border-radius: 8px; font-size: 14px; font-weight: 800; cursor: pointer; }
+    .cors-help-btn:hover { background: #fde68a; }
     .wp-badge {
       padding: 3px 8px;
       border-radius: 12px;
@@ -1802,21 +1824,17 @@
     <h2>경로 요청<a href="help.html#tvas" target="_blank" class="help-icon" title="경로 요청(TVAS) 도움말 열기" rel="noopener">?</a></h2>
   </div>
   <div id="tvas-panel-body">
-    <!-- CORS Unblock 확장 프로그램 설치 안내 -->
-    <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.6;color:#78350f">
-      <div style="font-weight:700;margin-bottom:4px">⚠️ 설치 필수 — CORS Unblock 확장</div>
-      <div>경로 서버(<code style="background:#fde68a;padding:1px 4px;border-radius:3px">ntmapstg.tmap.co.kr</code>)는 브라우저의 <b>교차 출처(CORS)</b> 요청을 허용하지 않습니다. 확장 프로그램이 없으면 요청 전송 시 브라우저가 즉시 차단하여 응답을 받을 수 없습니다.</div>
-      <div style="margin-top:4px">설치 후 브라우저 툴바의 방패 아이콘을 클릭해 <b>ON</b> 상태로 켜주세요.</div>
+    <!-- CORS Unblock 확장 설치 + 안내(? 팝업) -->
+    <div class="cors-install-row">
+      <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" class="cors-install-btn">
+        🛡️ CORS Unblock 확장 프로그램 설치
+      </a>
+      <button type="button" id="cors-help-btn" class="cors-help-btn" title="CORS Unblock 확장이 필요한 이유" aria-label="CORS Unblock 안내 보기">?</button>
     </div>
-    <a href="https://chromewebstore.google.com/detail/cors-unblock/gmcgbepaipojeljagoldjecdhaiildga" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;background:#3182f6;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">
-      🛡️ CORS Unblock 확장 프로그램 설치
-    </a>
-    <!-- Waypoints from map -->
+    <!-- 출발지 → 경유지 → 목적지 (세로 카드, 펼쳐서 상세 편집) -->
     <div>
-      <div class="tvas-field-label">출발지/목적지 (지도 우클릭으로 설정)</div>
-      <div id="tvas-waypoints-bar">
-        <span style="color:var(--muted);font-size:11px">설정된 지점이 없습니다</span>
-      </div>
+      <div class="tvas-field-label">출발지 · 경유지 · 목적지 (지도 우클릭으로 추가 · 눌러서 상세 편집)</div>
+      <div id="tvas-waypoints-bar"></div>
     </div>
     <!-- 경로 탐색 옵션: 경로 타입 / 서버 (세그먼트 토글) -->
     <div>
@@ -1910,6 +1928,7 @@
       <span class="tvas-ltog on" data-tl="truck">화물차</span>
       <span class="tvas-ltog on" data-tl="complexIntersection">복잡교차로</span>
       <span class="tvas-ltog on" data-tl="batteryDepletion">배터리방전</span>
+      <span class="tvas-ltog on" data-tl="arrivalBattery">도착배터리</span>
     </div>
     <!-- Result -->
     <div id="tvas-result-summary"></div>
@@ -1917,6 +1936,18 @@
       <summary>응답 원문</summary>
       <pre id="tvas-response-pre"></pre>
     </details>
+  </div>
+</div>
+
+<!-- ======== CORS Help Modal (? 버튼) ======== -->
+<div id="cors-help-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:20px 22px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);font-size:13px;line-height:1.7;color:#374151">
+    <div style="font-size:16px;font-weight:700;color:#78350f;margin-bottom:10px">⚠️ 설치 필수 — CORS Unblock 확장</div>
+    <div>경로 서버(<code style="background:#fde68a;padding:1px 4px;border-radius:3px">ntmapstg.tmap.co.kr</code>)는 브라우저의 <b>교차 출처(CORS)</b> 요청을 허용하지 않습니다. 확장 프로그램이 없으면 요청 전송 시 브라우저가 즉시 차단하여 응답을 받을 수 없습니다.</div>
+    <div style="margin-top:6px">설치 후 브라우저 툴바의 방패 아이콘을 클릭해 <b>ON</b> 상태로 켜주세요.</div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button id="cors-help-close" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -2399,12 +2430,13 @@ catCbs.forEach(cb => {
 <!-- TVAS Route Request Test Module -->
 <script type="module">
 import { parseTvas, resolveVertexCoordinates, parseNormalRouteResponse } from './js/tvas-parser.js';
-import { renderTvasRoute, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode, formatPoiId, showRestAreaOnMap, getRestAreaWaypoint, restAreaFacilities, restAreaLpgBrandName, restAreaSignSvg } from './js/tvas-renderer.js';
+import { renderTvasRoute, sumRoadEnergy, sumRouteSummaryEnergy, buildChargerSocPlan, clearTvasRoute, getTvasLayers, toggleTvasLayer, showEvChargerOnMap, getEvChargerWaypoint, showGasStationOnMap, getGasStationWaypoint, gasStationTypeName, gasStationTypeIcon, gasBrandName, gasFacilities, routeLineMode, formatPoiId, showRestAreaOnMap, getRestAreaWaypoint, restAreaFacilities, restAreaLpgBrandName, restAreaSignSvg } from './js/tvas-renderer.js';
 import { getMap } from './js/map-viewer.js';
 import { wgs84ToSkCoord, skCoordToWgs84, bearingDeg } from './js/coordinate.js';
 import { buildReverseGeocodeUrl, parseReverseGeocode } from './js/reverse-geocode.js';
-import { buildRouteUrl, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch } from './js/route-request.js';
-import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiSearchResponse, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, parsePoiDetailResponse, POI_DETAIL_FIND_BY_POI_ID, derivePoiDetailUrl, resolveRpFlag, resolvePoiId } from './js/poi-search.js';
+import { applyWaypointsToRouteBody, updateWaypointField, buildWaypointEditorHtml, waypointFromPoi } from './js/route-waypoints.js';
+import { buildRouteUrl, resolveBatteryCapacityWh, computeCurrentRange, extractIsochroneRings, applyEvBatteryToIsochrone, resolveIsochroneHeaders, resolveRouteTypeSwitch } from './js/route-request.js';
+import { POI_SEARCH_ENVS, buildPoiSearchUrl, buildPoiSearchBody, parsePoiResults, coerceJson, parseHeaderText, buildDefaultHeaderText, decodeTmapBody, extractTmapErrorHint, buildPoiDetailBody, parsePoiDetailResponse, POI_DETAIL_FIND_BY_POI_ID, derivePoiDetailUrl } from './js/poi-search.js';
 import {
   haversineM as mgHaversineMImpl,
   interpolatePath as mgInterpolatePathImpl,
@@ -3638,6 +3670,7 @@ let lastResponseJson = null;
 let lastCoords = null;  // 마지막 파싱된 좌표 (VX 클릭 이동용)
 let lastTvasResult = null;       // 경로선 모드(교통정보/RO4) 변경 시 재렌더용
 let lastReqCurrentEnergy = null; // 재렌더 시 방전 위치 계산용
+let lastReqCapacityWh = null;    // 재렌더 시 도착 배터리(SoC%) 계산용 — 배터리 용량(maxCharge)
 
 // ---- Waypoint state (from map long-click) ---- //
 const routeWaypoints = { depart: null, dest: null, vias: [] };  // vias = 경유지 배열
@@ -3650,28 +3683,99 @@ function wpIconHtml(label, color, sub) {
     '</div>';
 }
 
+// 펼친 카드 key (depart | via:N | dest)
+const wpExpanded = new Set();
+
 function updateWpBar() {
-  let html = '';
-  const wpLabel = (w) => w.name ? esc(w.name) : (w.lat.toFixed(5) + ',' + w.lon.toFixed(5));
-  const wpTitle = (w) => w.lat.toFixed(6) + ', ' + w.lon.toFixed(6) + (w.name ? ' · ' + esc(w.name) : '');
-  if (routeWaypoints.depart) {
-    const d = routeWaypoints.depart;
-    html += '<span class="wp-badge depart" title="' + wpTitle(d) + '">S ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'depart\')">&times;</span></span>';
+  tvasWpBar.innerHTML = buildWaypointEditorHtml(routeWaypoints, wpExpanded, wgs84ToSkCoord);
+}
+updateWpBar();   // 초기 빈 상태 안내
+
+// 카드 key → [kind, 경유지 idx, 지점]
+function wpFromKey(key) {
+  if (key.startsWith('via:')) { const i = Number(key.slice(4)); return ['via', i, routeWaypoints.vias[i]]; }
+  return [key, -1, routeWaypoints[key]];
+}
+
+// 카드 머리 클릭 → 접기/펼치기, × → 삭제
+tvasWpBar.addEventListener('click', (e) => {
+  const card = e.target.closest('.wp-card');
+  if (!card) return;
+  const key = card.dataset.wpKey;
+  if (e.target.closest('[data-wp-delete]')) {
+    const [kind, idx] = wpFromKey(key);
+    window._removeWp(kind, idx);
+    applyWaypointsToBody();
+    return;
   }
-  routeWaypoints.vias.forEach((v, i) => {
-    html += '<span class="wp-badge" title="' + wpTitle(v) + '" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">W' + (i+1) + ' ' + wpLabel(v) + ' <span class="wp-remove" onclick="window._removeWp(\'via\','+i+')">&times;</span></span>';
-  });
-  if (routeWaypoints.dest) {
-    const d = routeWaypoints.dest;
-    html += '<span class="wp-badge dest" title="' + wpTitle(d) + '">E ' + wpLabel(d) + ' <span class="wp-remove" onclick="window._removeWp(\'dest\')">&times;</span></span>';
+  if (e.target.closest('[data-wp-toggle]')) {
+    if (wpExpanded.has(key)) wpExpanded.delete(key); else wpExpanded.add(key);
+    updateWpBar();
   }
-  if (!html) html = '<span style="color:var(--muted);font-size:11px">지도 우클릭으로 출발/경유/목적지를 설정하세요</span>';
-  tvasWpBar.innerHTML = html;
+});
+
+// 상세 입력 수정 → 지점 상태 → 요청 바디 반영 (좌표 변경 시 지도 마커도 이동)
+tvasWpBar.addEventListener('change', (e) => {
+  const input = e.target.closest('[data-wp-field]');
+  const card = e.target.closest('.wp-card');
+  if (!input || !card) return;
+  const [kind, idx, wp] = wpFromKey(card.dataset.wpKey);
+  if (!wp) return;
+  const field = input.dataset.wpField;
+  const raw = input.type === 'checkbox' ? input.checked : input.value;
+  if (!updateWaypointField(wp, field, raw)) {
+    input.classList.add('invalid');
+    setStatus('입력값이 올바르지 않습니다: ' + field, 'error');
+    return;
+  }
+  if (field === 'lat' || field === 'lon') moveWpMarker(kind, idx, wp);
+  if (field === 'angle') redrawDepartHeading();
+  if (field === 'name') refreshWpDisplay(kind, wp);
+  applyWaypointsToBody();
+  updateWpBar();
+});
+
+// 좌표를 직접 수정한 지점의 지도 마커를 옮긴다.
+function moveWpMarker(kind, idx, wp) {
+  const map = getMap();
+  if (!map) return;
+  if (kind === 'via') {
+    const m = wpMarkers.vias[idx];
+    if (m) m.setLatLng([wp.lat, wp.lon]);
+  } else if (wpMarkers[kind]) {
+    wpMarkers[kind].setLatLng([wp.lat, wp.lon]);
+    if (kind === 'depart') {
+      // 방위각 드래그는 출발 좌표를 클로저로 들고 있으므로 새 좌표로 다시 연결
+      wpMarkers.depart.off('mousedown');
+      enableDepartHeadingDrag(wpMarkers.depart, wp.lat, wp.lon);
+      redrawDepartHeading();
+    }
+  }
+  refreshWpDisplay(kind, wp);
+}
+
+// 출발 방위각(angle) 화살표를 현재 값으로 다시 그린다 (값이 없으면 제거).
+function redrawDepartHeading() {
+  const map = getMap();
+  const d = routeWaypoints.depart;
+  if (!map) return;
+  if (!d || d.angle == null) {
+    if (departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
+    return;
+  }
+  const rad = d.angle * Math.PI / 180;
+  const toward = L.latLng(d.lat + 0.001 * Math.cos(rad), d.lon + 0.001 * Math.sin(rad) / Math.cos(d.lat * Math.PI / 180));
+  drawHeadingArrow(map, d.lat, d.lon, toward, d.angle, true);
 }
 
 window._removeWp = function(type, idx) {
   const map = getMap();
   if (type === 'via') {
+    // 펼침 상태도 삭제 위치 기준으로 당긴다
+    const openVias = routeWaypoints.vias.map((_, i) => wpExpanded.has('via:' + i));
+    openVias.forEach((_, i) => wpExpanded.delete('via:' + i));
+    openVias.splice(idx, 1);
+    openVias.forEach((o, i) => { if (o) wpExpanded.add('via:' + i); });
     routeWaypoints.vias.splice(idx, 1);
     if (map && wpMarkers.vias[idx]) map.removeLayer(wpMarkers.vias[idx]);
     wpMarkers.vias.splice(idx, 1);
@@ -3683,6 +3787,7 @@ window._removeWp = function(type, idx) {
     routeWaypoints.vias.forEach((v, i) => addViaMarker(v.lat, v.lon, i));
   } else {
     routeWaypoints[type] = null;
+    wpExpanded.delete(type);
     if (map && wpMarkers[type]) { map.removeLayer(wpMarkers[type]); wpMarkers[type] = null; }
     // 출발지 제거 시 방위각 화살표도 제거
     if (type === 'depart' && map && departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
@@ -3700,15 +3805,16 @@ function addViaMarker(lat, lon, idx) {
   wpMarkers.vias[idx] = marker;
 }
 
-function setWaypoint(type, lat, lon, name, rpFlag, poiId) {
+// evChargerFlag: 전기차 충전소 POI 면 true → 경유지 evChargerFlag / 목적지 destEVChargerFlag
+function setWaypoint(type, lat, lon, name, rpFlag, poiId, evChargerFlag = false) {
   let wp;
   if (type === 'via') {
     if (routeWaypoints.vias.length >= 5) { alert('경유지는 최대 5개까지 설정 가능합니다.'); return; }
-    wp = { lat, lon, name, rpFlag, poiId };
+    wp = { lat, lon, name, rpFlag, poiId, evChargerFlag };
     routeWaypoints.vias.push(wp);
     addViaMarker(lat, lon, routeWaypoints.vias.length - 1);
   } else {
-    wp = { lat, lon, name, rpFlag, poiId };
+    wp = { lat, lon, name, rpFlag, poiId, evChargerFlag };
     routeWaypoints[type] = wp;
     const map = getMap();
     if (!map) return;
@@ -3875,48 +3981,7 @@ function enableDepartHeadingDrag(marker, lat, lon) {
 function applyWaypointsToBody() {
   try {
     const body = JSON.parse(tvasBody.value);
-    if (routeWaypoints.depart) {
-      const sk = wgs84ToSkCoord(routeWaypoints.depart.lat, routeWaypoints.depart.lon);
-      body.departXPos = sk[0];
-      body.departYPos = sk[1];
-      // 출발지 명칭: POI name 또는 역지오코딩 buildingName → departName
-      if (routeWaypoints.depart.name) body.departName = routeWaypoints.depart.name;
-      // 출발 방위각(드래그로 설정) → angle
-      if (routeWaypoints.depart.angle != null) body.angle = routeWaypoints.depart.angle;
-    }
-    if (routeWaypoints.dest) {
-      const sk = wgs84ToSkCoord(routeWaypoints.dest.lat, routeWaypoints.dest.lon);
-      body.destXPos = sk[0];
-      body.destYPos = sk[1];
-      // 목적지 명칭: POI name 또는 역지오코딩 buildingName → destName
-      if (routeWaypoints.dest.name) body.destName = routeWaypoints.dest.name;
-      // 목적지 rpFlag: POI(검색/상세) 값 우선, 없으면 16
-      body.destRpFlag = resolveRpFlag('dest', routeWaypoints.dest.rpFlag);
-      // 목적지 poiId: POI 검색 결과 값. POI 가 아닌 지점이면 기본 바디의
-      // 샘플 ID 가 남지 않도록 비운다.
-      body.destPoiId = resolvePoiId(routeWaypoints.dest.poiId) ?? '';
-    }
-    // 경유지 반영
-    if (routeWaypoints.vias.length > 0) {
-      body.wayPoints = routeWaypoints.vias.map((v, i) => {
-        const sk = wgs84ToSkCoord(v.lat, v.lon);
-        const wp = {
-          x: sk[0],
-          y: sk[1],
-          wayPointName: v.name || ('경유지' + (i + 1)),
-          wayPointSearchFlag: 'WaypointSearch',
-          // 경유지 rpFlag: POI(검색/상세) 값 우선, 없으면 18
-          rpFlag: resolveRpFlag('via', v.rpFlag),
-        };
-        // 경유지 poiID: POI 검색 결과일 때만 넣는다.
-        const pid = resolvePoiId(v.poiId);
-        if (pid != null) wp.poiID = pid;
-        return wp;
-      });
-    } else {
-      delete body.wayPoints;
-    }
-    tvasBody.value = JSON.stringify(body, null, 2);
+    tvasBody.value = JSON.stringify(applyWaypointsToRouteBody(body, routeWaypoints, wgs84ToSkCoord), null, 2);
   } catch (e) { /* body not valid JSON, skip */ }
 }
 
@@ -4012,7 +4077,7 @@ function currentRouteMode() {
 function rerenderRouteLayers() {
   const map = getMap();
   if (!map || !lastTvasResult || !lastCoords) return;
-  renderTvasRoute(map, lastTvasResult, lastCoords, 0, { currentEnergy: lastReqCurrentEnergy, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
+  renderTvasRoute(map, lastTvasResult, lastCoords, 0, { currentEnergy: lastReqCurrentEnergy, capacityWh: lastReqCapacityWh, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
   applyPersistedLayerToggles();
 }
 // 교통정보 / RO4 는 상호 배타 모드 토글: 켜면 다른 모드는 끈다.
@@ -4215,7 +4280,8 @@ window._addRestAreaWaypoint = function(idx) {
         showRawResponse(raw);
         return;
       }
-      const pois = parsePoiSearchResponse(json);
+      // poiSearches[](camelCase/snake_case) · searchPoiInfo 등 응답 형태별 파서 선택
+      const pois = parsePoiResults(json);
       lastPois = pois;
       renderResults(pois);
       setPoiStatus(`${pois.length}건 검색됨`, pois.length ? 'ok' : '');
@@ -4276,7 +4342,7 @@ window._addRestAreaWaypoint = function(idx) {
     if (!map) return;
     map.setView([lat, lon], 16, { animate: true });
     if (window._poiMarker) map.removeLayer(window._poiMarker);
-    window._poiPending = { lat, lon, name: p.name, poiId: p.poiId, pkey: p.pkey, rpFlag: p.rpFlag };
+    window._poiPending = { lat, lon, name: p.name, poiId: p.poiId, pkey: p.pkey, rpFlag: p.rpFlag, isEvCharger: p.isEvCharger };
     const idAttr = p.pkey != null || p.poiId != null
       ? `<br><span style="color:#64748b;font-size:11px">poiId: ${esc(p.poiId || '-')} / pkey: ${esc(p.pkey || '-')}</span>` : '';
     const detailBtn = (p.pkey != null || p.poiId != null)
@@ -4337,7 +4403,8 @@ window._addRestAreaWaypoint = function(idx) {
   window._poiSetWp = function(type) {
     const p = window._poiPending;
     if (!p) return;
-    setWaypoint(type, p.lat, p.lon, p.name, p.rpFlag, p.poiId);
+    const w = waypointFromPoi(p, p.lat, p.lon);
+    setWaypoint(type, w.lat, w.lon, w.name, w.rpFlag, w.poiId, w.evChargerFlag);
     const map = getMap();
     if (map) map.closePopup();
   };
@@ -4374,7 +4441,8 @@ window._addRestAreaWaypoint = function(idx) {
       }
       const wgs = skCoordToWgs84(d.x, d.y);
       if (!wgs) { applyFallback('상세 좌표 변환 실패'); return; }
-      setWaypoint(type, wgs[0], wgs[1], d.name || fb.name, d.rpFlag, d.poiId ?? poiId);
+      const w = waypointFromPoi({ ...d, name: d.name || fb.name, poiId: d.poiId ?? poiId }, wgs[0], wgs[1]);
+      setWaypoint(type, w.lat, w.lon, w.name, w.rpFlag, w.poiId, w.evChargerFlag);
       setPoiStatus(`상세 조회로 설정: ${d.name || fb.name || poiId}`, 'ok');
     } catch (e) {
       applyFallback('상세 조회 실패 (CORS/프록시 필요할 수 있음): ' + e.message);
@@ -4499,6 +4567,7 @@ function clearAllWaypoints() {
   if (wpMarkers.vias) wpMarkers.vias.forEach(m => { if (m && map) map.removeLayer(m); });
   wpMarkers.vias = [];
   routeWaypoints.vias = [];
+  wpExpanded.clear();
   if (map && departHeadingArrow) { map.removeLayer(departHeadingArrow); departHeadingArrow = null; }
   if (map && departHintTip) { map.removeLayer(departHintTip); departHintTip = null; }
   updateWpBar();
@@ -4866,15 +4935,20 @@ tvasSendBtn.addEventListener('click', async () => {
     }
 
     // 요청 바디의 현재 배터리(currentEnergy)를 전달 → RO4 누적 에너지로 방전 위치 표시
-    let reqCurrentEnergy = null;
-    try { reqCurrentEnergy = JSON.parse(tvasBody.value).currentEnergy; } catch {}
+    let reqCurrentEnergy = null, reqCapacityWh = null;
+    try {
+      const reqBody = JSON.parse(tvasBody.value);
+      reqCurrentEnergy = reqBody.currentEnergy;
+      reqCapacityWh = resolveBatteryCapacityWh(reqBody);   // maxCharge → consumptionParam.batteryCapacity
+    } catch {}
     // 경로선 모드(교통정보/RO4)는 이전 선택 유지
-    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
+    const { summary } = renderTvasRoute(map, tvasResult, coords, 0, { currentEnergy: reqCurrentEnergy, capacityWh: reqCapacityWh, routeMode: currentRouteMode(), routeType: segVal(tvasRouteType) });
 
     // Save coords for VX click navigation + 모드 변경 시 재렌더용 상태 보관
     lastCoords = coords;
     lastTvasResult = tvasResult;
     lastReqCurrentEnergy = reqCurrentEnergy;
+    lastReqCapacityWh = reqCapacityWh;
 
     // Show layer toggles — 이전에 켜고 끈 레이어 on/off 상태를 그대로 유지
     tvasLayerToggles.style.display = 'flex';
@@ -4905,6 +4979,17 @@ tvasSendBtn.addEventListener('click', async () => {
   } finally {
     tvasSendBtn.disabled = false;
   }
+});
+
+// CORS 설치 버튼 옆 ? → 설치가 필요한 이유 팝업
+document.getElementById('cors-help-btn')?.addEventListener('click', () => {
+  document.getElementById('cors-help-modal').style.display = 'flex';
+});
+document.getElementById('cors-help-close')?.addEventListener('click', () => {
+  document.getElementById('cors-help-modal').style.display = 'none';
+});
+document.getElementById('cors-help-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'cors-help-modal') e.currentTarget.style.display = 'none';
 });
 
 function showCorsErrorModal() {
@@ -5039,7 +5124,8 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
       rs7Html += `</div>`;
     }
 
-    html += sectionDetail('경로요약', 'RS7', rs.items.length, rs7Html);
+    const rs7Total = `<div style="padding:4px 0 6px;border-bottom:1px solid rgba(148,163,184,0.15)">총 에너지 소모량: <b style="color:#a78bfa">${sumRouteSummaryEnergy(rs.items).toLocaleString()} W</b></div>`;
+    html += sectionDetail('경로요약', 'RS7', rs.items.length, rs7Total + rs7Html);
   }
 
   // ---- Info Index overview ---- //
@@ -5083,7 +5169,8 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
         [${i}] ~${vx(r.lastVxIdx, coords)} | ${rtName(r.roadType)} | 링크:${ltName(r.linkType)} | 시설:${fcName(r.facilityCode)} | ${r.roadLength}m | ${r.laneCount}차선 | ${r.speedLimit}km/h | ${r.energyConsumption}Wh
       </div>`
     ).join('');
-    html += sectionDetail('도로 정보', 'RO4', tvasResult.roads.length, rows);
+    const ro4Total = `<div style="padding:4px 0 6px;border-bottom:1px solid rgba(148,163,184,0.15)">총 에너지 소모량: <b style="color:#a78bfa">${sumRoadEnergy(tvasResult.roads).toLocaleString()} Wh</b></div>`;
+    html += sectionDetail('도로 정보', 'RO4', tvasResult.roads.length, ro4Total + rows);
   }
 
   // ---- GP: 안내점 ---- //
@@ -5326,6 +5413,7 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
     const mustCount    = tvasResult.evChargers.filter(e => e.mustCharge === 1).length;
     const onRouteCount = tvasResult.evChargers.filter(e => e.onRoute === 0).length;
     const nearbyCount  = tvasResult.evChargers.length - onRouteCount;
+    const es3Soc = buildChargerSocPlan(tvasResult.evChargers);   // 도착(ES3 충전소 도달 시 SoC)/목표 SoC
     const rows = tvasResult.evChargers.map((ev, i) => {
       let sockets = [];
       if (ev.dcCha) sockets.push('DC차데모');
@@ -5346,7 +5434,7 @@ function buildSummaryHtml(s, elapsed, tvasResult, coords, respInfo) {
         </div>
         ${ev.typeName ? '종류명칭: <b>'+esc(ev.typeName)+'</b><br>' : ''}${vx(ev.vxIdx, coords)} | ${isOnRoute?'<b style="color:#4ade80">경로상</b>':'<span style="color:#fbbf24">경로주변</span>'} | POI:${ev.poiId}<br>
         소켓: ${sockets.join(', ') || '-'} | 충전기: <b>${ev.availChargers}</b>/${ev.totalChargers} | ${speedName(ev.chargeSpeed)}
-        ${ev.chargeTime ? '<br>충전: '+Math.floor(ev.chargeTime/60)+'분 | '+ev.chargePower+'kW | SoC '+ev.arrivalSoc+'%→'+ev.expectedSoc+'%' : ''}
+        ${ev.chargeTime ? '<br>충전: '+Math.floor(ev.chargeTime/60)+'분 | '+ev.chargePower+'kW | SoC 도착 '+es3Soc[i].arrivalSoc+'% + 충전 '+es3Soc[i].chargeSoc+'% = 목표 '+es3Soc[i].targetSoc+'%' : ''}
         <br><span style="color:var(--muted)">도로종별:${ev.roadType} | 충전소종류:${ev.stationType===2?'My e-poi':'서버'} | 급속종류:${ev.fastType}${ev.manualStation ? ' | <span style="color:#fbbf24">수동</span>' : ''}${ev.isSelf ? ' | 셀프' : ''}</span>
         ${(ev.operators && ev.operators.length) ? '<div style="margin-top:3px;padding-left:8px;border-left:2px solid rgba(56,189,248,0.3);font-size:11px">사업자별 충전기 <b>'+ev.operators.length+'</b>'+ev.operators.map(op => '<br>· '+(op.name?'<b>'+esc(op.name)+'</b>':'사업자')+(op.opCode?' <span style="color:var(--muted)">['+esc(op.opCode)+']</span>':'')+' — 초고속 '+op.ultraFastAvail+' / 고속 '+op.fastAvail+' / 완속 '+op.slowAvail).join('')+'</div>' : ''}
       </div>`;

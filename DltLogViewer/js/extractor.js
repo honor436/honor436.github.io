@@ -21,21 +21,23 @@ import {
 const LOCATION_RE = /#onLocationChanged.*?Location\[(dr_gps|gps) ([0-9.]+),([0-9.]+).*?bear=([0-9.]+)/;
 const LOCATION_VEL_RE = /\bvel=(-?[0-9.]+)/;   // Android Location 속도(m/s), 있으면 그대로 사용
 const ET_RE = /et=\+\d+m\d+s\d+ms/;
-const MM_RESULT_START_RE = /\[MM\]\[\d+\]:\[MM_RESULT\].*Result\(LocalMatch\)/;
-const MM_GPS_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*GPS\s+Pos\s*=\s*([0-9.]+)\s+([0-9.]+),\s*([0-9.\-]+)/;
-const MM_MATCH_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*Match\s+Pos\s*=\s*([0-9.]+)\s+([0-9.]+),\s*([0-9.\-]+)/;
-const MM_GPS_SRC_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*GPS\s*=\s*([^,]+),\s*Hdop\s*=\s*([0-9.\-]+)\s*Speed:([0-9.\-]+)/;
-const MM_STATE_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*State\s*=\s*([^\x00\r\n]+)/;
-const MM_SUPPORT_DR_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*SupportDR\s*=\s*([^\x00\r\n]+)/;
-const MM_SCORE_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*Score\s*=\s*([0-9.\-]+),\s*NumOfMatchesInDR\s*(\d+),\s*isOpenSkyDRMode\s*(\d+)/;
-const MM_DIST_RE = /\[MM\]\[\d+\]:\[MM_RESULT\]\s*Dist=\s*([0-9.\-]+)\s*\/\s*vIndex\s*=\s*([0-9.\-]+)\s*\/\s*fB\s*=\s*([0-9.\-]+)/;
+const MM_RESULT_START_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\].*Result\(LocalMatch\)/;
+const MM_GPS_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*GPS\s+Pos\s*=\s*([0-9.]+)\s+([0-9.]+),\s*([0-9.\-]+)/;
+const MM_MATCH_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*Match\s+Pos\s*=\s*([0-9.]+)\s+([0-9.]+),\s*([0-9.\-]+)/;
+const MM_GPS_SRC_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*GPS\s*=\s*([^,]+),\s*Hdop\s*=\s*([0-9.\-]+)\s*Speed:([0-9.\-]+)/;
+const MM_STATE_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*State\s*=\s*([^\x00\r\n]+)/;
+const MM_SUPPORT_DR_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*SupportDR\s*=\s*([^\x00\r\n]+)/;
+const MM_SCORE_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*Score\s*=\s*([0-9.\-]+),\s*NumOfMatchesInDR\s*(\d+),\s*isOpenSkyDRMode\s*(\d+)/;
+const MM_DIST_RE = /\[MM\]\[\d+(?::\d+)?\]:\[MM_RESULT\]\s*Dist=\s*([0-9.\-]+)\s*\/\s*vIndex\s*=\s*([0-9.\-]+)\s*\/\s*fB\s*=\s*([0-9.\-]+)/;
 
-const RPLOG_POST_RE  = /#RpLog\[(\d+)\]:\[([^\]]+)\] --> POST (\S+)/;
-const RPLOG_REQ_RE   = /#RpLog\[(\d+)\]:\[([^\]]+)\] REQ: (\{.*)/;
-const RPLOG_RESP_RE  = /#RpLog\[(\d+)\]:\[([^\]]+)\] <-- (\d+) \((\d+)ms\) SessionID: (\S+)/;
-const RPLOG_RES_RE   = /#RpLog\[(\d+)\]:\[([^\]]+)\] RES: \[(\d+) ([^\]]+)\] \(size: ([^)]+)\)/;
-const TTS_STATUS_RE = /TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTTS status : ([^\x00\r\n]+)/;
-const TTS_SCRIPT_RE = /TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTTS script : ([^\x00\r\n]+)/;
+const RPLOG_POST_RE  = /#RpLog\[(\d+(?::\d+)?)\]:\[([^\]]+)\] --> POST (\S+)/;
+const RPLOG_REQ_RE   = /#RpLog\[(\d+(?::\d+)?)\]:\[([^\]]+)\] REQ: (\{.*)/;
+const RPLOG_RESP_RE  = /#RpLog\[(\d+(?::\d+)?)\]:\[([^\]]+)\] <-- (\d+) \((\d+)ms\) SessionID: (\S+)/;
+const RPLOG_RES_RE   = /#RpLog\[(\d+(?::\d+)?)\]:\[([^\]]+)\] RES: \[(\d+) ([^\]]+)\] \(size: ([^)]+)\)/;
+// 구형: TmapAutoExternalVoicePlayer:requestTTS[123]:requestTTS status : 0
+// 신형: TMAP(330250)^[4939:6852]:requestTTS status : 0  /  ...:requestTTS[1085] script : ...
+const TTS_STATUS_RE = /(?:TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]|\[\d+:\d+\]):requestTTS status : ([^\x00\r\n]+)/;
+const TTS_SCRIPT_RE = /(?:TmapAutoExternalVoicePlayer:requestTTS\[(\d+)\]:requestTTS|\[\d+:\d+\]:requestTTS\[(\d+)\]) script : ([^\x00\r\n]+)/;
 
 const GPS_INTERESTING_STRINGS = [
   '#onLocationChanged',
@@ -513,6 +515,7 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
     let currentMmResult = null;
     let recentLocation = null;
     const ttsStatusByRequestId = {};
+    let pendingTtsStatus = null;
     const rplogMap = new Map();
     const rplogSessionLastRpId = new Map();
     // 현재 진행 중인 RpLog REQ (멀티-청크 JSON 흡수용). REQ: 라인에서 set, RES:/POST(다른 RP) 에서 clear
@@ -741,7 +744,7 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
                 }
               } else {
                 // Continuation: #RpLog[sgId]:data (no [RP-label] present)
-                const contM = /#RpLog\[(\d+)\]:([^\[].*)/.exec(line);
+                const contM = /#RpLog\[(\d+(?::\d+)?)\]:([^\[].*)/.exec(line);
                 if (contM) {
                   const [, sgId, chunk] = contM;
                   const lastRpId = rplogSessionLastRpId.get(sgId);
@@ -781,13 +784,19 @@ export async function extractLogs(files, progressCallback = null, mode = 'all') 
       // ---- TTS ---- //
       if (hasTts) {
         const statusM = TTS_STATUS_RE.exec(line);
-        if (statusM) ttsStatusByRequestId[statusM[1]] = sanitizeText(statusM[2]);
+        if (statusM) {
+          // 신형 status 라인은 요청 ID 가 없다 → 다음 script 에 붙인다
+          if (statusM[1]) ttsStatusByRequestId[statusM[1]] = sanitizeText(statusM[2]);
+          else pendingTtsStatus = sanitizeText(statusM[2]);
+        }
 
         const scriptM = TTS_SCRIPT_RE.exec(line);
         if (scriptM) {
-          const reqId = scriptM[1];
+          const reqId = scriptM[1] || scriptM[2];
+          const status = ttsStatusByRequestId[reqId] || pendingTtsStatus || null;
+          pendingTtsStatus = null;
           const entry = buildTtsEntry(ttsSequence++, file.name, timestamp,
-            scriptM[2], ttsStatusByRequestId[reqId] || null, reqId);
+            scriptM[3], status, reqId);
           if (recentLocation) {
             entry.requestLat = recentLocation.lat;
             entry.requestLon = recentLocation.lon;

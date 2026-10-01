@@ -1,5 +1,5 @@
 {
-  "0": "좌표 변환·DLT 파서",
+  "0": "DltLogViewer/js/extractor.js",
   "1": "ImageMapper 앱",
   "2": "DltLogViewer-beta/js/extractor.js",
   "3": "SHP 앱 UI (beta)",
@@ -57,7 +57,7 @@
   "55": "차선 안내",
   "56": "설치 스크립트 ps1 (beta)",
   "57": "경유지 마커 (beta)",
-  "58": "showRouteAnchors",
+  "58": "addViaMarker",
   "59": "설치 스크립트 ps1",
   "60": "역지오코딩 (beta)",
   "61": "역지오코딩",
@@ -69,7 +69,5 @@
   "67": "서버테스트 응답 표시",
   "68": "README",
   "69": "캐러셀 정지",
-  "70": "pre-commit",
-  "71": "renderLogs",
-  "72": "renderRoadNames"
+  "70": "pre-commit"
 }

@@ -115,9 +115,9 @@
     "semantic_hash": "913e4417904c14205d29135729991439"
   },
   "DltLogViewer/js/extractor.js": {
-    "mtime": 1784025155.0816865,
-    "ast_hash": "f1c6e000e678698702827127a3bad89e",
-    "semantic_hash": "f1c6e000e678698702827127a3bad89e"
+    "mtime": 1790820685.1981456,
+    "ast_hash": "1eaab17f295202bbd1c3b0ee110b0058",
+    "semantic_hash": ""
   },
   "DltLogViewer/js/map-viewer.js": {
     "mtime": 1780036771.1672103,
@@ -417,6 +417,11 @@
   "tests/tvas-energy.test.mjs": {
     "mtime": 1790778106.3231907,
     "ast_hash": "ea784993e172a4a4dd5d6cf7d9988e35",
+    "semantic_hash": ""
+  },
+  "tests/extractor-tag-format.test.mjs": {
+    "mtime": 1790820693.4740071,
+    "ast_hash": "df9cf2c1ce3492c25e3528c907716d7c",
     "semantic_hash": ""
   }
 }

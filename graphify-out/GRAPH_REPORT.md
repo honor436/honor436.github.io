@@ -1,21 +1,21 @@
-# Graph Report - honor436.github.io  (2026-09-30)
+# Graph Report - honor436.github.io  (2026-10-01)
 
 ## Corpus Check
-- 73 files · ~171,852 words
+- 74 files · ~172,260 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1293 nodes · 2440 edges · 73 communities (65 shown, 8 thin omitted)
+- 1295 nodes · 2443 edges · 71 communities (63 shown, 8 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 60 edges (avg confidence: 0.72)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `22036e3b`
+- Built from commit: `d9aa7f73`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- 좌표 변환·DLT 파서
+- DltLogViewer/js/extractor.js
 - ImageMapper 앱
 - DltLogViewer-beta/js/extractor.js
 - SHP 앱 UI (beta)
@@ -72,7 +72,7 @@
 - DltLogViewer-beta/js/shp-layer.js
 - 차선 안내
 - 경유지 마커 (beta)
-- showRouteAnchors
+- addViaMarker
 - 역지오코딩 (beta)
 - 역지오코딩
 - 파일 스캔 (app.js)
@@ -83,8 +83,6 @@
 - README
 - 캐러셀 정지
 - pre-commit
-- renderLogs
-- renderRoadNames
 
 ## God Nodes (most connected - your core abstractions)
 1. `DltLogViewer index.html (내비 데이터 뷰어)` - 33 edges
@@ -121,9 +119,9 @@
 - **내비 데이터 뷰어 회귀 테스트 필수 함정** — claude_rs7_route_summary_layout, claude_rd5_layout, claude_sk_to_wgs84_bessel, claude_initmap_reinit_contextmenu, claude_dom_null_guard [EXTRACTED 1.00]
 - **Tmap 요청 편집 흐름 (타입 선택→URL/바디 채움→메뉴 갱신)** — server_test_index_selecttype, server_test_index_fillurl, server_test_index_fillbody, server_test_index_rendermenu [EXTRACTED 1.00]
 
-## Communities (73 total, 8 thin omitted)
+## Communities (71 total, 8 thin omitted)
 
-### Community 0 - "좌표 변환·DLT 파서"
+### Community 0 - "DltLogViewer/js/extractor.js"
 Cohesion: 0.05
 Nodes (48): affineFeatures(), applyAffineTransform(), bearingDeg(), besselToWgs84(), ecefToGeod(), fitAffineTransform(), geodToEcef(), quadraticFeatures() (+40 more)
 
@@ -148,8 +146,8 @@ Cohesion: 0.06
 Nodes (62): ADDR_KEYS, buildDefaultHeaderText(), buildPoiDetailBody(), buildPoiSearchBody(), buildPoiSearchHeaders(), buildPoiSearchUrl(), buildRoutePoiSearchBody(), coerceJson() (+54 more)
 
 ### Community 6 - "DltLogViewer/js/tvas-renderer.js"
-Cohesion: 0.05
-Nodes (41): DANGER_TYPE_NAMES, ROAD_TYPE_NAMES, ROUTE_OPTION_NAMES, angleName(), angleToArrow(), buildDangerPopup(), buildEndpointLabel(), buildIntersectionNameLabels() (+33 more)
+Cohesion: 0.06
+Nodes (37): GUIDANCE_CODE_NAMES, LANE_ANGLE_ARROWS, ROUTE_OPTION_NAMES, angleName(), angleToArrow(), buildDangerPopup(), buildEndpointLabel(), buildLanePopup() (+29 more)
 
 ### Community 7 - "DltLogViewer-beta/js/traffic-layer.js"
 Cohesion: 0.13
@@ -157,7 +155,7 @@ Nodes (25): ACCIDENT_COLORS, buildTrafficPopupHtml(), buildTrafficUrl(), CATEGOR
 
 ### Community 8 - "DltLogViewer/js/tvas-parser.js"
 Cohesion: 0.09
-Nodes (39): evNameBlobStart(), FACILITY_CODE_NAMES, GUIDANCE_CODE_NAMES, LANE_ANGLE_ARROWS, LANE_ANGLE_NAMES, LINK_TYPE_NAMES, nameBlobEnd(), parseCityBoundary() (+31 more)
+Nodes (39): DANGER_TYPE_NAMES, evNameBlobStart(), FACILITY_CODE_NAMES, LANE_ANGLE_NAMES, LINK_TYPE_NAMES, nameBlobEnd(), parseCityBoundary(), parseComplexIntersections() (+31 more)
 
 ### Community 9 - "좌표검색 앱 UI (js/app.js)"
 Cohesion: 0.05
@@ -173,7 +171,7 @@ Nodes (35): evNameBlobStart(), FACILITY_CODE_NAMES, LINK_TYPE_NAMES, nameBlobEnd
 
 ### Community 12 - "DltLogViewer-beta/js/tvas-renderer.js"
 Cohesion: 0.06
-Nodes (25): DANGER_TYPE_NAMES, GUIDANCE_CODE_NAMES, LANE_ANGLE_ARROWS, LANE_ANGLE_NAMES, ROAD_TYPE_NAMES, ROUTE_OPTION_NAMES, buildDirectionNameLabels(), CONGESTION_COLORS (+17 more)
+Nodes (26): DANGER_TYPE_NAMES, GUIDANCE_CODE_NAMES, LANE_ANGLE_ARROWS, LANE_ANGLE_NAMES, ROAD_TYPE_NAMES, ROUTE_OPTION_NAMES, buildEndpointLabel(), CONGESTION_COLORS (+18 more)
 
 ### Community 13 - "TeamRoulette 룰렛"
 Cohesion: 0.16
@@ -193,15 +191,15 @@ Nodes (21): adb_run(), AppSocket, download_apk(), find_adb(), install_apk(), is_
 
 ### Community 17 - "DltLogViewer/js/map-viewer.js"
 Cohesion: 0.14
-Nodes (23): formatTimestamp(), addAnchor(), addCoordMarker(), clearCoordMarkers(), clearRouteAnchors(), clearRuler(), divIcon(), esc() (+15 more)
+Nodes (24): formatTimestamp(), addAnchor(), addCoordMarker(), clearCoordMarkers(), clearRouteAnchors(), clearRuler(), divIcon(), esc() (+16 more)
 
 ### Community 18 - "tvas-renderer.test.mjs"
 Cohesion: 0.11
-Nodes (27): buildGasStationPopup(), buildRestAreaPopup(), buildWaypointPopup(), formatPoiId(), gasBrandChip(), gasBrandColor(), gasBrandName(), gasFacilities() (+19 more)
+Nodes (26): buildGasStationPopup(), buildRestAreaPopup(), buildWaypointPopup(), formatPoiId(), gasBrandChip(), gasBrandColor(), gasBrandName(), gasFacilities() (+18 more)
 
 ### Community 19 - "DltLogViewer-beta/js/map-viewer.js"
-Cohesion: 0.13
-Nodes (21): addAnchor(), addCoordMarker(), addViaMarker(), clearCoordMarkers(), clearRouteAnchors(), clearRuler(), divIcon(), formatDistance() (+13 more)
+Cohesion: 0.14
+Nodes (23): formatTimestamp(), addAnchor(), addCoordMarker(), clearCoordMarkers(), clearRouteAnchors(), clearRuler(), divIcon(), esc() (+15 more)
 
 ### Community 20 - "DltLogViewer/js/route-request.js"
 Cohesion: 0.16
@@ -228,20 +226,20 @@ Cohesion: 0.19
 Nodes (9): applyEvBatteryToIsochrone(), buildIsoBodyFromEvBattery(), buildIsochroneBody(), EV_BATTERY_FIELDS, EV_ISOCHRONE_SHARED_FIELDS, isochroneConsumptionParam(), isochroneHeader(), resolveRouteTypeSwitch() (+1 more)
 
 ### Community 26 - "esc"
-Cohesion: 0.18
-Nodes (11): buildIntersectionNameLabels(), buildRoadNameLabels(), esc(), incidentIconHtml(), intersectionLabelIconHtml(), renderComplexIntersections(), renderIncidents(), renderIntersectionNames() (+3 more)
+Cohesion: 0.14
+Nodes (14): buildDirectionNameLabels(), buildIntersectionNameLabels(), buildRoadNameLabels(), directionLabelIconHtml(), esc(), incidentIconHtml(), intersectionLabelIconHtml(), renderComplexIntersections() (+6 more)
 
 ### Community 27 - "buildRestAreaPopup"
-Cohesion: 0.29
-Nodes (10): buildRestAreaPopup(), gasBrandName(), renderRestAreas(), restAreaBadgeIcons(), restAreaFacilities(), restAreaIconHtml(), restAreaIconSpec(), restAreaLpgBrandName() (+2 more)
+Cohesion: 0.19
+Nodes (14): buildRestAreaPopup(), buildWaypointPopup(), formatPoiId(), gasBrandName(), renderRestAreas(), renderWaypoints(), restAreaBadgeIcons(), restAreaFacilities() (+6 more)
 
 ### Community 28 - "도움말 개념"
 Cohesion: 0.14
 Nodes (14): DltLogViewer help.html (도움말), DLT 폴더 로드, 지도 레이어, 복잡교차로(MC4) 이미지, RP-XX 마커, DLT 경로 요청 로그 (RpLog), 줄자 (거리 측정), SHP 링크/노드 (+6 more)
 
 ### Community 29 - "esc"
-Cohesion: 0.16
-Nodes (15): arrivalBatteryLabelHtml(), _batteryColor(), buildArrivalBatteryPopup(), buildDirectionNameLabels(), chargerSocBubbleHtml(), directionLabelIconHtml(), esc(), incidentIconHtml() (+7 more)
+Cohesion: 0.14
+Nodes (14): buildDirectionNameLabels(), buildIntersectionNameLabels(), buildRoadNameLabels(), directionLabelIconHtml(), esc(), incidentIconHtml(), intersectionLabelIconHtml(), renderComplexIntersections() (+6 more)
 
 ### Community 30 - "주유소·EV 팝업"
 Cohesion: 0.17
@@ -268,8 +266,8 @@ Cohesion: 0.22
 Nodes (10): 변경 워크플로우 (실패 테스트→구현→리팩토링→실로그 수동검증→커밋), DOM 요소 null 가드 (stats-section, layer-panel), initMap 재호출 시 contextmenu 유실 → map-init 이벤트 재부착, 외부 I/O 격리 (FakeFile 폴리필·fixture), 내비 데이터 뷰어 (Navi Data Viewer) 프로젝트 지침, node:test 내장 러너 (npm test), RD5 레이아웃 (헤더 40B, 레코드 24B, tollgate blob), RS7 경로요약 레이아웃 (헤더 48B, 32B 세그먼트, 16B 주요도로, 명칭 blob) (+2 more)
 
 ### Community 36 - "analyzeGps"
-Cohesion: 0.25
-Nodes (9): analyzeGps(), collectFromEntry(), getAnalysisCount(), getFilesFromDataTransfer(), onScanProgress(), renderFileList(), setProgress(), showError() (+1 more)
+Cohesion: 0.24
+Nodes (10): analyzeGps(), collectFromEntry(), displayResults(), getAnalysisCount(), getFilesFromDataTransfer(), onScanProgress(), renderFileList(), setProgress() (+2 more)
 
 ### Community 37 - "GPS 분석 흐름 (beta)"
 Cohesion: 0.24
@@ -288,8 +286,8 @@ Cohesion: 0.29
 Nodes (4): BESSEL_e2, besselToWgs84(), transformGeom(), WGS84_e2
 
 ### Community 41 - "tvas-energy.test.mjs"
-Cohesion: 0.17
-Nodes (16): arrivalBatteryPoints(), bubbleSide(), buildChargerSocPlan(), buildEvPopup(), chargingStops(), _distM(), evChargerColor(), evChargerLayerKey() (+8 more)
+Cohesion: 0.12
+Nodes (24): arrivalBatteryLabelHtml(), arrivalBatteryPoints(), _batteryColor(), bubbleSide(), buildArrivalBatteryPopup(), buildChargerSocPlan(), buildEvPopup(), chargerSocBubbleHtml() (+16 more)
 
 ### Community 42 - "MockGPS 재생 보간"
 Cohesion: 0.62
@@ -351,9 +349,9 @@ Nodes (5): angleName(), angleToArrow(), buildLanePopup(), laneIconHtml(), render
 Cohesion: 0.60
 Nodes (5): addViaMarker(), removeWp(), setWaypoint(), updateWpBar(), wpIconHtml()
 
-### Community 58 - "showRouteAnchors"
-Cohesion: 0.25
-Nodes (9): showRouteAnchors(), buildEndpointLabel(), buildWaypointPopup(), departIconHtml(), destIconHtml(), formatPoiId(), renderEndpoints(), renderWaypoints() (+1 more)
+### Community 58 - "addViaMarker"
+Cohesion: 0.60
+Nodes (5): addViaMarker(), removeWp(), setWaypoint(), updateWpBar(), wpIconHtml()
 
 ### Community 62 - "파일 스캔 (app.js)"
 Cohesion: 0.50
@@ -362,14 +360,6 @@ Nodes (4): collectFromEntry(), getFilesFromDataTransfer(), onScanProgress(), set
 ### Community 65 - "샘플 캐러셀"
 Cohesion: 0.67
 Nodes (3): goToSlide, nextSlide, startAutoPlay
-
-### Community 71 - "renderLogs"
-Cohesion: 0.57
-Nodes (7): formatTimestamp(), esc(), field(), renderLogs(), routePopupHtml(), ttsPopupHtml(), displayResults()
-
-### Community 72 - "renderRoadNames"
-Cohesion: 0.67
-Nodes (3): buildRoadNameLabels(), renderRoadNames(), roadNameLabelIconHtml()
 
 ## Knowledge Gaps
 - **295 isolated node(s):** `DLT_MARKER`, `_utf8`, `_markerPositions`, `GPS_INTERESTING_STRINGS`, `ROUTE_TTS_INTERESTING_STRINGS` (+290 more)
@@ -382,13 +372,13 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `DltLogViewer index.html (내비 데이터 뷰어)` connect `뷰어 인라인 스크립트` to `CLAUDE.md TDD 지침`, `Beta 경로 POI 검색`, `좌표검색·CORS`, `Mock GPS 재생 UI`, `Mock GPS 설치`, `인증 게이트·도구 페이지`, `도움말 개념`?**
   _High betweenness centrality (0.008) - this node is a cross-community bridge._
 - **Why does `honor436 개발 도구 모음 (메인 인덱스)` connect `인증 게이트·도구 페이지` to `뷰어 인라인 스크립트`?**
-  _High betweenness centrality (0.007) - this node is a cross-community bridge._
+  _High betweenness centrality (0.006) - this node is a cross-community bridge._
 - **Why does `서버 테스트 — Tmap 요청 테스터` connect `인증 게이트·도구 페이지` to `DltLogViewer/js/poi-search.js`?**
-  _High betweenness centrality (0.007) - this node is a cross-community bridge._
+  _High betweenness centrality (0.006) - this node is a cross-community bridge._
 - **What connects `DLT_MARKER`, `_utf8`, `_markerPositions` to the rest of the system?**
   _295 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `좌표 변환·DLT 파서` be split into smaller, more focused modules?**
-  _Cohesion score 0.05406746031746032 - nodes in this community are weakly interconnected._
+- **Should `DltLogViewer/js/extractor.js` be split into smaller, more focused modules?**
+  _Cohesion score 0.052214452214452214 - nodes in this community are weakly interconnected._
 - **Should `ImageMapper 앱` be split into smaller, more focused modules?**
   _Cohesion score 0.10344827586206896 - nodes in this community are weakly interconnected._
 - **Should `DltLogViewer-beta/js/extractor.js` be split into smaller, more focused modules?**
